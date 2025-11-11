@@ -1,8 +1,6 @@
-// COPY THIS ENTIRE CODE and replace your app/browse/page.tsx
-
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -25,7 +23,8 @@ interface Listing {
   }
 }
 
-export default function BrowsePage() {
+// Separate component that uses useSearchParams
+function BrowseContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [listings, setListings] = useState<Listing[]>([])
@@ -536,5 +535,21 @@ export default function BrowsePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Main component wrapped with Suspense
+export default function BrowsePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+          <p className="text-white mt-4">Loading...</p>
+        </div>
+      </div>
+    }>
+      <BrowseContent />
+    </Suspense>
   )
 }
