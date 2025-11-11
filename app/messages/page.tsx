@@ -1,8 +1,6 @@
-// Create a new file: app/messages/page.tsx
-
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -42,7 +40,8 @@ interface Message {
   }
 }
 
-export default function MessagesPage() {
+// Component that uses useSearchParams
+function MessagesContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -495,5 +494,21 @@ export default function MessagesPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Main component wrapped with Suspense
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
+          <p className="text-white mt-4">Loading...</p>
+        </div>
+      </div>
+    }>
+      <MessagesContent />
+    </Suspense>
   )
 }
