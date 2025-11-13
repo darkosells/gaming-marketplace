@@ -1,4 +1,4 @@
-// Create a new file: app/login/page.tsx
+// app/login/page.tsx - FIXED VERSION
 
 'use client'
 
@@ -28,8 +28,24 @@ export default function LoginPage() {
 
       if (error) throw error
 
-      // Redirect to dashboard after successful login
-      router.push('/dashboard')
+      // Get user profile to check role
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, is_admin')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profileError) throw profileError
+
+      // Redirect based on role
+      if (profile.is_admin) {
+        router.push('/admin')
+      } else if (profile.role === 'vendor') {
+        router.push('/dashboard')
+      } else {
+        router.push('/customer-dashboard')
+      }
+
       router.refresh()
     } catch (error: any) {
       setError(error.message || 'Failed to login')
