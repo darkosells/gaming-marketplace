@@ -1,4 +1,4 @@
-// Create a new file: app/customer-dashboard/page.tsx
+// app/customer-dashboard/page.tsx - FIXED CUSTOMER DASHBOARD
 
 'use client'
 
@@ -35,31 +35,43 @@ export default function CustomerDashboardPage() {
   }
 
   const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        router.push('/login')
+        return
+      }
+
+      setUser(user)
+
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError)
+        router.push('/login')
+        return
+      }
+
+      setProfile(profileData)
+
+      // CRITICAL: Redirect vendors to vendor dashboard
+      if (profileData?.role === 'vendor') {
+        console.log('User is a vendor, redirecting to vendor dashboard')
+        router.push('/dashboard')
+        return
+      }
+
+      await fetchMyOrders(user.id)
+      setLoading(false)
+    } catch (error) {
+      console.error('Check user error:', error)
       router.push('/login')
-      return
     }
-
-    setUser(user)
-
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    setProfile(profileData)
-
-    // Redirect vendors to vendor dashboard
-    if (profileData?.role === 'vendor') {
-      router.push('/dashboard')
-      return
-    }
-
-    await fetchMyOrders(user.id)
-    setLoading(false)
   }
 
   const fetchMyOrders = async (userId: string) => {
@@ -78,7 +90,11 @@ export default function CustomerDashboardPage() {
         .eq('buyer_id', userId)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Fetch orders error:', error)
+        return
+      }
+      
       setMyOrders(data || [])
     } catch (error) {
       console.error('Error fetching orders:', error)
@@ -121,6 +137,24 @@ export default function CustomerDashboardPage() {
     )
   }
 
+  // If we get here and user is not a customer, show error
+  if (profile?.role !== 'customer') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-white mb-4">Access Denied</h1>
+          <p className="text-gray-400 mb-6">This page is for customers only.</p>
+          <Link href="/dashboard" className="text-purple-400 hover:text-purple-300">
+            Go to Vendor Dashboard →
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const pendingOrders = myOrders.filter(o => o.status === 'pending')
+  const completedOrders = myOrders.filter(o => o.status === 'completed')
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Navigation */}
@@ -138,6 +172,9 @@ export default function CustomerDashboardPage() {
               <Link href="/browse" className="text-gray-300 hover:text-white transition">
                 Browse
               </Link>
+              <Link href="/messages" className="text-gray-300 hover:text-white transition">
+                Messages
+              </Link>
               <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -152,15 +189,21 @@ export default function CustomerDashboardPage() {
                 <button className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition">
                   <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                     <span className="text-white font-semibold text-sm">
-                      {profile?.username?.charAt(0).toUpperCase() || 'U'}
+                      {profile?.username?.charAt(0).toUpperCase() || 'C'}
                     </span>
                   </div>
-                  <span className="text-white">{profile?.username || 'Account'}</span>
+                  <span className="text-white">{profile?.username || 'Customer'}</span>
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
                 </button>
                 
                 <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-2xl border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999]">
                   <Link href="/customer-dashboard" className="block px-4 py-3 text-white hover:bg-white/10 rounded-t-lg">
                     My Account
+                  </Link>
+                  <Link href="/messages" className="block px-4 py-3 text-white hover:bg-white/10">
+                    Messages
                   </Link>
                   <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/10 rounded-b-lg">
                     Logout
@@ -178,81 +221,69 @@ export default function CustomerDashboardPage() {
           {/* Welcome Section */}
           <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 mb-8">
             <h1 className="text-4xl font-bold text-white mb-2">
-              Welcome, {profile?.username}! 👋
+              Welcome, {profile?.username}!
             </h1>
-            <p className="text-gray-400 mb-4">
-              Email: {user?.email}
+            <p className="text-gray-300">
+              Manage your orders and account here.
             </p>
-            <div className="flex items-center gap-2">
-              <span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm font-semibold">
-                Customer Account
-              </span>
-            </div>
           </div>
 
-          {/* Quick Stats */}
+          {/* Stats */}
           <div className="grid md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-6">
-              <div className="text-3xl mb-2">🛒</div>
-              <h3 className="text-white font-semibold mb-1">Total Orders</h3>
-              <p className="text-3xl font-bold text-white">{myOrders.length}</p>
+            <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
+              <div className="text-3xl mb-2">📦</div>
+              <div className="text-gray-400 text-sm">Total Orders</div>
+              <div className="text-3xl font-bold text-white">{myOrders.length}</div>
             </div>
-
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-6">
+            <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
               <div className="text-3xl mb-2">⏳</div>
-              <h3 className="text-white font-semibold mb-1">Pending Orders</h3>
-              <p className="text-3xl font-bold text-white">
-                {myOrders.filter(o => o.status === 'pending').length}
-              </p>
+              <div className="text-gray-400 text-sm">Pending</div>
+              <div className="text-3xl font-bold text-white">{pendingOrders.length}</div>
             </div>
-
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-6">
+            <div className="bg-gradient-to-br from-green-500/20 to-blue-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
               <div className="text-3xl mb-2">✅</div>
-              <h3 className="text-white font-semibold mb-1">Completed</h3>
-              <p className="text-3xl font-bold text-white">
-                {myOrders.filter(o => o.status === 'completed').length}
-              </p>
+              <div className="text-gray-400 text-sm">Completed</div>
+              <div className="text-3xl font-bold text-white">{completedOrders.length}</div>
             </div>
           </div>
 
           {/* Quick Actions */}
           <div className="grid md:grid-cols-3 gap-6 mb-8">
-            <Link href="/browse" className="group">
-              <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-6 transition">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition">🔍</div>
-                <h3 className="text-lg font-bold text-white mb-1">Browse Marketplace</h3>
-                <p className="text-sm text-gray-400">Find gaming accounts and items</p>
-              </div>
-            </Link>
-
-            <button 
-              onClick={() => alert('Messaging feature coming soon!')}
-              className="group text-left"
+            <Link
+              href="/browse"
+              className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 hover:border-purple-500/50 transition group"
             >
-              <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-6 transition">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition">💬</div>
-                <h3 className="text-lg font-bold text-white mb-1">Messages</h3>
-                <p className="text-sm text-gray-400">Contact sellers</p>
-              </div>
-            </button>
-
-            <Link href="/customer-dashboard" className="group">
-              <div className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-6 transition">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition">⚙️</div>
-                <h3 className="text-lg font-bold text-white mb-1">Account Settings</h3>
-                <p className="text-sm text-gray-400">Manage your account</p>
-              </div>
+              <div className="text-4xl mb-3">🎮</div>
+              <h3 className="text-xl font-bold text-white mb-2">Browse Listings</h3>
+              <p className="text-gray-400 text-sm">Find gaming accounts, top-ups & keys</p>
+            </Link>
+            <Link
+              href="/messages"
+              className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 hover:border-purple-500/50 transition group"
+            >
+              <div className="text-4xl mb-3">💬</div>
+              <h3 className="text-xl font-bold text-white mb-2">Messages</h3>
+              <p className="text-gray-400 text-sm">Chat with sellers</p>
+            </Link>
+            <Link
+              href="/customer-dashboard"
+              className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 hover:border-purple-500/50 transition group"
+            >
+              <div className="text-4xl mb-3">⚙️</div>
+              <h3 className="text-xl font-bold text-white mb-2">Settings</h3>
+              <p className="text-gray-400 text-sm">Manage your account</p>
             </Link>
           </div>
 
-          {/* My Orders */}
+          {/* Recent Orders */}
           <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 mb-8">
-            <h2 className="text-2xl font-bold text-white mb-6">My Orders</h2>
+            <h2 className="text-2xl font-bold text-white mb-6">Recent Orders</h2>
+
             {myOrders.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-6xl mb-4">📭</div>
-                <p className="text-gray-400 mb-2">No orders yet</p>
-                <p className="text-sm text-gray-500 mb-4">Start shopping to see your orders here</p>
+                <div className="text-5xl mb-4">📭</div>
+                <h3 className="text-xl font-bold text-white mb-2">No orders yet</h3>
+                <p className="text-gray-400 mb-6">Start shopping to see your orders here!</p>
                 <Link
                   href="/browse"
                   className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition"
@@ -262,52 +293,37 @@ export default function CustomerDashboardPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {myOrders.map((order) => (
-                  <div key={order.id} className="bg-white/5 border border-white/10 rounded-xl p-6">
+                {myOrders.map((order: any) => (
+                  <div key={order.id} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:border-purple-500/50 transition">
                     <div className="flex items-center gap-4">
-                      {/* Image */}
-                      <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                      <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
                         {order.listing?.image_url ? (
-                          <img
-                            src={order.listing.image_url}
-                            alt={order.listing.title}
-                            className="w-full h-full object-cover"
-                          />
+                          <img src={order.listing.image_url} alt={order.listing.title} className="w-full h-full object-cover rounded-lg" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-3xl">
-                              {order.listing?.category === 'account' ? '🎮' : order.listing?.category === 'topup' ? '💰' : '🔑'}
-                            </span>
-                          </div>
+                          <span className="text-2xl">
+                            {order.listing?.category === 'account' ? '🎮' : order.listing?.category === 'topup' ? '💰' : '🔑'}
+                          </span>
                         )}
                       </div>
-
-                      {/* Details */}
                       <div className="flex-1">
-                        <h3 className="text-white font-semibold mb-1">{order.listing?.title || 'Item'}</h3>
-                        <p className="text-sm text-gray-400 mb-2">{order.listing?.game}</p>
-                        <div className="flex items-center gap-4">
-                          <span className="text-green-400 font-bold">${order.amount.toFixed(2)}</span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            order.status === 'completed' 
-                              ? 'bg-green-500/20 text-green-400' 
-                              : order.status === 'pending'
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {new Date(order.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
+                        <h4 className="text-white font-semibold">{order.listing?.title || 'Unknown Item'}</h4>
+                        <p className="text-sm text-gray-400">{order.listing?.game || 'N/A'}</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(order.created_at).toLocaleDateString()}
+                        </p>
                       </div>
-
-                      {/* Action */}
-                      <button
-                        onClick={() => alert('Order details coming soon!')}
-                        className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition"
-                      >
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-white">${order.amount}</p>
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                          order.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                          order.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                          order.status === 'disputed' ? 'bg-red-500/20 text-red-400' :
+                          'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                        </span>
+                      </div>
+                      <button className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition">
                         View Details
                       </button>
                     </div>
@@ -317,7 +333,7 @@ export default function CustomerDashboardPage() {
             )}
           </div>
 
-          {/* Become Vendor Card - Moved to bottom */}
+          {/* Become Vendor Card */}
           <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-8">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div>

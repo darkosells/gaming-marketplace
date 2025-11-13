@@ -1,4 +1,4 @@
-// COPY THIS ENTIRE CODE and replace your app/dashboard/page.tsx
+// app/dashboard/page.tsx - VENDOR DASHBOARD WITH QUICK ACTIONS
 
 'use client'
 
@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 
-export default function DashboardPage() {
+export default function VendorDashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -20,7 +20,6 @@ export default function DashboardPage() {
     checkUser()
     checkCart()
     
-    // Listen for cart updates
     const handleStorageChange = () => checkCart()
     window.addEventListener('storage', handleStorageChange)
     window.addEventListener('cart-updated', handleStorageChange)
@@ -36,34 +35,41 @@ export default function DashboardPage() {
   }
 
   const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        router.push('/login')
+        return
+      }
+
+      setUser(user)
+
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError)
+        router.push('/login')
+        return
+      }
+
+      setProfile(profileData)
+
+      if (profileData?.role !== 'vendor') {
+        router.push('/customer-dashboard')
+        return
+      }
+
+      await fetchMyListings(user.id)
+      setLoading(false)
+    } catch (error) {
+      console.error('Check user error:', error)
       router.push('/login')
-      return
     }
-
-    setUser(user)
-
-    // Get profile data
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    setProfile(profileData)
-
-    // Redirect customers to customer dashboard
-    if (profileData?.role === 'customer') {
-      router.push('/customer-dashboard')
-      return
-    }
-
-    // Fetch user's listings
-    await fetchMyListings(user.id)
-    
-    setLoading(false)
   }
 
   const fetchMyListings = async (userId: string) => {
@@ -74,7 +80,11 @@ export default function DashboardPage() {
         .eq('seller_id', userId)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Fetch listings error:', error)
+        return
+      }
+      
       setMyListings(data || [])
     } catch (error) {
       console.error('Error fetching listings:', error)
@@ -93,6 +103,23 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  if (profile?.role !== 'vendor') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-white mb-4">Access Denied</h1>
+          <p className="text-gray-400 mb-6">You need to be a vendor to access this page.</p>
+          <Link href="/customer-dashboard" className="text-purple-400 hover:text-purple-300">
+            Go to Customer Dashboard →
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const activeListings = myListings.filter(l => l.status === 'active')
+  const totalPurchases = 0
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -114,7 +141,9 @@ export default function DashboardPage() {
               <Link href="/sell" className="text-gray-300 hover:text-white transition">
                 Sell
               </Link>
-              {/* Cart Icon */}
+              <Link href="/messages" className="text-gray-300 hover:text-white transition">
+                Messages
+              </Link>
               <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -129,19 +158,24 @@ export default function DashboardPage() {
                 <button className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition">
                   <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                     <span className="text-white font-semibold text-sm">
-                      {profile?.username?.charAt(0).toUpperCase() || 'U'}
+                      {profile?.username?.charAt(0).toUpperCase() || 'V'}
                     </span>
                   </div>
-                  <span className="text-white">{profile?.username || 'Account'}</span>
+                  <span className="text-white">{profile?.username || 'Vendor'}</span>
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
                 </button>
                 
-                {/* Dropdown Menu */}
                 <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-2xl border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999]">
                   <Link href="/dashboard" className="block px-4 py-3 text-white hover:bg-white/10 rounded-t-lg">
                     Dashboard
                   </Link>
                   <Link href="/sell" className="block px-4 py-3 text-white hover:bg-white/10">
                     Create Listing
+                  </Link>
+                  <Link href="/messages" className="block px-4 py-3 text-white hover:bg-white/10">
+                    Messages
                   </Link>
                   <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/10 rounded-b-lg">
                     Logout
@@ -159,61 +193,79 @@ export default function DashboardPage() {
           {/* Welcome Section */}
           <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 mb-8">
             <h1 className="text-4xl font-bold text-white mb-2">
-              Welcome back, {profile?.username}! 👋
+              Vendor Dashboard
             </h1>
-            <p className="text-gray-400">
-              Email: {user?.email}
+            <p className="text-gray-300">
+              Welcome back, {profile?.username}! Manage your listings and sales here.
             </p>
           </div>
 
-          {/* Quick Stats */}
+          {/* Stats */}
           <div className="grid md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-6">
-              <div className="text-3xl mb-2">🛒</div>
-              <h3 className="text-white font-semibold mb-1">Purchases</h3>
-              <p className="text-3xl font-bold text-white">0</p>
-            </div>
-
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-6">
+            <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
               <div className="text-3xl mb-2">💰</div>
-              <h3 className="text-white font-semibold mb-1">Active Listings</h3>
-              <p className="text-3xl font-bold text-white">{myListings.filter(l => l.status === 'active').length}</p>
+              <div className="text-gray-400 text-sm">Total Purchases</div>
+              <div className="text-3xl font-bold text-white">{totalPurchases}</div>
             </div>
-
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl p-6">
+            <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
+              <div className="text-3xl mb-2">📦</div>
+              <div className="text-gray-400 text-sm">Active Listings</div>
+              <div className="text-3xl font-bold text-white">{activeListings.length}</div>
+            </div>
+            <div className="bg-gradient-to-br from-green-500/20 to-blue-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
               <div className="text-3xl mb-2">⭐</div>
-              <h3 className="text-white font-semibold mb-1">Rating</h3>
-              <p className="text-3xl font-bold text-white">{profile?.rating || '0.0'}</p>
+              <div className="text-gray-400 text-sm">Rating</div>
+              <div className="text-3xl font-bold text-white">
+                {profile?.rating > 0 ? profile.rating.toFixed(1) : 'New'}
+              </div>
             </div>
           </div>
 
-          {/* Action Cards */}
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            <Link href="/sell" className="group">
-              <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 backdrop-blur-lg border border-white/10 rounded-2xl p-8 hover:border-purple-500/50 transition-all">
-                <div className="text-5xl mb-4 group-hover:scale-110 transition">📝</div>
-                <h3 className="text-2xl font-bold text-white mb-2">Create a Listing</h3>
-                <p className="text-gray-400">Start selling your gaming accounts, items, or keys</p>
-              </div>
+          {/* Quick Actions */}
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <Link
+              href="/sell"
+              className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 hover:border-purple-500/50 transition group"
+            >
+              <div className="text-4xl mb-3">📝</div>
+              <h3 className="text-xl font-bold text-white mb-2">Create Listing</h3>
+              <p className="text-gray-400 text-sm">List a new item for sale</p>
             </Link>
-
-            <Link href="/browse" className="group">
-              <div className="bg-gradient-to-br from-pink-500/20 to-pink-600/20 backdrop-blur-lg border border-white/10 rounded-2xl p-8 hover:border-pink-500/50 transition-all">
-                <div className="text-5xl mb-4 group-hover:scale-110 transition">🔍</div>
-                <h3 className="text-2xl font-bold text-white mb-2">Browse Listings</h3>
-                <p className="text-gray-400">Find accounts, top-ups, and game keys</p>
-              </div>
+            <Link
+              href="/messages"
+              className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 hover:border-purple-500/50 transition group"
+            >
+              <div className="text-4xl mb-3">💬</div>
+              <h3 className="text-xl font-bold text-white mb-2">Messages</h3>
+              <p className="text-gray-400 text-sm">Chat with buyers</p>
+            </Link>
+            <Link
+              href="/browse"
+              className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 hover:border-purple-500/50 transition group"
+            >
+              <div className="text-4xl mb-3">🎮</div>
+              <h3 className="text-xl font-bold text-white mb-2">Browse</h3>
+              <p className="text-gray-400 text-sm">Explore the marketplace</p>
             </Link>
           </div>
 
           {/* My Listings */}
           <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8">
-            <h2 className="text-2xl font-bold text-white mb-6">My Listings</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">My Listings</h2>
+              <Link
+                href="/sell"
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition"
+              >
+                + Create Listing
+              </Link>
+            </div>
+
             {myListings.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-6xl mb-4">📭</div>
-                <p className="text-gray-400">No listings yet</p>
-                <p className="text-sm text-gray-500 mt-2 mb-4">Start selling by creating your first listing</p>
+                <div className="text-5xl mb-4">📦</div>
+                <h3 className="text-xl font-bold text-white mb-2">No listings yet</h3>
+                <p className="text-gray-400 mb-6">Create your first listing to start selling!</p>
                 <Link
                   href="/sell"
                   className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition"
@@ -224,56 +276,42 @@ export default function DashboardPage() {
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {myListings.map((listing) => (
-                  <div key={listing.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                    {/* Image */}
+                  <div key={listing.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition">
                     <div className="relative h-40 bg-gradient-to-br from-purple-500/20 to-pink-500/20">
                       {listing.image_url ? (
-                        <img
-                          src={listing.image_url}
-                          alt={listing.title}
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={listing.image_url} alt={listing.title} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-5xl">
-                            {listing.category === 'account' ? '🎮' : listing.category === 'topup' ? '💰' : '🔑'}
-                          </span>
+                        <div className="w-full h-full flex items-center justify-center text-5xl">
+                          {listing.category === 'account' ? '🎮' : listing.category === 'topup' ? '💰' : '🔑'}
                         </div>
                       )}
-                      {/* Status Badge */}
                       <div className="absolute top-2 right-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          listing.status === 'active' 
-                            ? 'bg-green-500/20 text-green-400 border border-green-500/50' 
-                            : listing.status === 'sold'
-                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
-                            : 'bg-gray-500/20 text-gray-400 border border-gray-500/50'
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          listing.status === 'active' ? 'bg-green-500/90 text-white' :
+                          listing.status === 'sold' ? 'bg-gray-500/90 text-white' :
+                          'bg-red-500/90 text-white'
                         }`}>
                           {listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
                         </span>
                       </div>
                     </div>
-
-                    {/* Content */}
                     <div className="p-4">
-                      <p className="text-xs text-purple-400 font-semibold mb-1">{listing.game}</p>
-                      <h3 className="text-white font-semibold mb-2 line-clamp-2">{listing.title}</h3>
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-xl font-bold text-green-400">${listing.price.toFixed(2)}</p>
-                        <p className="text-sm text-gray-400">{listing.stock} in stock</p>
+                      <h3 className="text-white font-semibold mb-1 truncate">{listing.title}</h3>
+                      <p className="text-sm text-gray-400 mb-2">{listing.game}</p>
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-xl font-bold text-white">${listing.price}</span>
+                        <span className="text-sm text-gray-400">Stock: {listing.stock}</span>
                       </div>
-
-                      {/* Action Buttons */}
                       <div className="flex gap-2">
                         <Link
                           href={`/listing/${listing.id}`}
-                          className="flex-1 bg-white/5 hover:bg-white/10 text-white py-2 px-3 rounded-lg text-sm font-semibold text-center transition"
+                          className="flex-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 py-2 rounded-lg text-sm font-semibold text-center transition"
                         >
                           View
                         </Link>
                         <Link
                           href={`/listing/${listing.id}/edit`}
-                          className="flex-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 py-2 px-3 rounded-lg text-sm font-semibold text-center transition"
+                          className="flex-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 py-2 rounded-lg text-sm font-semibold text-center transition"
                         >
                           Edit
                         </Link>
