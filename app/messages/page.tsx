@@ -312,7 +312,7 @@ function MessagesContent() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-purple-400 mb-1">{conv.listing?.title}</p>
+                            <p className="text-xs text-purple-400 mb-1">{conv.listing?.title || 'Unknown Item'}</p>
                             <p className="text-xs text-gray-400 truncate">{conv.last_message}</p>
                           </div>
                         </div>
@@ -343,7 +343,7 @@ function MessagesContent() {
                             ? selectedConversation.seller.username 
                             : selectedConversation.buyer.username}
                         </h3>
-                        <p className="text-sm text-purple-400">{selectedConversation.listing.title}</p>
+                        <p className="text-sm text-purple-400">{selectedConversation.listing?.title || 'Unknown Item'}</p>
                       </div>
                       {isSeller && selectedConversation.order && selectedConversation.order.status === 'pending' && (
                         <button

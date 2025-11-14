@@ -21,6 +21,8 @@ interface Listing {
   profiles: {
     username: string
     rating: number
+    total_reviews: number
+    average_rating: number
   }
 }
 
@@ -68,7 +70,9 @@ function BrowseContent() {
           *,
           profiles (
             username,
-            rating
+            rating,
+            total_reviews,
+            average_rating
           )
         `)
         .eq('status', 'active')
@@ -415,10 +419,21 @@ function BrowseContent() {
 
                           {/* Seller Info */}
                           <div className="text-right">
-                            <p className="text-xs text-gray-400">Seller</p>
+                            <p className="text-xs text-gray-400 mb-1">Seller</p>
                             <p className="text-sm text-white font-semibold">{listing.profiles?.username}</p>
-                            {listing.profiles?.rating > 0 && (
-                              <p className="text-xs text-yellow-400">★ {listing.profiles.rating.toFixed(1)}</p>
+                            {/* ✅ UPDATED: Show rating and review count */}
+                            {listing.profiles?.average_rating > 0 ? (
+                              <div className="flex items-center justify-end gap-1 mt-1">
+                                <span className="text-yellow-400 text-sm">★</span>
+                                <span className="text-xs text-yellow-400 font-semibold">
+                                  {listing.profiles.average_rating.toFixed(1)}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  ({listing.profiles.total_reviews || 0})
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-gray-500 mt-1">No reviews yet</p>
                             )}
                           </div>
                         </div>

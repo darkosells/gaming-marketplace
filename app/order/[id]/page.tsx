@@ -57,13 +57,19 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [showDisputeForm, setShowDisputeForm] = useState(false)
+  const [showReviewModal, setShowReviewModal] = useState(false)
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null)
   
   // Dispute form state
   const [disputeReason, setDisputeReason] = useState('')
   const [disputeDescription, setDisputeDescription] = useState('')
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([])
-
+  
+  // Review form state
+  const [rating, setRating] = useState(0)
+  const [hoveredRating, setHoveredRating] = useState(0)
+  const [reviewComment, setReviewComment] = useState('')
+  const [hasReviewed, setHasReviewed] = useState(false)
   useEffect(() => {
     checkAuth()
   }, [])
@@ -116,7 +122,6 @@ export default function OrderDetailPage() {
         .from('orders')
         .select(`
           *,
-          listing:listings(title, game, category, image_url, delivery_type),
           buyer:profiles!buyer_id(username),
           seller:profiles!seller_id(username)
         `)
@@ -131,7 +136,19 @@ export default function OrderDetailPage() {
         return
       }
 
-      setOrder(data)
+      // Build listing object from snapshot data stored in order
+      const orderWithListing = {
+        ...data,
+        listing: {
+          title: data.listing_title || 'Unknown Item',
+          game: data.listing_game || 'N/A',
+          category: data.listing_category || 'account',
+          image_url: data.listing_image_url || null,
+          delivery_type: data.listing_delivery_type || 'manual'
+        }
+      }
+
+      setOrder(orderWithListing)
 
       // Fetch dispute if exists
       if (data.status === 'dispute_raised') {
@@ -145,6 +162,19 @@ export default function OrderDetailPage() {
 
         if (disputeData) {
           setDispute(disputeData)
+        }
+      }
+
+      // Check if user has already reviewed this order
+      if (data.status === 'completed' && data.buyer_id === user.id) {
+        const { data: reviewData } = await supabase
+          .from('reviews')
+          .select('id')
+          .eq('order_id', params.id)
+          .single()
+
+        if (reviewData) {
+          setHasReviewed(true)
         }
       }
     } catch (error: any) {
@@ -181,7 +211,7 @@ export default function OrderDetailPage() {
   }
 
   const handleConfirmReceipt = async () => {
-    if (!confirm('Confirm that you received the item? This will complete the order and you can leave a review.')) return
+    if (!confirm('Confirm that you received the item? This will complete the order.')) return
 
     setActionLoading(true)
     try {
@@ -195,8 +225,8 @@ export default function OrderDetailPage() {
 
       if (error) throw error
 
-      // TODO: Show review modal/form here
-      alert('Order completed! Thank you for your purchase.\n\n(Review system coming soon!)')
+      // Show review modal
+      setShowReviewModal(true)
       fetchOrder()
     } catch (error: any) {
       console.error('Error:', error)
@@ -256,6 +286,37 @@ export default function OrderDetailPage() {
     } catch (error: any) {
       console.error('Error:', error)
       alert('Failed to raise dispute: ' + error.message)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleSubmitReview = async () => {
+    if (rating === 0) {
+      alert('Please select a star rating')
+      return
+    }
+
+    setActionLoading(true)
+    try {
+      // Don't send seller_id - trigger will auto-populate it from order
+      const { error } = await supabase
+        .from('reviews')
+        .insert({
+          order_id: params.id,
+          buyer_id: user.id,
+          rating: rating,
+          comment: reviewComment.trim() || null
+        })
+
+      if (error) throw error
+
+      setShowReviewModal(false)
+      setHasReviewed(true)
+      alert('Thank you for your review!')
+    } catch (error: any) {
+      console.error('Error:', error)
+      alert('Failed to submit review: ' + error.message)
     } finally {
       setActionLoading(false)
     }
@@ -376,19 +437,19 @@ export default function OrderDetailPage() {
             <div className="flex gap-6">
               {/* Image */}
               <div className="w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                {order.listing.image_url ? (
+                {order.listing?.image_url ? (
                   <img src={order.listing.image_url} alt={order.listing.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-5xl">
-                    {order.listing.category === 'account' ? '🎮' : order.listing.category === 'topup' ? '💰' : '🔑'}
+                    {order.listing?.category === 'account' ? '🎮' : order.listing?.category === 'topup' ? '💰' : '🔑'}
                   </div>
                 )}
               </div>
 
               {/* Details */}
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-white mb-2">{order.listing.title}</h2>
-                <p className="text-purple-400 mb-4">{order.listing.game}</p>
+                <h2 className="text-2xl font-bold text-white mb-2">{order.listing?.title || 'Unknown Item'}</h2>
+                <p className="text-purple-400 mb-4">{order.listing?.game || 'Unknown Game'}</p>
                 
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
@@ -402,7 +463,7 @@ export default function OrderDetailPage() {
                   <div>
                     <p className="text-sm text-gray-400">Delivery Type</p>
                     <p className="text-white font-semibold">
-                      {order.listing.delivery_type === 'automatic' ? '⚡ Automatic' : '👤 Manual'}
+                      {order.listing?.delivery_type === 'automatic' ? '⚡ Automatic' : '👤 Manual'}
                     </p>
                   </div>
                   <div>
@@ -725,15 +786,110 @@ export default function OrderDetailPage() {
               )}
 
               {/* Automatic Delivery Info */}
-              {order.listing.delivery_type === 'automatic' && (order.status === 'delivered' || order.status === 'completed') && (
+              {order.listing?.delivery_type === 'automatic' && (order.status === 'delivered' || order.status === 'completed') && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                   <p className="text-blue-400 text-sm">
                     ⚡ This order was automatically delivered. Check your messages for the delivery code.
                   </p>
                 </div>
               )}
+
+              {/* Leave Review Button for Completed Orders */}
+              {isBuyer && order.status === 'completed' && !hasReviewed && (
+                <button
+                  onClick={() => setShowReviewModal(true)}
+                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-yellow-500/50 transition"
+                >
+                  ⭐ Leave a Review
+                </button>
+              )}
+
+              {/* Already Reviewed Message */}
+              {isBuyer && order.status === 'completed' && hasReviewed && (
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                  <p className="text-green-400 text-sm text-center">
+                    ✓ You have already reviewed this order. Thank you!
+                  </p>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Review Modal */}
+          {showReviewModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-gradient-to-br from-slate-900 to-purple-900 border-2 border-purple-500/50 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+                <h2 className="text-3xl font-bold text-white mb-2">Rate Your Experience</h2>
+                <p className="text-gray-300 mb-6">How was your purchase from {order?.seller.username}?</p>
+
+                {/* Star Rating */}
+                <div className="flex justify-center gap-2 mb-6">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onMouseEnter={() => setHoveredRating(star)}
+                      onMouseLeave={() => setHoveredRating(0)}
+                      onClick={() => setRating(star)}
+                      className="text-5xl transition-transform hover:scale-110"
+                    >
+                      {star <= (hoveredRating || rating) ? (
+                        <span className="text-yellow-400">★</span>
+                      ) : (
+                        <span className="text-gray-600">★</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {rating > 0 && (
+                  <p className="text-center text-white font-semibold mb-4">
+                    {rating === 1 && "Poor"}
+                    {rating === 2 && "Fair"}
+                    {rating === 3 && "Good"}
+                    {rating === 4 && "Very Good"}
+                    {rating === 5 && "Excellent"}
+                  </p>
+                )}
+
+                {/* Review Comment (Optional) */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-white mb-2">
+                    Your Review (Optional)
+                  </label>
+                  <textarea
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Share details about your experience..."
+                    rows={4}
+                    maxLength={500}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500/50 focus:outline-none resize-none"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    {reviewComment.length}/500 characters
+                  </p>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSubmitReview}
+                    disabled={rating === 0 || actionLoading}
+                    className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Submit Review
+                  </button>
+                  <button
+                    onClick={() => setShowReviewModal(false)}
+                    disabled={actionLoading}
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-semibold border border-white/10 transition"
+                  >
+                    Skip for Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

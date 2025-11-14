@@ -24,6 +24,8 @@ interface Listing {
     username: string
     rating: number
     total_sales: number
+    total_reviews: number
+    average_rating: number
     verified: boolean
     created_at: string
   }
@@ -73,6 +75,8 @@ export default function ListingDetailPage() {
             username,
             rating,
             total_sales,
+            total_reviews,
+            average_rating,
             verified,
             created_at
           )
@@ -96,17 +100,34 @@ export default function ListingDetailPage() {
       const { data, error } = await supabase
         .from('reviews')
         .select(`
-          *,
-          profiles:reviewer_id (
-            username
-          )
+          id,
+          rating,
+          comment,
+          created_at,
+          buyer:profiles!reviews_buyer_id_fkey(username)
         `)
-        .eq('reviewee_id', listing.seller_id)
+        .eq('seller_id', listing.seller_id)
         .order('created_at', { ascending: false })
         .limit(10)
 
       if (error) throw error
-      setReviews(data || [])
+      
+      // Map the data to match the Review interface
+      const mappedReviews = (data || []).map((review: any) => {
+        const buyerData = Array.isArray(review.buyer) ? review.buyer[0] : review.buyer
+        return {
+          id: review.id,
+          rating: review.rating,
+          comment: review.comment,
+          created_at: review.created_at,
+          reviewer_id: '', // Not needed for display
+          profiles: {
+            username: buyerData?.username || 'Anonymous'
+          }
+        }
+      })
+      
+      setReviews(mappedReviews)
     } catch (error) {
       console.error('Error fetching reviews:', error)
     }
@@ -194,6 +215,17 @@ export default function ListingDetailPage() {
       console.error('Error creating order:', error)
       alert('Failed to create order: ' + error.message)
     }
+  }
+
+  // Censor username for privacy (e.g., "john123" -> "jo****3")
+  const censorUsername = (username: string) => {
+    if (!username || username.length <= 3) return username
+    
+    const firstTwo = username.substring(0, 2)
+    const lastOne = username.substring(username.length - 1)
+    const middle = '*'.repeat(Math.min(username.length - 3, 4)) // Max 4 stars
+    
+    return `${firstTwo}${middle}${lastOne}`
   }
 
   const handleAddToCart = () => {
@@ -443,7 +475,7 @@ export default function ListingDetailPage() {
                             </span>
                           </div>
                           <div>
-                            <p className="text-white font-semibold">{review.profiles.username}</p>
+                            <p className="text-white font-semibold">{censorUsername(review.profiles.username)}</p>
                             <div className="flex items-center">
                               {[...Array(5)].map((_, i) => (
                                 <span key={i} className={i < review.rating ? 'text-yellow-400' : 'text-gray-600'}>
@@ -457,7 +489,9 @@ export default function ListingDetailPage() {
                           {new Date(review.created_at).toLocaleDateString()}
                         </span>
                       </div>
-                      <p className="text-gray-300 text-sm">{review.comment}</p>
+                      {review.comment && (
+                        <p className="text-gray-300 text-sm">{review.comment}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -559,7 +593,7 @@ export default function ListingDetailPage() {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
-                    <Link href={`/seller/${listing.profiles.id}`} className="text-white font-semibold hover:text-purple-400 transition">
+                    <Link href={`/profile/${listing.profiles.id}`} className="text-white font-semibold hover:text-purple-400 transition">
                       {listing.profiles.username}
                     </Link>
                     {listing.profiles.verified && (
@@ -576,18 +610,22 @@ export default function ListingDetailPage() {
                   <div className="flex items-center space-x-2">
                     <span className="text-yellow-400">★</span>
                     <span className="text-white font-semibold">
-                      {listing.profiles.rating > 0 ? listing.profiles.rating.toFixed(1) : 'New'}
+                      {listing.profiles.average_rating > 0 
+                        ? listing.profiles.average_rating.toFixed(1) 
+                        : 'No reviews yet'}
                     </span>
                   </div>
                 </div>
                 <div className="flex justify-between py-2 border-b border-white/10">
-                  <span className="text-gray-400">Total Sales</span>
-                  <span className="text-white font-semibold">{listing.profiles.total_sales}</span>
+                  <span className="text-gray-400">Total Reviews</span>
+                  <span className="text-white font-semibold">
+                    {listing.profiles.total_reviews || 0}
+                  </span>
                 </div>
               </div>
 
               <Link
-                href={`/seller/${listing.profiles.id}`}
+                href={`/profile/${listing.profiles.id}`}
                 className="block w-full mt-4 bg-white/5 hover:bg-white/10 text-white py-2 rounded-lg font-semibold text-center border border-white/10 transition"
               >
                 View Profile

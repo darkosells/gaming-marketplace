@@ -1,4 +1,4 @@
-// app/customer-dashboard/page.tsx - FIXED CUSTOMER DASHBOARD WITH WORKING ORDER NAVIGATION
+// app/customer-dashboard/page.tsx - FIXED CUSTOMER DASHBOARD
 
 'use client'
 
@@ -76,28 +76,47 @@ export default function CustomerDashboardPage() {
 
   const fetchMyOrders = async (userId: string) => {
     try {
+      console.log('🔍 Fetching orders for user:', userId)
+      
       const { data, error } = await supabase
         .from('orders')
-        .select(`
-          *,
-          listing:listings (
-            title,
-            game,
-            image_url,
-            category
-          )
-        `)
+        .select('*')
         .eq('buyer_id', userId)
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Fetch orders error:', error)
+        console.error('❌ Fetch orders error:', error)
         return
       }
       
-      setMyOrders(data || [])
+      console.log('📦 Raw orders data from database:', data)
+      
+      // Use snapshot data stored in the order
+      const ordersWithListings = (data || []).map((order: any) => {
+        // Use snapshot data from order columns (fallback to 'Unknown' if not available)
+        const listingSnapshot = {
+          title: order.listing_title || 'Unknown Item',
+          game: order.listing_game || 'N/A',
+          category: order.listing_category || 'account',
+          image_url: order.listing_image_url || null
+        }
+        
+        console.log(`Order ${order.id}:`, {
+          hasSnapshot: !!order.listing_title,
+          listingTitle: listingSnapshot.title,
+          snapshotData: listingSnapshot
+        })
+        
+        return {
+          ...order,
+          listing: listingSnapshot
+        }
+      })
+      
+      console.log('✅ Final orders with listings:', ordersWithListings)
+      setMyOrders(ordersWithListings)
     } catch (error) {
-      console.error('Error fetching orders:', error)
+      console.error('💥 Error fetching orders:', error)
     }
   }
 
@@ -296,9 +315,10 @@ export default function CustomerDashboardPage() {
                 {myOrders.map((order: any) => (
                   <div key={order.id} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:border-purple-500/50 transition">
                     <div className="flex items-center gap-4">
+                      {/* ✅ FIXED: Added optional chaining for all listing properties */}
                       <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
                         {order.listing?.image_url ? (
-                          <img src={order.listing.image_url} alt={order.listing.title} className="w-full h-full object-cover rounded-lg" />
+                          <img src={order.listing.image_url} alt={order.listing.title || 'Item'} className="w-full h-full object-cover rounded-lg" />
                         ) : (
                           <span className="text-2xl">
                             {order.listing?.category === 'account' ? '🎮' : order.listing?.category === 'topup' ? '💰' : '🔑'}
@@ -323,7 +343,6 @@ export default function CustomerDashboardPage() {
                           {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                         </span>
                       </div>
-                      {/* ✅ FIXED: Added Link component with proper navigation */}
                       <Link
                         href={`/order/${order.id}`}
                         className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition inline-block"
