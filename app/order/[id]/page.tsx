@@ -21,6 +21,9 @@ interface Order {
   delivered_at: string | null
   dispute_reason: string | null
   dispute_opened_at: string | null
+  resolved_by: string | null
+  resolution_notes: string | null
+  resolution_type: string | null
   listing: {
     title: string
     game: string
@@ -52,8 +55,10 @@ export default function OrderDetailPage() {
   const supabase = createClient()
   
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [order, setOrder] = useState<Order | null>(null)
   const [dispute, setDispute] = useState<Dispute | null>(null)
+  const [adminActions, setAdminActions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [showDisputeForm, setShowDisputeForm] = useState(false)
@@ -70,15 +75,16 @@ export default function OrderDetailPage() {
   const [hoveredRating, setHoveredRating] = useState(0)
   const [reviewComment, setReviewComment] = useState('')
   const [hasReviewed, setHasReviewed] = useState(false)
+
   useEffect(() => {
     checkAuth()
   }, [])
 
   useEffect(() => {
-    if (user) {
+    if (user && profile) {
       fetchOrder()
     }
-  }, [user])
+  }, [user, profile])
 
   // Timer effect for 48-hour countdown
   useEffect(() => {
@@ -114,6 +120,15 @@ export default function OrderDetailPage() {
     }
 
     setUser(user)
+
+    // Fetch user profile to check admin status
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    setProfile(profileData)
   }
 
   const fetchOrder = async () => {
@@ -130,8 +145,9 @@ export default function OrderDetailPage() {
 
       if (error) throw error
 
-      // Check if user is part of this order
-      if (data.buyer_id !== user.id && data.seller_id !== user.id) {
+      // Check if user is part of this order OR is an admin
+      const isAdmin = profile?.is_admin === true
+      if (data.buyer_id !== user.id && data.seller_id !== user.id && !isAdmin) {
         router.push('/dashboard')
         return
       }
@@ -177,11 +193,39 @@ export default function OrderDetailPage() {
           setHasReviewed(true)
         }
       }
+
+      // Fetch admin actions for this order (if admin or if order had dispute)
+      if (profile?.is_admin || data.dispute_opened_at) {
+        await fetchAdminActions()
+      }
     } catch (error: any) {
       console.error('Error fetching order:', error)
       alert('Failed to load order')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchAdminActions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_actions')
+        .select(`
+          *,
+          admin:profiles!admin_actions_admin_id_fkey(username)
+        `)
+        .eq('target_type', 'order')
+        .eq('target_id', params.id)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching admin actions:', error)
+        return
+      }
+
+      setAdminActions(data || [])
+    } catch (error) {
+      console.error('Error fetching admin actions:', error)
     }
   }
 
@@ -248,23 +292,7 @@ export default function OrderDetailPage() {
 
     setActionLoading(true)
     try {
-      // TODO: Upload evidence files to Supabase Storage
-      // For now, we'll just create the dispute without file uploads
       const evidenceUrls: string[] = []
-
-      // If you want to implement file uploads, uncomment and modify:
-      // for (const file of evidenceFiles) {
-      //   const fileExt = file.name.split('.').pop()
-      //   const fileName = `${user.id}/${Date.now()}.${fileExt}`
-      //   const { data: uploadData, error: uploadError } = await supabase.storage
-      //     .from('dispute-evidence')
-      //     .upload(fileName, file)
-      //   if (uploadError) throw uploadError
-      //   const { data: { publicUrl } } = supabase.storage
-      //     .from('dispute-evidence')
-      //     .getPublicUrl(fileName)
-      //   evidenceUrls.push(publicUrl)
-      // }
 
       // Create dispute
       const { error } = await supabase
@@ -299,7 +327,6 @@ export default function OrderDetailPage() {
 
     setActionLoading(true)
     try {
-      // Don't send seller_id - trigger will auto-populate it from order
       const { error } = await supabase
         .from('reviews')
         .insert({
@@ -376,6 +403,7 @@ export default function OrderDetailPage() {
 
   const isBuyer = order.buyer_id === user?.id
   const isSeller = order.seller_id === user?.id
+  const isAdmin = profile?.is_admin === true
   const serviceFee = order.amount * 0.05
   const totalAmount = order.amount + serviceFee
 
@@ -402,10 +430,26 @@ export default function OrderDetailPage() {
 
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
+          {/* Admin View Notice */}
+          {isAdmin && !isBuyer && !isSeller && (
+            <div className="bg-orange-500/20 border border-orange-500/50 rounded-xl p-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">👑</div>
+                <div>
+                  <h3 className="text-orange-400 font-bold">Admin View</h3>
+                  <p className="text-orange-200 text-sm">You are viewing this order as an administrator.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Header */}
           <div className="mb-8">
-            <Link href={isBuyer ? '/customer-dashboard' : '/dashboard'} className="text-purple-400 hover:text-purple-300 mb-4 inline-block">
-              ← Back to Dashboard
+            <Link 
+              href={isAdmin && !isBuyer && !isSeller ? '/admin' : (isBuyer ? '/customer-dashboard' : '/dashboard')} 
+              className="text-purple-400 hover:text-purple-300 mb-4 inline-block"
+            >
+              ← Back to {isAdmin && !isBuyer && !isSeller ? 'Admin Dashboard' : 'Dashboard'}
             </Link>
             <div className="flex items-center justify-between">
               <div>
@@ -669,7 +713,7 @@ export default function OrderDetailPage() {
                           const files = Array.from(e.target.files || [])
                           if (files.length > 3) {
                             alert('Maximum 3 files allowed')
-                            e.target.value = '' // Reset input
+                            e.target.value = ''
                             return
                           }
                           setEvidenceFiles(files)
@@ -785,6 +829,15 @@ export default function OrderDetailPage() {
                 </div>
               )}
 
+              {/* Admin View - No actions, just viewing */}
+              {isAdmin && !isBuyer && !isSeller && (
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
+                  <p className="text-orange-400 text-sm">
+                    👑 You are viewing this order as an administrator. Use the Admin Dashboard to manage disputes or join the chat.
+                  </p>
+                </div>
+              )}
+
               {/* Automatic Delivery Info */}
               {order.listing?.delivery_type === 'automatic' && (order.status === 'delivered' || order.status === 'completed') && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
@@ -810,6 +863,146 @@ export default function OrderDetailPage() {
                   <p className="text-green-400 text-sm text-center">
                     ✓ You have already reviewed this order. Thank you!
                   </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Order History Timeline */}
+          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 mt-6">
+            <h3 className="text-xl font-bold text-white mb-4">📋 Order History</h3>
+            
+            <div className="space-y-4">
+              {/* Order Created */}
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
+                    <span className="text-blue-400">🛒</span>
+                  </div>
+                  <div className="w-0.5 h-full bg-white/10 mt-2"></div>
+                </div>
+                <div className="flex-1 pb-4">
+                  <p className="text-white font-semibold">Order Created</p>
+                  <p className="text-sm text-gray-400">{new Date(order.created_at).toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 mt-1">Order placed by {order.buyer.username}</p>
+                </div>
+              </div>
+
+              {/* Payment Status */}
+              {order.payment_status === 'paid' && (
+                <div className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                      <span className="text-green-400">💳</span>
+                    </div>
+                    <div className="w-0.5 h-full bg-white/10 mt-2"></div>
+                  </div>
+                  <div className="flex-1 pb-4">
+                    <p className="text-white font-semibold">Payment Confirmed</p>
+                    <p className="text-sm text-gray-400">Payment received</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Delivered */}
+              {order.delivered_at && (
+                <div className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                      <span className="text-yellow-400">📦</span>
+                    </div>
+                    <div className="w-0.5 h-full bg-white/10 mt-2"></div>
+                  </div>
+                  <div className="flex-1 pb-4">
+                    <p className="text-white font-semibold">Item Delivered</p>
+                    <p className="text-sm text-gray-400">{new Date(order.delivered_at).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500 mt-1">Marked as delivered by {order.seller.username}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Dispute Raised */}
+              {order.dispute_opened_at && (
+                <div className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                      <span className="text-red-400">⚠️</span>
+                    </div>
+                    <div className="w-0.5 h-full bg-white/10 mt-2"></div>
+                  </div>
+                  <div className="flex-1 pb-4">
+                    <p className="text-white font-semibold">Dispute Raised</p>
+                    <p className="text-sm text-gray-400">{new Date(order.dispute_opened_at).toLocaleString()}</p>
+                    {order.dispute_reason && (
+                      <p className="text-xs text-red-400 mt-1">Reason: {order.dispute_reason}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Actions */}
+              {adminActions.map((action) => (
+                <div key={action.id} className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
+                      <span className="text-orange-400">👑</span>
+                    </div>
+                    <div className="w-0.5 h-full bg-white/10 mt-2"></div>
+                  </div>
+                  <div className="flex-1 pb-4">
+                    <p className="text-white font-semibold">
+                      {action.action_type === 'dispute_resolved_buyer' && 'Dispute Resolved - Buyer Refunded'}
+                      {action.action_type === 'dispute_resolved_seller' && 'Dispute Resolved - Order Completed'}
+                      {!action.action_type.includes('dispute_resolved') && action.description}
+                    </p>
+                    <p className="text-sm text-gray-400">{new Date(action.created_at).toLocaleString()}</p>
+                    <p className="text-xs text-orange-400 mt-1">
+                      Admin: {action.admin?.username || 'Unknown'}
+                    </p>
+                    {action.metadata?.previous_status && action.metadata?.new_status && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Status changed: {action.metadata.previous_status} → {action.metadata.new_status}
+                      </p>
+                    )}
+                    {action.metadata?.notes && (
+                      <div className="bg-white/5 border border-white/10 rounded p-2 mt-2">
+                        <p className="text-xs text-gray-400">Admin Notes:</p>
+                        <p className="text-sm text-white">{action.metadata.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Completed/Refunded */}
+              {order.completed_at && (order.status === 'completed' || order.status === 'refunded') && (
+                <div className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      order.status === 'refunded' ? 'bg-orange-500/20' : 'bg-green-500/20'
+                    }`}>
+                      <span className={order.status === 'refunded' ? 'text-orange-400' : 'text-green-400'}>
+                        {order.status === 'refunded' ? '💰' : '✅'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-white font-semibold">
+                      {order.status === 'refunded' ? 'Order Refunded' : 'Order Completed'}
+                    </p>
+                    <p className="text-sm text-gray-400">{new Date(order.completed_at).toLocaleString()}</p>
+                    {order.resolution_type && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Resolution: {order.resolution_type === 'refunded' ? 'Buyer won dispute' : 'Seller won dispute'}
+                      </p>
+                    )}
+                    {order.resolution_notes && (
+                      <div className="bg-white/5 border border-white/10 rounded p-2 mt-2">
+                        <p className="text-xs text-gray-400">Resolution Notes:</p>
+                        <p className="text-sm text-white">{order.resolution_notes}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

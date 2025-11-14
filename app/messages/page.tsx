@@ -36,8 +36,10 @@ interface Message {
   sender_id: string
   content: string
   created_at: string
+  message_type: string // Added message_type
   sender: {
     username: string
+    is_admin: boolean
   }
 }
 
@@ -54,6 +56,7 @@ function MessagesContent() {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -105,6 +108,45 @@ function MessagesContent() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  // Check if we need to show a date separator between messages
+  const shouldShowDateSeparator = (currentMsg: Message, previousMsg: Message | null) => {
+    if (!previousMsg) return true // Always show date for first message
+    
+    const currentDate = new Date(currentMsg.created_at)
+    const previousDate = new Date(previousMsg.created_at)
+    
+    // Show separator if messages are from different days
+    return currentDate.toDateString() !== previousDate.toDateString()
+  }
+
+  // Format date for separator
+  const formatDateSeparator = (date: string) => {
+    const messageDate = new Date(date)
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    
+    if (messageDate.toDateString() === today.toDateString()) {
+      return 'Today'
+    } else if (messageDate.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday'
+    } else {
+      return messageDate.toLocaleDateString('en-US', { 
+        month: 'long', 
+        day: 'numeric', 
+        year: messageDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined 
+      })
+    }
+  }
+
+  // Common emojis for quick access
+  const commonEmojis = ['😊', '😂', '❤️', '👍', '🎮', '🔥', '✨', '🎉', '👋', '🙌', '💯', '✅', '❌', '🤔', '😎', '🥳']
+
+  const insertEmoji = (emoji: string) => {
+    setNewMessage(prev => prev + emoji)
+    setShowEmojiPicker(false)
   }
 
   const checkAuth = async () => {
@@ -162,7 +204,7 @@ function MessagesContent() {
         .from('messages')
         .select(`
           *,
-          sender:profiles!messages_sender_id_fkey(username)
+          sender:profiles!messages_sender_id_fkey(username, is_admin)
         `)
         .eq('conversation_id', selectedConversation.id)
         .order('created_at', { ascending: true })
@@ -193,7 +235,8 @@ function MessagesContent() {
           receiver_id: receiverId,
           listing_id: selectedConversation.listing_id,
           order_id: selectedConversation.order_id,
-          content: newMessage.trim()
+          content: newMessage.trim(),
+          message_type: 'user' // Regular user message
         })
 
       if (error) throw error
@@ -362,26 +405,121 @@ function MessagesContent() {
                   </div>
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.map((message) => {
+                  <div className="flex-1 overflow-y-auto p-4 space-y-1">
+                    {messages.map((message, index) => {
                       const isOwnMessage = message.sender_id === user.id
+                      const isSystemMessage = message.message_type === 'system'
+                      const previousMessage = index > 0 ? messages[index - 1] : null
+                      const showDateSeparator = shouldShowDateSeparator(message, previousMessage)
+                      const otherUser = isOwnMessage ? selectedConversation.seller : selectedConversation.buyer
+                      
                       return (
-                        <div
-                          key={message.id}
-                          className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div className={`max-w-[70%] ${isOwnMessage ? 'order-2' : 'order-1'}`}>
-                            <div className={`rounded-2xl px-4 py-2 ${
-                              isOwnMessage 
-                                ? 'bg-purple-500 text-white' 
-                                : 'bg-white/10 text-white'
-                            }`}>
-                              <p className="text-sm">{message.content}</p>
+                        <div key={message.id}>
+                          {/* Date Separator */}
+                          {showDateSeparator && (
+                            <div className="flex items-center justify-center my-4">
+                              <div className="bg-white/10 px-4 py-1 rounded-full">
+                                <p className="text-xs text-gray-400 font-semibold">
+                                  {formatDateSeparator(message.created_at)}
+                                </p>
+                              </div>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1 px-2">
-                              {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
+                          )}
+                          
+                          {/* System Message - Centered */}
+                          {isSystemMessage ? (
+                            <div className="flex justify-center my-4">
+                              <div className="max-w-[85%] bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 backdrop-blur-lg border border-blue-400/30 rounded-2xl p-4 shadow-lg">
+                                <div className="flex items-start gap-3">
+                                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <span className="text-xl">🔔</span>
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="text-blue-300 font-bold text-sm">System Notification</span>
+                                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+                                    </div>
+                                    <div className="text-white text-sm whitespace-pre-wrap leading-relaxed">
+                                      {message.content}
+                                    </div>
+                                    <p className="text-xs text-blue-300/60 mt-3 text-center">
+                                      {new Date(message.created_at).toLocaleString([], { 
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : message.sender?.is_admin ? (
+                            /* Admin Message - Centered with special styling */
+                            <div className="flex justify-center my-4">
+                              <div className="max-w-[85%] bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-lg border border-orange-400/30 rounded-2xl p-4 shadow-lg">
+                                <div className="flex items-start gap-3">
+                                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <span className="text-xl">👑</span>
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="text-orange-300 font-bold text-sm">{message.sender.username}</span>
+                                      <span className="px-2 py-0.5 rounded text-xs font-bold bg-orange-500/30 text-orange-200 border border-orange-400/50">
+                                        ADMIN
+                                      </span>
+                                    </div>
+                                    <div className="text-white text-sm whitespace-pre-wrap leading-relaxed">
+                                      {message.content}
+                                    </div>
+                                    <p className="text-xs text-orange-300/60 mt-3 text-center">
+                                      {new Date(message.created_at).toLocaleString([], { 
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Regular User Message */
+                            <div className={`flex gap-2 mb-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                              {/* User Icon (for other user's messages) */}
+                              {!isOwnMessage && (
+                                <div className="w-8 h-8 bg-gradient-to-br from-purple-500/30 to-pink-500/30 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                  <span className="text-white font-semibold text-xs">
+                                    {otherUser.username.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              {/* Message Bubble */}
+                              <div className={`max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
+                                <div className={`rounded-2xl px-4 py-2 ${
+                                  isOwnMessage 
+                                    ? 'bg-purple-500 text-white' 
+                                    : 'bg-white/10 text-white'
+                                }`}>
+                                  <p className="text-sm break-words">{message.content}</p>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1 px-2">
+                                  {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                              
+                              {/* User Icon (for own messages) */}
+                              {isOwnMessage && (
+                                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                  <span className="text-white font-semibold text-xs">
+                                    {user.email?.charAt(0).toUpperCase() || 'U'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -389,8 +527,45 @@ function MessagesContent() {
                   </div>
 
                   {/* Message Input */}
-                  <form onSubmit={sendMessage} className="p-4 border-t border-white/10 bg-white/5">
+                  <form onSubmit={sendMessage} className="p-4 border-t border-white/10 bg-white/5 relative">
+                    {/* Emoji Picker */}
+                    {showEmojiPicker && (
+                      <div className="absolute bottom-20 left-4 bg-slate-800 border border-white/20 rounded-lg p-3 shadow-2xl z-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs text-gray-400 font-semibold">Quick Emojis</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowEmojiPicker(false)}
+                            className="text-gray-400 hover:text-white"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-8 gap-1">
+                          {commonEmojis.map((emoji, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              onClick={() => insertEmoji(emoji)}
+                              className="text-2xl hover:bg-white/10 rounded p-1 transition"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex gap-2">
+                      {/* Emoji Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        className="px-3 py-3 rounded-lg bg-white/10 border border-white/10 text-white hover:bg-white/20 transition"
+                      >
+                        😊
+                      </button>
+                      
                       <input
                         type="text"
                         value={newMessage}
