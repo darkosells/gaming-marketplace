@@ -1,4 +1,4 @@
-// app/dashboard/page.tsx - ENHANCED VENDOR DASHBOARD WITH ORDERS
+// app/dashboard/page.tsx - UPDATED VENDOR DASHBOARD WITH DISPUTE SYSTEM SUPPORT
 
 'use client'
 
@@ -81,6 +81,7 @@ export default function VendorDashboardPage() {
         .from('listings')
         .select('*')
         .eq('seller_id', userId)
+        .neq('status', 'removed') // ✅ Exclude soft-deleted listings
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -152,11 +153,18 @@ export default function VendorDashboardPage() {
   }
 
   const activeListings = myListings.filter(l => l.status === 'active')
-  const totalRevenue = myOrders
-    .filter(o => o.status === 'completed')
-    .reduce((sum, o) => sum + parseFloat(o.amount), 0)
-  const pendingOrders = myOrders.filter(o => o.status === 'paid' || o.status === 'delivered')
+  
+  // ✅ UPDATED: Only count revenue from COMPLETED orders (not delivered)
+  // Delivered orders are in 48-hour confirmation period and funds are on hold
   const completedOrders = myOrders.filter(o => o.status === 'completed')
+  const totalRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(o.amount), 0)
+  
+  // ✅ UPDATED: Pending includes paid, delivered (awaiting confirmation), and disputes
+  const pendingOrders = myOrders.filter(o => 
+    o.status === 'paid' || 
+    o.status === 'delivered' || 
+    o.status === 'dispute_raised'
+  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -243,6 +251,7 @@ export default function VendorDashboardPage() {
               <div className="text-3xl mb-2">💰</div>
               <div className="text-gray-400 text-sm">Total Revenue</div>
               <div className="text-3xl font-bold text-white">${totalRevenue.toFixed(2)}</div>
+              <div className="text-xs text-gray-500 mt-1">From completed orders only</div>
             </div>
             <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
               <div className="text-3xl mb-2">📦</div>
@@ -253,6 +262,7 @@ export default function VendorDashboardPage() {
               <div className="text-3xl mb-2">⏳</div>
               <div className="text-gray-400 text-sm">Pending Orders</div>
               <div className="text-3xl font-bold text-white">{pendingOrders.length}</div>
+              <div className="text-xs text-gray-500 mt-1">Paid + Delivered + Disputes</div>
             </div>
             <div className="bg-gradient-to-br from-green-500/20 to-blue-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
               <div className="text-3xl mb-2">✅</div>
@@ -429,12 +439,15 @@ export default function VendorDashboardPage() {
                             <p className="text-xl font-bold text-white">${order.amount}</p>
                             <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
                               order.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                              order.status === 'delivered' ? 'bg-blue-500/20 text-blue-400' :
-                              order.status === 'paid' ? 'bg-yellow-500/20 text-yellow-400' :
+                              order.status === 'delivered' ? 'bg-yellow-500/20 text-yellow-400' :
+                              order.status === 'paid' ? 'bg-blue-500/20 text-blue-400' :
                               order.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400' :
-                              'bg-gray-500/20 text-gray-400'
+                              order.status === 'cancelled' ? 'bg-gray-500/20 text-gray-400' :
+                              'bg-purple-500/20 text-purple-400'
                             }`}>
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1).replace('_', ' ')}
+                              {order.status === 'delivered' ? 'Awaiting Confirmation' :
+                               order.status === 'dispute_raised' ? 'Dispute Active' :
+                               order.status.charAt(0).toUpperCase() + order.status.slice(1).replace('_', ' ')}
                             </span>
                           </div>
                           <Link
