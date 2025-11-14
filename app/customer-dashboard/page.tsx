@@ -1,4 +1,4 @@
-// app/customer-dashboard/page.tsx - FIXED CUSTOMER DASHBOARD
+// app/customer-dashboard/page.tsx - FIXED CUSTOMER DASHBOARD WITH WORKING ORDER NAVIGATION
 
 'use client'
 
@@ -323,9 +323,13 @@ export default function CustomerDashboardPage() {
                           {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                         </span>
                       </div>
-                      <button className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition">
+                      {/* ✅ FIXED: Added Link component with proper navigation */}
+                      <Link
+                        href={`/order/${order.id}`}
+                        className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition inline-block"
+                      >
                         View Details
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 ))}

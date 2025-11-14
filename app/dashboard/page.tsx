@@ -1,4 +1,4 @@
-// app/dashboard/page.tsx - VENDOR DASHBOARD WITH QUICK ACTIONS
+// app/dashboard/page.tsx - ENHANCED VENDOR DASHBOARD WITH ORDERS
 
 'use client'
 
@@ -13,6 +13,8 @@ export default function VendorDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [cartItemCount, setCartItemCount] = useState(0)
   const [myListings, setMyListings] = useState<any[]>([])
+  const [myOrders, setMyOrders] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<'listings' | 'orders'>('listings')
   const router = useRouter()
   const supabase = createClient()
 
@@ -65,6 +67,7 @@ export default function VendorDashboardPage() {
       }
 
       await fetchMyListings(user.id)
+      await fetchMyOrders(user.id)
       setLoading(false)
     } catch (error) {
       console.error('Check user error:', error)
@@ -88,6 +91,36 @@ export default function VendorDashboardPage() {
       setMyListings(data || [])
     } catch (error) {
       console.error('Error fetching listings:', error)
+    }
+  }
+
+  const fetchMyOrders = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          listing:listings (
+            title,
+            game,
+            image_url,
+            category
+          ),
+          buyer:profiles!buyer_id (
+            username
+          )
+        `)
+        .eq('seller_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Fetch orders error:', error)
+        return
+      }
+      
+      setMyOrders(data || [])
+    } catch (error) {
+      console.error('Error fetching orders:', error)
     }
   }
 
@@ -119,7 +152,11 @@ export default function VendorDashboardPage() {
   }
 
   const activeListings = myListings.filter(l => l.status === 'active')
-  const totalPurchases = 0
+  const totalRevenue = myOrders
+    .filter(o => o.status === 'completed')
+    .reduce((sum, o) => sum + parseFloat(o.amount), 0)
+  const pendingOrders = myOrders.filter(o => o.status === 'paid' || o.status === 'delivered')
+  const completedOrders = myOrders.filter(o => o.status === 'completed')
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -201,23 +238,26 @@ export default function VendorDashboardPage() {
           </div>
 
           {/* Stats */}
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
+          <div className="grid md:grid-cols-4 gap-6 mb-8">
             <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
               <div className="text-3xl mb-2">💰</div>
-              <div className="text-gray-400 text-sm">Total Purchases</div>
-              <div className="text-3xl font-bold text-white">{totalPurchases}</div>
+              <div className="text-gray-400 text-sm">Total Revenue</div>
+              <div className="text-3xl font-bold text-white">${totalRevenue.toFixed(2)}</div>
             </div>
             <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
               <div className="text-3xl mb-2">📦</div>
               <div className="text-gray-400 text-sm">Active Listings</div>
               <div className="text-3xl font-bold text-white">{activeListings.length}</div>
             </div>
+            <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
+              <div className="text-3xl mb-2">⏳</div>
+              <div className="text-gray-400 text-sm">Pending Orders</div>
+              <div className="text-3xl font-bold text-white">{pendingOrders.length}</div>
+            </div>
             <div className="bg-gradient-to-br from-green-500/20 to-blue-500/20 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
-              <div className="text-3xl mb-2">⭐</div>
-              <div className="text-gray-400 text-sm">Rating</div>
-              <div className="text-3xl font-bold text-white">
-                {profile?.rating > 0 ? profile.rating.toFixed(1) : 'New'}
-              </div>
+              <div className="text-3xl mb-2">✅</div>
+              <div className="text-gray-400 text-sm">Completed Sales</div>
+              <div className="text-3xl font-bold text-white">{completedOrders.length}</div>
             </div>
           </div>
 
@@ -249,77 +289,166 @@ export default function VendorDashboardPage() {
             </Link>
           </div>
 
-          {/* My Listings */}
+          {/* Tabs */}
           <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-white">My Listings</h2>
-              <Link
-                href="/sell"
-                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition"
+            <div className="flex space-x-4 mb-6 border-b border-white/10 pb-4">
+              <button
+                onClick={() => setActiveTab('listings')}
+                className={`px-6 py-2 rounded-lg font-semibold transition ${
+                  activeTab === 'listings'
+                    ? 'bg-purple-500/30 text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
               >
-                + Create Listing
-              </Link>
+                My Listings ({myListings.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('orders')}
+                className={`px-6 py-2 rounded-lg font-semibold transition ${
+                  activeTab === 'orders'
+                    ? 'bg-purple-500/30 text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                My Orders ({myOrders.length})
+              </button>
             </div>
 
-            {myListings.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-5xl mb-4">📦</div>
-                <h3 className="text-xl font-bold text-white mb-2">No listings yet</h3>
-                <p className="text-gray-400 mb-6">Create your first listing to start selling!</p>
-                <Link
-                  href="/sell"
-                  className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition"
-                >
-                  Create Listing
-                </Link>
-              </div>
-            ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {myListings.map((listing) => (
-                  <div key={listing.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition">
-                    <div className="relative h-40 bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                      {listing.image_url ? (
-                        <img src={listing.image_url} alt={listing.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-5xl">
-                          {listing.category === 'account' ? '🎮' : listing.category === 'topup' ? '💰' : '🔑'}
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          listing.status === 'active' ? 'bg-green-500/90 text-white' :
-                          listing.status === 'sold' ? 'bg-gray-500/90 text-white' :
-                          'bg-red-500/90 text-white'
-                        }`}>
-                          {listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="text-white font-semibold mb-1 truncate">{listing.title}</h3>
-                      <p className="text-sm text-gray-400 mb-2">{listing.game}</p>
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-xl font-bold text-white">${listing.price}</span>
-                        <span className="text-sm text-gray-400">Stock: {listing.stock}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Link
-                          href={`/listing/${listing.id}`}
-                          className="flex-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 py-2 rounded-lg text-sm font-semibold text-center transition"
-                        >
-                          View
-                        </Link>
-                        <Link
-                          href={`/listing/${listing.id}/edit`}
-                          className="flex-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 py-2 rounded-lg text-sm font-semibold text-center transition"
-                        >
-                          Edit
-                        </Link>
-                      </div>
-                    </div>
+            {/* Listings Tab */}
+            {activeTab === 'listings' && (
+              <>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-white">My Listings</h2>
+                  <Link
+                    href="/sell"
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition"
+                  >
+                    + Create Listing
+                  </Link>
+                </div>
+
+                {myListings.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-5xl mb-4">📦</div>
+                    <h3 className="text-xl font-bold text-white mb-2">No listings yet</h3>
+                    <p className="text-gray-400 mb-6">Create your first listing to start selling!</p>
+                    <Link
+                      href="/sell"
+                      className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition"
+                    >
+                      Create Listing
+                    </Link>
                   </div>
-                ))}
-              </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {myListings.map((listing) => (
+                      <div key={listing.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition">
+                        <div className="relative h-40 bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                          {listing.image_url ? (
+                            <img src={listing.image_url} alt={listing.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-5xl">
+                              {listing.category === 'account' ? '🎮' : listing.category === 'topup' ? '💰' : '🔑'}
+                            </div>
+                          )}
+                          <div className="absolute top-2 right-2">
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              listing.status === 'active' ? 'bg-green-500/90 text-white' :
+                              listing.status === 'sold' ? 'bg-gray-500/90 text-white' :
+                              listing.status === 'out_of_stock' ? 'bg-yellow-500/90 text-white' :
+                              'bg-red-500/90 text-white'
+                            }`}>
+                              {listing.status === 'out_of_stock' ? 'Out of Stock' : listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <h3 className="text-white font-semibold mb-1 truncate">{listing.title}</h3>
+                          <p className="text-sm text-gray-400 mb-2">{listing.game}</p>
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-xl font-bold text-white">${listing.price}</span>
+                            <span className="text-sm text-gray-400">
+                              Stock: {listing.stock} | {listing.delivery_type === 'automatic' ? '⚡ Auto' : '👤 Manual'}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Link
+                              href={`/listing/${listing.id}`}
+                              className="flex-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 py-2 rounded-lg text-sm font-semibold text-center transition"
+                            >
+                              View
+                            </Link>
+                            <Link
+                              href={`/listing/${listing.id}/edit`}
+                              className="flex-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 py-2 rounded-lg text-sm font-semibold text-center transition"
+                            >
+                              Edit
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Orders Tab */}
+            {activeTab === 'orders' && (
+              <>
+                <h2 className="text-2xl font-bold text-white mb-6">My Orders</h2>
+
+                {myOrders.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-5xl mb-4">📭</div>
+                    <h3 className="text-xl font-bold text-white mb-2">No orders yet</h3>
+                    <p className="text-gray-400 mb-6">Your sales will appear here once customers start buying!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {myOrders.map((order: any) => (
+                      <div key={order.id} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:border-purple-500/50 transition">
+                        <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                            {order.listing?.image_url ? (
+                              <img src={order.listing.image_url} alt={order.listing.title} className="w-full h-full object-cover rounded-lg" />
+                            ) : (
+                              <span className="text-2xl">
+                                {order.listing?.category === 'account' ? '🎮' : order.listing?.category === 'topup' ? '💰' : '🔑'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-white font-semibold">{order.listing?.title || 'Unknown Item'}</h4>
+                            <p className="text-sm text-gray-400">Buyer: {order.buyer?.username}</p>
+                            <p className="text-sm text-gray-500">
+                              {new Date(order.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xl font-bold text-white">${order.amount}</p>
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                              order.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                              order.status === 'delivered' ? 'bg-blue-500/20 text-blue-400' :
+                              order.status === 'paid' ? 'bg-yellow-500/20 text-yellow-400' :
+                              order.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400' :
+                              'bg-gray-500/20 text-gray-400'
+                            }`}>
+                              {order.status.charAt(0).toUpperCase() + order.status.slice(1).replace('_', ' ')}
+                            </span>
+                          </div>
+                          <Link
+                            href={`/order/${order.id}`}
+                            className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition"
+                          >
+                            View Details
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

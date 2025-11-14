@@ -1,65 +1,55 @@
-// Create a new file: app/listing/[id]/edit/page.tsx
+// app/listing/[id]/edit/page.tsx - EDIT LISTING WITH DELIVERY CODE MANAGEMENT
 
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
+import Navigation from '@/components/Navigation'
+
+interface DeliveryCode {
+  id: string
+  code_text: string
+  is_used: boolean
+  order_id: string | null
+  delivered_at: string | null
+}
 
 export default function EditListingPage() {
   const params = useParams()
   const router = useRouter()
   const supabase = createClient()
+
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [listing, setListing] = useState<any>(null)
+  const [deliveryCodes, setDeliveryCodes] = useState<DeliveryCode[]>([])
+  const [newCodes, setNewCodes] = useState<string[]>([''])
 
-  // Form fields
-  const [category, setCategory] = useState('account')
-  const [game, setGame] = useState('')
+  // Form state
   const [title, setTitle] = useState('')
+  const [game, setGame] = useState('')
+  const [category, setCategory] = useState('account')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [platform, setPlatform] = useState('')
-  const [stock, setStock] = useState('1')
+  const [stock, setStock] = useState('')
   const [imageUrl, setImageUrl] = useState('')
-  const [status, setStatus] = useState('active')
-
-  const popularGames = [
-    'Fortnite',
-    'League of Legends',
-    'Valorant',
-    'Genshin Impact',
-    'GTA 5',
-    'Clash of Clans',
-    'Roblox',
-    'Minecraft',
-    'CS:GO',
-    'Apex Legends',
-    'Call of Duty',
-    'FIFA',
-    'Rocket League',
-    'World of Warcraft',
-    'Other'
-  ]
-
-  const platforms = [
-    'PC',
-    'PlayStation',
-    'Xbox',
-    'Nintendo Switch',
-    'Mobile',
-    'Cross-Platform'
-  ]
+  const [deliveryType, setDeliveryType] = useState<'manual' | 'automatic'>('manual')
 
   useEffect(() => {
-    checkUser()
+    checkAuth()
   }, [])
 
-  const checkUser = async () => {
+  useEffect(() => {
+    if (user) {
+      fetchListing()
+    }
+  }, [user])
+
+  const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -68,10 +58,9 @@ export default function EditListingPage() {
     }
 
     setUser(user)
-    await fetchListing(user.id)
   }
 
-  const fetchListing = async (userId: string) => {
+  const fetchListing = async () => {
     try {
       const { data, error } = await supabase
         .from('listings')
@@ -82,89 +71,177 @@ export default function EditListingPage() {
       if (error) throw error
 
       // Check if user owns this listing
-      if (data.seller_id !== userId) {
+      if (data.seller_id !== user.id) {
+        alert('You do not have permission to edit this listing')
         router.push('/dashboard')
         return
       }
 
-      // Populate form with existing data
-      setCategory(data.category)
-      setGame(data.game)
+      setListing(data)
       setTitle(data.title)
+      setGame(data.game)
+      setCategory(data.category)
       setDescription(data.description || '')
       setPrice(data.price.toString())
       setPlatform(data.platform || '')
       setStock(data.stock.toString())
       setImageUrl(data.image_url || '')
-      setStatus(data.status)
-      
+      setDeliveryType(data.delivery_type || 'manual')
+
+      // Fetch delivery codes if automatic
+      if (data.delivery_type === 'automatic') {
+        await fetchDeliveryCodes()
+      }
     } catch (error: any) {
-      setError('Failed to load listing')
       console.error('Error fetching listing:', error)
+      alert('Failed to load listing')
+      router.push('/dashboard')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setSubmitting(true)
+  const fetchDeliveryCodes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_codes')
+        .select('*')
+        .eq('listing_id', params.id)
+        .order('created_at', { ascending: true })
 
-    // Validation
-    if (!game || !title || !price) {
-      setError('Please fill in all required fields')
-      setSubmitting(false)
-      return
+      if (error) throw error
+
+      setDeliveryCodes(data || [])
+    } catch (error: any) {
+      console.error('Error fetching delivery codes:', error)
     }
+  }
 
-    if (parseFloat(price) <= 0) {
-      setError('Price must be greater than 0')
-      setSubmitting(false)
-      return
+  const handleAddCodeField = () => {
+    setNewCodes([...newCodes, ''])
+  }
+
+  const handleRemoveCodeField = (index: number) => {
+    setNewCodes(newCodes.filter((_, i) => i !== index))
+  }
+
+  const handleNewCodeChange = (index: number, value: string) => {
+    const updated = [...newCodes]
+    updated[index] = value
+    setNewCodes(updated)
+  }
+
+  const handleDeleteExistingCode = async (codeId: string) => {
+    if (!confirm('Are you sure you want to delete this delivery code?')) return
+
+    try {
+      const { error } = await supabase
+        .from('delivery_codes')
+        .delete()
+        .eq('id', codeId)
+
+      if (error) throw error
+
+      alert('Delivery code deleted successfully!')
+      await fetchDeliveryCodes()
+    } catch (error: any) {
+      console.error('Error deleting code:', error)
+      alert('Failed to delete delivery code: ' + error.message)
     }
+  }
 
-    if (parseInt(stock) < 0) {
-      setError('Stock cannot be negative')
-      setSubmitting(false)
+  const handleUpdateExistingCode = async (codeId: string, newText: string) => {
+    if (!newText.trim()) {
+      alert('Code text cannot be empty')
       return
     }
 
     try {
       const { error } = await supabase
-        .from('listings')
-        .update({
-          category,
-          game,
-          title,
-          description,
-          price: parseFloat(price),
-          platform,
-          stock: parseInt(stock),
-          image_url: imageUrl || null,
-          status
-        })
-        .eq('id', params.id)
+        .from('delivery_codes')
+        .update({ code_text: newText })
+        .eq('id', codeId)
 
       if (error) throw error
 
-      setSuccess(true)
-      
-      // Redirect to the listing after 1 second
-      setTimeout(() => {
-        router.push(`/listing/${params.id}`)
-      }, 1000)
-
+      alert('Delivery code updated successfully!')
+      await fetchDeliveryCodes()
     } catch (error: any) {
-      setError(error.message || 'Failed to update listing')
+      console.error('Error updating code:', error)
+      alert('Failed to update delivery code: ' + error.message)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!title || !game || !price) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    if (deliveryType === 'manual' && !stock) {
+      alert('Please enter stock quantity')
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      // Update listing
+      const { error: listingError } = await supabase
+        .from('listings')
+        .update({
+          title,
+          game,
+          category,
+          description,
+          price: parseFloat(price),
+          platform,
+          stock: deliveryType === 'manual' ? parseInt(stock) : 0, // Stock for manual, will be auto-calculated for automatic
+          image_url: imageUrl,
+          delivery_type: deliveryType
+        })
+        .eq('id', params.id)
+
+      if (listingError) throw listingError
+
+      // If automatic delivery, handle new codes
+      if (deliveryType === 'automatic') {
+        const validNewCodes = newCodes.filter(code => code.trim().length > 0)
+        
+        if (validNewCodes.length > 0) {
+          const codesToInsert = validNewCodes.map(code => ({
+            listing_id: params.id,
+            code_text: code.trim()
+          }))
+
+          const { error: codesError } = await supabase
+            .from('delivery_codes')
+            .insert(codesToInsert)
+
+          if (codesError) throw codesError
+
+          // Reset new codes
+          setNewCodes([''])
+          await fetchDeliveryCodes()
+        }
+      }
+
+      alert('Listing updated successfully!')
+      router.push('/dashboard')
+    } catch (error: any) {
+      console.error('Error updating listing:', error)
+      alert('Failed to update listing: ' + error.message)
     } finally {
-      setSubmitting(false)
+      setSaving(false)
     }
   }
 
   const handleDelete = async () => {
-    const confirmed = confirm('Are you sure you want to delete this listing? This action cannot be undone.')
-    if (!confirmed) return
+    if (!confirm('Are you sure you want to delete this listing? This action cannot be undone.')) {
+      return
+    }
 
     try {
       const { error } = await supabase
@@ -174,10 +251,11 @@ export default function EditListingPage() {
 
       if (error) throw error
 
-      alert('Listing deleted successfully')
+      alert('Listing deleted successfully!')
       router.push('/dashboard')
     } catch (error: any) {
-      setError(error.message || 'Failed to delete listing')
+      console.error('Error deleting listing:', error)
+      alert('Failed to delete listing: ' + error.message)
     }
   }
 
@@ -189,290 +267,307 @@ export default function EditListingPage() {
     )
   }
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center px-4">
-        <div className="max-w-md w-full">
-          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 shadow-2xl text-center">
-            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl">✓</span>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Listing Updated!</h2>
-            <p className="text-gray-400 mb-4">
-              Your listing has been updated successfully. Redirecting...
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const unusedCodes = deliveryCodes.filter(c => !c.is_used)
+  const usedCodes = deliveryCodes.filter(c => c.is_used)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Navigation */}
-      <nav className="bg-black/30 backdrop-blur-lg border-b border-white/10">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🎮</span>
-              </div>
-              <span className="text-xl font-bold text-white">GameVault</span>
-            </Link>
+      <Navigation />
 
-            <div className="flex items-center space-x-4">
-              <Link href="/browse" className="text-gray-300 hover:text-white transition">
-                Browse
-              </Link>
-              <Link href="/dashboard" className="text-gray-300 hover:text-white transition">
-                Dashboard
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <Link href={`/listing/${params.id}`} className="text-purple-400 hover:text-purple-300 mb-4 inline-block">
-              ← Back to Listing
+            <Link href="/dashboard" className="text-purple-400 hover:text-purple-300 mb-4 inline-block">
+              ← Back to Dashboard
             </Link>
             <h1 className="text-4xl font-bold text-white mb-2">Edit Listing</h1>
-            <p className="text-gray-400">Update your listing details</p>
+            <p className="text-gray-400">Update your listing details and manage delivery codes</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8">
-            {error && (
-              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-6">
-                <p className="text-red-200 text-sm">{error}</p>
-              </div>
-            )}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Basic Info Card */}
+            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+              <h2 className="text-2xl font-bold text-white mb-6">Basic Information</h2>
 
-            {/* Status Selection */}
-            <div className="mb-6">
-              <label className="block text-white font-semibold mb-3">
-                Status <span className="text-red-400">*</span>
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-slate-800 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="active">Active (Visible to buyers)</option>
-                <option value="sold">Sold</option>
-                <option value="removed">Removed (Hidden)</option>
-              </select>
-            </div>
-
-            {/* Category Selection */}
-            <div className="mb-6">
-              <label className="block text-white font-semibold mb-3">
-                Category <span className="text-red-400">*</span>
-              </label>
-              <div className="grid grid-cols-3 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setCategory('account')}
-                  className={`p-4 rounded-lg border-2 transition ${
-                    category === 'account'
-                      ? 'border-purple-500 bg-purple-500/20'
-                      : 'border-white/10 bg-white/5 hover:border-white/20'
-                  }`}
-                >
-                  <div className="text-4xl mb-2">🎮</div>
-                  <div className="text-white font-semibold">Account</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCategory('topup')}
-                  className={`p-4 rounded-lg border-2 transition ${
-                    category === 'topup'
-                      ? 'border-purple-500 bg-purple-500/20'
-                      : 'border-white/10 bg-white/5 hover:border-white/20'
-                  }`}
-                >
-                  <div className="text-4xl mb-2">💰</div>
-                  <div className="text-white font-semibold">Top-Up</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCategory('key')}
-                  className={`p-4 rounded-lg border-2 transition ${
-                    category === 'key'
-                      ? 'border-purple-500 bg-purple-500/20'
-                      : 'border-white/10 bg-white/5 hover:border-white/20'
-                  }`}
-                >
-                  <div className="text-4xl mb-2">🔑</div>
-                  <div className="text-white font-semibold">Game Key</div>
-                </button>
-              </div>
-            </div>
-
-            {/* Game Selection */}
-            <div className="mb-6">
-              <label className="block text-white font-semibold mb-2">
-                Game <span className="text-red-400">*</span>
-              </label>
-              <select
-                value={game}
-                onChange={(e) => setGame(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-lg bg-slate-800 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">Select a game</option>
-                {popularGames.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Title */}
-            <div className="mb-6">
-              <label className="block text-white font-semibold mb-2">
-                Title <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Rare Fortnite Account - 50+ Skins"
-                required
-                maxLength={100}
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              <p className="text-sm text-gray-400 mt-1">{title.length}/100 characters</p>
-            </div>
-
-            {/* Description */}
-            <div className="mb-6">
-              <label className="block text-white font-semibold mb-2">
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe your item in detail"
-                rows={6}
-                maxLength={1000}
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-              />
-              <p className="text-sm text-gray-400 mt-1">{description.length}/1000 characters</p>
-            </div>
-
-            {/* Price and Stock Row */}
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
-              {/* Price */}
-              <div>
-                <label className="block text-white font-semibold mb-2">
-                  Price (USD) <span className="text-red-400">*</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-white mb-2 font-semibold">Title *</label>
                   <input
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="0.00"
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
+                    placeholder="Epic Fortnite Account - Level 200"
                     required
-                    min="0.01"
-                    step="0.01"
-                    className="w-full pl-8 pr-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-white mb-2 font-semibold">Game *</label>
+                    <input
+                      type="text"
+                      value={game}
+                      onChange={(e) => setGame(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
+                      placeholder="Fortnite"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-white mb-2 font-semibold">Category *</label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
+                      required
+                    >
+                      <option value="account">Account</option>
+                      <option value="topup">Top-up</option>
+                      <option value="key">Game Key</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-white mb-2 font-semibold">Description</label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none h-32"
+                    placeholder="Describe your item..."
+                  />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-white mb-2 font-semibold">Price (USD) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
+                      placeholder="25.00"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-white mb-2 font-semibold">Platform</label>
+                    <input
+                      type="text"
+                      value={platform}
+                      onChange={(e) => setPlatform(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
+                      placeholder="PC, PS5, Xbox..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-white mb-2 font-semibold">Image URL</label>
+                  <input
+                    type="url"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
+                    placeholder="https://example.com/image.jpg"
                   />
                 </div>
               </div>
+            </div>
 
-              {/* Stock */}
-              <div>
-                <label className="block text-white font-semibold mb-2">
-                  Stock <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  placeholder="1"
-                  required
-                  min="0"
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+            {/* Delivery Type Card */}
+            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+              <h2 className="text-2xl font-bold text-white mb-6">Delivery Settings</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-white mb-2 font-semibold">Delivery Type</label>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType('manual')}
+                      className={`p-4 rounded-lg border-2 transition ${
+                        deliveryType === 'manual'
+                          ? 'border-purple-500 bg-purple-500/20'
+                          : 'border-white/10 bg-white/5 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="text-3xl mb-2">👤</div>
+                      <div className="text-white font-semibold mb-1">Manual Delivery</div>
+                      <div className="text-sm text-gray-400">You manually deliver after payment</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryType('automatic')}
+                      className={`p-4 rounded-lg border-2 transition ${
+                        deliveryType === 'automatic'
+                          ? 'border-purple-500 bg-purple-500/20'
+                          : 'border-white/10 bg-white/5 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="text-3xl mb-2">⚡</div>
+                      <div className="text-white font-semibold mb-1">Automatic Delivery</div>
+                      <div className="text-sm text-gray-400">Instant delivery with codes</div>
+                    </button>
+                  </div>
+                </div>
+
+                {deliveryType === 'manual' && (
+                  <div>
+                    <label className="block text-white mb-2 font-semibold">Stock Quantity *</label>
+                    <input
+                      type="number"
+                      value={stock}
+                      onChange={(e) => setStock(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
+                      placeholder="10"
+                      required
+                    />
+                  </div>
+                )}
+
+                {deliveryType === 'automatic' && (
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                    <p className="text-blue-400 text-sm">
+                      ⚡ Stock is automatically calculated from available delivery codes below
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Platform */}
-            <div className="mb-6">
-              <label className="block text-white font-semibold mb-2">
-                Platform
-              </label>
-              <select
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-slate-800 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">Select platform (optional)</option>
-                {platforms.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
+            {/* Delivery Codes Management (only for automatic) */}
+            {deliveryType === 'automatic' && (
+              <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+                <h2 className="text-2xl font-bold text-white mb-6">Delivery Codes Management</h2>
 
-            {/* Image URL */}
-            <div className="mb-6">
-              <label className="block text-white font-semibold mb-2">
-                Image URL
-              </label>
-              <input
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://example.com/image.jpg"
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+                {/* Existing Codes */}
+                {deliveryCodes.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">
+                      Existing Codes ({unusedCodes.length} available, {usedCodes.length} used)
+                    </h3>
 
-            {/* Preview */}
-            {imageUrl && (
-              <div className="mb-6">
-                <label className="block text-white font-semibold mb-2">Preview</label>
-                <div className="relative h-48 bg-white/5 rounded-lg overflow-hidden">
-                  <img
-                    src={imageUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none'
-                    }}
-                  />
+                    {/* Available Codes */}
+                    {unusedCodes.length > 0 && (
+                      <div className="space-y-2 mb-4">
+                        <p className="text-sm text-gray-400 mb-2">Available Codes:</p>
+                        {unusedCodes.map((code) => (
+                          <div key={code.id} className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                            <input
+                              type="text"
+                              defaultValue={code.code_text}
+                              onBlur={(e) => {
+                                if (e.target.value !== code.code_text) {
+                                  handleUpdateExistingCode(code.id, e.target.value)
+                                }
+                              }}
+                              className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none"
+                            />
+                            <span className="text-green-400 text-xs font-semibold px-2">✓ Available</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExistingCode(code.id)}
+                              className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-3 py-2 rounded text-sm font-semibold transition"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Used Codes (Read-only) */}
+                    {usedCodes.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-400 mb-2">Used Codes (sold):</p>
+                        {usedCodes.map((code) => (
+                          <div key={code.id} className="flex items-center gap-2 bg-gray-500/10 border border-gray-500/20 rounded-lg p-3 opacity-60">
+                            <input
+                              type="text"
+                              value={code.code_text}
+                              disabled
+                              className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-gray-400 text-sm cursor-not-allowed"
+                            />
+                            <span className="text-gray-400 text-xs font-semibold px-2">✗ Sold</span>
+                            <span className="text-gray-500 text-xs">
+                              {code.delivered_at ? new Date(code.delivered_at).toLocaleDateString() : 'N/A'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Add New Codes */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Add New Codes</h3>
+                  <div className="space-y-3 mb-4">
+                    {newCodes.map((code, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={code}
+                          onChange={(e) => handleNewCodeChange(index, e.target.value)}
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
+                          placeholder="Enter delivery code or instructions"
+                        />
+                        {newCodes.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCodeField(index)}
+                            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-3 rounded-lg transition"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddCodeField}
+                    className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-4 py-2 rounded-lg font-semibold border border-purple-500/50 transition"
+                  >
+                    + Add Another Code
+                  </button>
+
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mt-4">
+                    <p className="text-yellow-400 text-sm">
+                      💡 <strong>Tip:</strong> Each code will be automatically delivered to buyers when they complete payment. 
+                      Stock is calculated from the number of available (unused) codes.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Action Buttons */}
+            {/* Actions */}
             <div className="flex gap-4">
               <button
                 type="submit"
-                disabled={submitting}
-                className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={saving}
+                className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-lg font-semibold text-lg hover:shadow-lg hover:shadow-purple-500/50 transition disabled:opacity-50"
               >
-                {submitting ? 'Updating...' : 'Update Listing'}
+                {saving ? 'Saving...' : 'Save Changes'}
               </button>
+              
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-8 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg font-semibold border border-red-500/50 transition"
+                className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-8 py-4 rounded-lg font-semibold border border-red-500/50 transition"
               >
-                Delete
+                Delete Listing
               </button>
-              <Link
-                href={`/listing/${params.id}`}
-                className="px-8 py-3 bg-white/5 hover:bg-white/10 text-white rounded-lg font-semibold border border-white/10 transition text-center"
-              >
-                Cancel
-              </Link>
             </div>
           </form>
         </div>
