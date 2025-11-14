@@ -239,23 +239,24 @@ export default function EditListingPage() {
   }
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this listing? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to remove this listing? This will hide it from the marketplace but preserve order history.')) {
       return
     }
 
     try {
+      // Always use soft delete (set status to 'removed') to avoid foreign key issues
       const { error } = await supabase
         .from('listings')
-        .delete()
+        .update({ status: 'removed' })
         .eq('id', params.id)
 
       if (error) throw error
 
-      alert('Listing deleted successfully!')
+      alert('Listing removed successfully! It has been hidden from the marketplace.')
       router.push('/dashboard')
     } catch (error: any) {
-      console.error('Error deleting listing:', error)
-      alert('Failed to delete listing: ' + error.message)
+      console.error('Error removing listing:', error)
+      alert('Failed to remove listing: ' + error.message)
     }
   }
 
