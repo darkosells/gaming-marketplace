@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
+import Navigation from '@/components/Navigation'
 
 interface Conversation {
   id: string
@@ -47,7 +48,6 @@ function MessagesContent() {
   const supabase = createClient()
   
   const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -55,19 +55,9 @@ function MessagesContent() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [cartItemCount, setCartItemCount] = useState(0)
 
   useEffect(() => {
-    checkUser()
-    checkCart()
-    
-    const handleStorageChange = () => checkCart()
-    window.addEventListener('storage', handleStorageChange)
-    window.addEventListener('cart-updated', handleStorageChange)
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      window.removeEventListener('cart-updated', handleStorageChange)
-    }
+    checkAuth()
   }, [])
 
   useEffect(() => {
@@ -113,16 +103,11 @@ function MessagesContent() {
     scrollToBottom()
   }, [messages])
 
-  const checkCart = () => {
-    const cart = localStorage.getItem('cart')
-    setCartItemCount(cart ? 1 : 0)
-  }
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const checkUser = async () => {
+  const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -131,20 +116,7 @@ function MessagesContent() {
     }
 
     setUser(user)
-
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    setProfile(profileData)
     setLoading(false)
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
   }
 
   const fetchConversations = async () => {
@@ -268,7 +240,6 @@ function MessagesContent() {
     }
   }
 
-  const isVendor = profile?.role === 'vendor'
   const isSeller = selectedConversation?.seller_id === user?.id
 
   if (loading) {
@@ -282,58 +253,7 @@ function MessagesContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Navigation */}
-      <nav className="bg-black/30 backdrop-blur-lg border-b border-white/10 sticky top-0 z-50">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🎮</span>
-              </div>
-              <span className="text-xl font-bold text-white">GameVault</span>
-            </Link>
-
-            <div className="flex items-center space-x-4">
-              <Link href="/browse" className="text-gray-300 hover:text-white transition">
-                Browse
-              </Link>
-              <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                {cartItemCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                    {cartItemCount}
-                  </span>
-                )}
-              </Link>
-              <Link href={isVendor ? '/dashboard' : '/customer-dashboard'} className="text-gray-300 hover:text-white transition">
-                Dashboard
-              </Link>
-              <div className="relative group z-[9999]">
-                <button className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-semibold text-sm">
-                      {profile?.username?.charAt(0).toUpperCase() || 'U'}
-                    </span>
-                  </div>
-                </button>
-                
-                <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-lg border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999]">
-                  <Link href={isVendor ? '/dashboard' : '/customer-dashboard'} className="block px-4 py-3 text-white hover:bg-white/10 rounded-t-lg">
-                    Dashboard
-                  </Link>
-                  <Link href="/messages" className="block px-4 py-3 text-white hover:bg-white/10">
-                    Messages
-                  </Link>
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/10 rounded-b-lg">
-                    Logout
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navigation />
 
       {/* Messages Content */}
       <div className="container mx-auto px-4 py-8">

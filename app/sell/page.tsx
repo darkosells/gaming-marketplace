@@ -1,11 +1,10 @@
-// Create a new file: app/sell/page.tsx
-
 'use client'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Navigation from '@/components/Navigation'
 
 export default function CreateListingPage() {
   const router = useRouter()
@@ -54,10 +53,10 @@ export default function CreateListingPage() {
   ]
 
   useEffect(() => {
-    checkUser()
+    checkAuth()
   }, [])
 
-  const checkUser = async () => {
+  const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -161,27 +160,7 @@ export default function CreateListingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Navigation */}
-      <nav className="bg-black/30 backdrop-blur-lg border-b border-white/10">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🎮</span>
-              </div>
-              <span className="text-xl font-bold text-white">GameVault</span>
-            </Link>
-
-            <div className="flex items-center space-x-4">
-              <Link href="/browse" className="text-gray-300 hover:text-white transition">
-                Browse
-              </Link>
-              <Link href="/dashboard" className="text-gray-300 hover:text-white transition">
-                Dashboard
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navigation />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">

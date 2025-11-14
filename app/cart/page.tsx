@@ -1,11 +1,10 @@
-// Create a new file: app/cart/page.tsx
-
 'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Navigation from '@/components/Navigation'
 
 interface CartItem {
   listing_id: string
@@ -27,8 +26,6 @@ interface CartItem {
 
 export default function CartPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
   const [cartItem, setCartItem] = useState<CartItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
@@ -36,37 +33,20 @@ export default function CartPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    checkUser()
+    checkAuth()
   }, [])
 
-  const checkUser = async () => {
+  const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
       router.push('/login')
       return
     }
-
-    setUser(user)
-
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-    
-    setProfile(profileData)
     
     // Load cart from localStorage
     loadCart()
     setLoading(false)
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
-    router.push('/')
   }
 
   const loadCart = async () => {
@@ -154,48 +134,7 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Navigation */}
-      <nav className="bg-black/30 backdrop-blur-lg border-b border-white/10 sticky top-0 z-50">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🎮</span>
-              </div>
-              <span className="text-xl font-bold text-white">GameVault</span>
-            </Link>
-
-            <div className="flex items-center space-x-4">
-              <Link href="/browse" className="text-gray-300 hover:text-white transition">
-                Browse
-              </Link>
-              <Link href="/dashboard" className="text-gray-300 hover:text-white transition">
-                Dashboard
-              </Link>
-              <div className="relative group z-[9999]">
-                <button className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-semibold text-sm">
-                      {profile?.username?.charAt(0).toUpperCase() || 'U'}
-                    </span>
-                  </div>
-                </button>
-                
-                <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-lg border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999]">
-                  <Link href="/dashboard" className="block px-4 py-3 text-white hover:bg-white/10 rounded-t-lg">
-                    Dashboard
-                  </Link>
-                  <Link href="/sell" className="block px-4 py-3 text-white hover:bg-white/10">
-                    Create Listing
-                  </Link>
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/10 rounded-b-lg">
-                    Logout
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navigation />
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
