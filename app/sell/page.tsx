@@ -24,6 +24,10 @@ export default function CreateListingPage() {
   const [platform, setPlatform] = useState('')
   const [stock, setStock] = useState('1')
   const [imageUrl, setImageUrl] = useState('')
+  
+  // Delivery fields
+  const [deliveryType, setDeliveryType] = useState<'manual' | 'automatic'>('manual')
+  const [deliveryCodes, setDeliveryCodes] = useState<string[]>([''])
 
   const popularGames = [
     'Fortnite',
@@ -56,6 +60,24 @@ export default function CreateListingPage() {
     checkAuth()
   }, [])
 
+  // Update delivery codes array when stock changes
+  useEffect(() => {
+    if (deliveryType === 'automatic') {
+      const stockNum = parseInt(stock) || 1
+      setDeliveryCodes(prevCodes => {
+        const newCodes = [...prevCodes]
+        // Add or remove fields to match stock
+        while (newCodes.length < stockNum) {
+          newCodes.push('')
+        }
+        while (newCodes.length > stockNum) {
+          newCodes.pop()
+        }
+        return newCodes
+      })
+    }
+  }, [stock, deliveryType])
+
   const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     
@@ -66,6 +88,12 @@ export default function CreateListingPage() {
 
     setUser(user)
     setLoading(false)
+  }
+
+  const handleDeliveryCodeChange = (index: number, value: string) => {
+    const newCodes = [...deliveryCodes]
+    newCodes[index] = value
+    setDeliveryCodes(newCodes)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,8 +120,25 @@ export default function CreateListingPage() {
       return
     }
 
+    // Validate delivery codes for automatic delivery
+    if (deliveryType === 'automatic') {
+      const emptyCodeIndex = deliveryCodes.findIndex(code => !code.trim())
+      if (emptyCodeIndex !== -1) {
+        setError(`Delivery code #${emptyCodeIndex + 1} is empty. All delivery codes must be filled for automatic delivery.`)
+        setSubmitting(false)
+        return
+      }
+
+      if (deliveryCodes.length !== parseInt(stock)) {
+        setError('Number of delivery codes must match stock quantity')
+        setSubmitting(false)
+        return
+      }
+    }
+
     try {
-      const { data, error } = await supabase
+      // Create the listing
+      const { data: listingData, error: listingError } = await supabase
         .from('listings')
         .insert([
           {
@@ -106,25 +151,47 @@ export default function CreateListingPage() {
             platform,
             stock: parseInt(stock),
             image_url: imageUrl || null,
-            status: 'active'
+            status: 'active',
+            delivery_type: deliveryType
           }
         ])
         .select()
+        .single()
 
-      if (error) throw error
+      if (listingError) throw listingError
+
+      // If automatic delivery, insert delivery codes
+      if (deliveryType === 'automatic' && listingData) {
+        const codeInserts = deliveryCodes.map(code => ({
+          listing_id: listingData.id,
+          code_text: code.trim(),
+          is_used: false
+        }))
+
+        const { error: codesError } = await supabase
+          .from('delivery_codes')
+          .insert(codeInserts)
+
+        if (codesError) {
+          // If codes fail to insert, delete the listing and show error
+          await supabase.from('listings').delete().eq('id', listingData.id)
+          throw new Error('Failed to save delivery codes: ' + codesError.message)
+        }
+      }
 
       setSuccess(true)
       
       // Redirect to the new listing after 2 seconds
       setTimeout(() => {
-        if (data && data[0]) {
-          router.push(`/listing/${data[0].id}`)
+        if (listingData) {
+          router.push(`/listing/${listingData.id}`)
         } else {
           router.push('/dashboard')
         }
       }, 2000)
 
     } catch (error: any) {
+      console.error('Create listing error:', error)
       setError(error.message || 'Failed to create listing')
     } finally {
       setSubmitting(false)
@@ -349,6 +416,77 @@ export default function CreateListingPage() {
                 ))}
               </select>
             </div>
+
+            {/* Delivery Type Selection */}
+            <div className="mb-6">
+              <label className="block text-white font-semibold mb-3">
+                Delivery Type <span className="text-red-400">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryType('manual')}
+                  className={`p-4 rounded-lg border-2 transition ${
+                    deliveryType === 'manual'
+                      ? 'border-purple-500 bg-purple-500/20'
+                      : 'border-white/10 bg-white/5 hover:border-white/20'
+                  }`}
+                >
+                  <div className="text-3xl mb-2">👤</div>
+                  <div className="text-white font-semibold mb-1">Manual Delivery</div>
+                  <div className="text-xs text-gray-400">You send details manually after payment</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeliveryType('automatic')
+                    // Initialize delivery codes array
+                    const stockNum = parseInt(stock) || 1
+                    setDeliveryCodes(new Array(stockNum).fill(''))
+                  }}
+                  className={`p-4 rounded-lg border-2 transition ${
+                    deliveryType === 'automatic'
+                      ? 'border-purple-500 bg-purple-500/20'
+                      : 'border-white/10 bg-white/5 hover:border-white/20'
+                  }`}
+                >
+                  <div className="text-3xl mb-2">⚡</div>
+                  <div className="text-white font-semibold mb-1">Automatic Delivery</div>
+                  <div className="text-xs text-gray-400">Auto-send via messenger after payment</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Delivery Codes (only show if automatic) */}
+            {deliveryType === 'automatic' && (
+              <div className="mb-6">
+                <label className="block text-white font-semibold mb-2">
+                  Delivery Codes/Instructions <span className="text-red-400">*</span>
+                </label>
+                <p className="text-sm text-gray-400 mb-4">
+                  Provide one delivery code/instruction for each item in stock. These will be automatically sent to buyers via messenger after payment.
+                </p>
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                  {deliveryCodes.map((code, index) => (
+                    <div key={index} className="bg-white/5 border border-white/10 rounded-lg p-3">
+                      <label className="block text-sm text-gray-300 mb-2">
+                        Item #{index + 1}
+                      </label>
+                      <textarea
+                        value={code}
+                        onChange={(e) => handleDeliveryCodeChange(index, e.target.value)}
+                        placeholder="e.g., Username: player123 | Password: abc123xyz | Email: user@example.com"
+                        required
+                        rows={3}
+                        maxLength={1000}
+                        className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">{code.length}/1000 characters</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Image URL */}
             <div className="mb-6">

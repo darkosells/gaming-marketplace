@@ -6,200 +6,238 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 
-interface Listing {
+interface DeliveryCode {
   id: string
-  title: string
-  description: string
-  price: number
-  game: string
-  category: string
-  platform: string
-  image_url: string
-  status: string
-  stock: number
-  created_at: string
-  seller_id: string
-  profiles: {
-    id: string
-    username: string
-    rating: number
-    total_sales: number
-    verified: boolean
-    created_at: string
-  }
+  code_text: string
+  is_used: boolean
+  order_id: string | null
+  delivered_at: string | null
 }
 
-interface Review {
-  id: string
-  rating: number
-  comment: string
-  created_at: string
-  reviewer_id: string
-  profiles: {
-    username: string
-  }
-}
-
-export default function ListingDetailPage() {
+export default function EditListingPage() {
   const params = useParams()
   const router = useRouter()
-  const [listing, setListing] = useState<Listing | null>(null)
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [loading, setLoading] = useState(true)
-  const [quantity, setQuantity] = useState(1)
-  const [activeTab, setActiveTab] = useState('description')
-  const [user, setUser] = useState<any>(null)
-  
   const supabase = createClient()
+  
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  // Form fields
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [price, setPrice] = useState('')
+  const [platform, setPlatform] = useState('')
+  const [status, setStatus] = useState('active')
+  const [imageUrl, setImageUrl] = useState('')
+  const [deliveryType, setDeliveryType] = useState<'manual' | 'automatic'>('manual')
+  
+  // Delivery codes
+  const [deliveryCodes, setDeliveryCodes] = useState<DeliveryCode[]>([])
+  const [newCodes, setNewCodes] = useState<string[]>([])
+  const [showAddCodes, setShowAddCodes] = useState(false)
 
   useEffect(() => {
     checkAuth()
-    fetchListing()
-  }, [params.id])
+  }, [])
+
+  useEffect(() => {
+    if (user) {
+      fetchListing()
+    }
+  }, [user])
 
   const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
     setUser(user)
   }
 
   const fetchListing = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: listing, error } = await supabase
         .from('listings')
-        .select(`
-          *,
-          profiles (
-            id,
-            username,
-            rating,
-            total_sales,
-            verified,
-            created_at
-          )
-        `)
+        .select('*')
         .eq('id', params.id)
         .single()
 
       if (error) throw error
-      setListing(data)
-    } catch (error) {
+
+      // Check if user owns this listing
+      if (listing.seller_id !== user.id) {
+        router.push('/dashboard')
+        return
+      }
+
+      // Set form fields
+      setTitle(listing.title)
+      setDescription(listing.description || '')
+      setPrice(listing.price.toString())
+      setPlatform(listing.platform || '')
+      setStatus(listing.status)
+      setImageUrl(listing.image_url || '')
+      setDeliveryType(listing.delivery_type || 'manual')
+
+      // Fetch delivery codes if automatic delivery
+      if (listing.delivery_type === 'automatic') {
+        fetchDeliveryCodes()
+      }
+
+      setLoading(false)
+    } catch (error: any) {
       console.error('Error fetching listing:', error)
-    } finally {
+      setError('Failed to load listing')
       setLoading(false)
     }
   }
 
-  const fetchReviews = async () => {
-    if (!listing?.seller_id) return
-    
+  const fetchDeliveryCodes = async () => {
     try {
       const { data, error } = await supabase
-        .from('reviews')
-        .select(`
-          *,
-          profiles:reviewer_id (
-            username
-          )
-        `)
-        .eq('reviewee_id', listing.seller_id)
-        .order('created_at', { ascending: false })
-        .limit(10)
+        .from('delivery_codes')
+        .select('*')
+        .eq('listing_id', params.id)
+        .order('created_at', { ascending: true })
 
       if (error) throw error
-      setReviews(data || [])
+      setDeliveryCodes(data || [])
     } catch (error) {
-      console.error('Error fetching reviews:', error)
+      console.error('Error fetching delivery codes:', error)
     }
   }
 
-  useEffect(() => {
-    if (listing) {
-      fetchReviews()
-    }
-  }, [listing])
-
-  const handleBuyNow = () => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
-    // Will implement checkout later
-    alert('Checkout functionality coming soon!')
-  }
-
-  const handleAddToCart = () => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
-
-    if (!listing) return
-
-    // Check if cart already has an item
-    const existingCart = localStorage.getItem('cart')
-    if (existingCart) {
-      const proceed = confirm('You already have an item in your cart. Adding this item will replace it. Continue?')
-      if (!proceed) return
-    }
-
-    // Add to cart (single item only)
-    const cart = {
-      listing_id: listing.id,
-      quantity: quantity
-    }
-    localStorage.setItem('cart', JSON.stringify(cart))
-    
-    // Trigger cart update event
-    window.dispatchEvent(new Event('cart-updated'))
-    
-    // Redirect to cart
-    router.push('/cart')
-  }
-
-  const handleContactSeller = async () => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
-
-    if (!listing) return
+  const handleUpdateListing = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
 
     try {
-      // Check if conversation already exists
-      const { data: existingConv, error: checkError } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('listing_id', listing.id)
-        .eq('buyer_id', user.id)
-        .eq('seller_id', listing.seller_id)
-        .single()
-
-      if (existingConv) {
-        // Conversation exists, redirect to it
-        router.push(`/messages?conversation=${existingConv.id}`)
-        return
-      }
-
-      // Create new conversation
-      const { data: newConv, error: createError } = await supabase
-        .from('conversations')
-        .insert({
-          listing_id: listing.id,
-          buyer_id: user.id,
-          seller_id: listing.seller_id,
-          last_message: 'Started conversation',
-          last_message_at: new Date().toISOString()
+      const { error: updateError } = await supabase
+        .from('listings')
+        .update({
+          title,
+          description,
+          price: parseFloat(price),
+          platform,
+          status,
+          image_url: imageUrl || null
         })
-        .select()
-        .single()
+        .eq('id', params.id)
 
-      if (createError) throw createError
+      if (updateError) throw updateError
 
-      // Redirect to messages
-      router.push(`/messages?conversation=${newConv.id}`)
-    } catch (error) {
-      console.error('Error creating conversation:', error)
-      alert('Failed to start conversation. Please try again.')
+      setSuccess(true)
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 1500)
+    } catch (error: any) {
+      console.error('Update error:', error)
+      setError(error.message || 'Failed to update listing')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleUpdateCode = async (codeId: string, newText: string) => {
+    try {
+      const { error } = await supabase
+        .from('delivery_codes')
+        .update({ code_text: newText, updated_at: new Date().toISOString() })
+        .eq('id', codeId)
+
+      if (error) throw error
+
+      // Update local state
+      setDeliveryCodes(prev =>
+        prev.map(code => code.id === codeId ? { ...code, code_text: newText } : code)
+      )
+
+      alert('Delivery code updated successfully')
+    } catch (error: any) {
+      console.error('Error updating code:', error)
+      alert('Failed to update delivery code: ' + error.message)
+    }
+  }
+
+  const handleDeleteCode = async (codeId: string) => {
+    if (!confirm('Delete this delivery code? This will reduce your stock by 1.')) return
+
+    try {
+      const { error } = await supabase
+        .from('delivery_codes')
+        .delete()
+        .eq('id', codeId)
+
+      if (error) throw error
+
+      // Update local state
+      setDeliveryCodes(prev => prev.filter(code => code.id !== codeId))
+      alert('Delivery code deleted successfully')
+    } catch (error: any) {
+      console.error('Error deleting code:', error)
+      alert('Failed to delete delivery code: ' + error.message)
+    }
+  }
+
+  const handleAddNewCodes = async () => {
+    if (newCodes.length === 0) return
+
+    // Validate all codes are filled
+    const emptyIndex = newCodes.findIndex(code => !code.trim())
+    if (emptyIndex !== -1) {
+      setError(`New code #${emptyIndex + 1} is empty`)
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const codeInserts = newCodes.map(code => ({
+        listing_id: params.id as string,
+        code_text: code.trim(),
+        is_used: false
+      }))
+
+      const { error } = await supabase
+        .from('delivery_codes')
+        .insert(codeInserts)
+
+      if (error) throw error
+
+      // Refresh delivery codes
+      await fetchDeliveryCodes()
+      setNewCodes([])
+      setShowAddCodes(false)
+      alert('New delivery codes added successfully')
+    } catch (error: any) {
+      console.error('Error adding codes:', error)
+      setError('Failed to add delivery codes: ' + error.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteListing = async () => {
+    if (!confirm('Are you sure you want to delete this listing? This action cannot be undone.')) return
+
+    try {
+      const { error } = await supabase
+        .from('listings')
+        .delete()
+        .eq('id', params.id)
+
+      if (error) throw error
+
+      router.push('/dashboard')
+    } catch (error: any) {
+      console.error('Delete error:', error)
+      alert('Failed to delete listing: ' + error.message)
     }
   }
 
@@ -211,320 +249,286 @@ export default function ListingDetailPage() {
     )
   }
 
-  if (!listing) {
+  if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-white mb-4">Listing Not Found</h1>
-          <Link href="/browse" className="text-purple-400 hover:text-purple-300">
-            ← Back to Browse
-          </Link>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full">
+          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 shadow-2xl text-center">
+            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-4xl">✓</span>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Listing Updated!</h2>
+            <p className="text-gray-400 mb-4">Redirecting to dashboard...</p>
+          </div>
         </div>
       </div>
     )
   }
 
-  const totalPrice = listing.price * quantity
-  const sellerJoinDate = new Date(listing.profiles.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const unusedCodes = deliveryCodes.filter(code => !code.is_used)
+  const usedCodes = deliveryCodes.filter(code => code.is_used)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Navigation */}
       <Navigation />
 
-      {/* Breadcrumb */}
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center space-x-2 text-sm">
-          <Link href="/" className="text-gray-400 hover:text-white">Home</Link>
-          <span className="text-gray-600">/</span>
-          <Link href="/browse" className="text-gray-400 hover:text-white">Browse</Link>
-          <span className="text-gray-600">/</span>
-          <Link href={`/browse?game=${listing.game}`} className="text-gray-400 hover:text-white">{listing.game}</Link>
-          <span className="text-gray-600">/</span>
-          <span className="text-gray-300">{listing.title}</span>
-        </div>
-      </div>
+      <div className="container mx-auto px-4 py-12">
+        <div className="max-w-3xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <Link href="/dashboard" className="text-purple-400 hover:text-purple-300 mb-4 inline-block">
+              ← Back to Dashboard
+            </Link>
+            <h1 className="text-4xl font-bold text-white mb-2">Edit Listing</h1>
+            <p className="text-gray-400">Update your listing details</p>
+          </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - Product Info */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Main Product Card */}
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
-              {/* Image */}
-              <div className="relative h-96 bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                {listing.image_url ? (
-                  <img
-                    src={listing.image_url}
-                    alt={listing.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-9xl">
-                      {listing.category === 'account' ? '🎮' : listing.category === 'topup' ? '💰' : '🔑'}
-                    </span>
+          {/* Form */}
+          <form onSubmit={handleUpdateListing} className="space-y-6">
+            {error && (
+              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4">
+                <p className="text-red-200 text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Basic Info Card */}
+            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-white mb-4">Basic Information</h2>
+
+              {/* Title */}
+              <div className="mb-4">
+                <label className="block text-white font-semibold mb-2">Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  maxLength={100}
+                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="mb-4">
+                <label className="block text-white font-semibold mb-2">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={6}
+                  maxLength={1000}
+                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                />
+              </div>
+
+              {/* Price and Platform */}
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-white font-semibold mb-2">Price (USD)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                    <input
+                      type="number"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      required
+                      min="0.01"
+                      step="0.01"
+                      className="w-full pl-8 pr-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
                   </div>
-                )}
-                {/* Category Badge */}
-                <div className="absolute top-4 left-4">
-                  <span className="bg-black/50 backdrop-blur-lg px-4 py-2 rounded-full text-sm text-white font-semibold">
-                    {listing.category === 'account' ? 'Gaming Account' : listing.category === 'topup' ? 'Top-Up' : 'Game Key'}
-                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-white font-semibold mb-2">Platform</label>
+                  <input
+                    type="text"
+                    value={platform}
+                    onChange={(e) => setPlatform(e.target.value)}
+                    placeholder="Optional"
+                    className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
                 </div>
               </div>
 
-              {/* Product Details */}
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <p className="text-purple-400 font-semibold mb-2">{listing.game}</p>
-                    <h1 className="text-3xl font-bold text-white mb-2">{listing.title}</h1>
-                    {listing.platform && (
-                      <span className="inline-block bg-white/5 px-3 py-1 rounded-full text-sm text-gray-300">
-                        {listing.platform}
-                      </span>
-                    )}
-                  </div>
-                </div>
+              {/* Status */}
+              <div className="mb-4">
+                <label className="block text-white font-semibold mb-2">Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-slate-800 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 1rem center',
+                    backgroundSize: '1.5em 1.5em',
+                    paddingRight: '3rem'
+                  }}
+                >
+                  <option value="active" className="bg-slate-800">Active</option>
+                  <option value="sold" className="bg-slate-800">Sold</option>
+                  <option value="removed" className="bg-slate-800">Removed</option>
+                  <option value="out_of_stock" className="bg-slate-800">Out of Stock</option>
+                </select>
+              </div>
 
-                {/* Tabs */}
-                <div className="border-b border-white/10 mb-6">
-                  <div className="flex space-x-8">
-                    <button
-                      onClick={() => setActiveTab('description')}
-                      className={`pb-4 border-b-2 transition ${
-                        activeTab === 'description'
-                          ? 'border-purple-500 text-white'
-                          : 'border-transparent text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Description
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('details')}
-                      className={`pb-4 border-b-2 transition ${
-                        activeTab === 'details'
-                          ? 'border-purple-500 text-white'
-                          : 'border-transparent text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Details
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tab Content */}
-                {activeTab === 'description' && (
-                  <div className="text-gray-300">
-                    <p className="whitespace-pre-wrap">{listing.description || 'No description provided.'}</p>
-                  </div>
-                )}
-
-                {activeTab === 'details' && (
-                  <div className="space-y-3">
-                    <div className="flex justify-between py-2 border-b border-white/10">
-                      <span className="text-gray-400">Category</span>
-                      <span className="text-white font-semibold">
-                        {listing.category === 'account' ? 'Gaming Account' : listing.category === 'topup' ? 'Top-Up' : 'Game Key'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-white/10">
-                      <span className="text-gray-400">Game</span>
-                      <span className="text-white font-semibold">{listing.game}</span>
-                    </div>
-                    {listing.platform && (
-                      <div className="flex justify-between py-2 border-b border-white/10">
-                        <span className="text-gray-400">Platform</span>
-                        <span className="text-white font-semibold">{listing.platform}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between py-2 border-b border-white/10">
-                      <span className="text-gray-400">Stock</span>
-                      <span className="text-white font-semibold">{listing.stock} available</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-white/10">
-                      <span className="text-gray-400">Listed</span>
-                      <span className="text-white font-semibold">
-                        {new Date(listing.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                )}
+              {/* Image URL */}
+              <div>
+                <label className="block text-white font-semibold mb-2">Image URL</label>
+                <input
+                  type="url"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
               </div>
             </div>
 
-            {/* Seller Reviews Section */}
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-white mb-6">Seller Reviews</h2>
-              
-              {reviews.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-400">No reviews yet</p>
+            {/* Delivery Codes Management (only for automatic delivery) */}
+            {deliveryType === 'automatic' && (
+              <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Delivery Codes</h2>
+                    <p className="text-sm text-gray-400">
+                      Available: {unusedCodes.length} | Sold: {usedCodes.length}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCodes(!showAddCodes)}
+                    className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-semibold transition"
+                  >
+                    {showAddCodes ? 'Cancel' : '+ Add Codes'}
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {reviews.map((review) => (
-                    <div key={review.id} className="bg-white/5 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
-                            <span className="text-white font-semibold">
-                              {review.profiles.username.charAt(0).toUpperCase()}
-                            </span>
+
+                {/* Add New Codes */}
+                {showAddCodes && (
+                  <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-lg">
+                    <h3 className="text-white font-semibold mb-3">Add New Delivery Codes</h3>
+                    <div className="space-y-3 mb-4">
+                      {newCodes.map((code, index) => (
+                        <div key={index}>
+                          <textarea
+                            value={code}
+                            onChange={(e) => {
+                              const updated = [...newCodes]
+                              updated[index] = e.target.value
+                              setNewCodes(updated)
+                            }}
+                            placeholder={`New code #${index + 1}`}
+                            rows={2}
+                            maxLength={1000}
+                            className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">{code.length}/1000 characters</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewCodes([...newCodes, ''])}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-sm font-semibold border border-white/10 transition"
+                      >
+                        + Add Another
+                      </button>
+                      {newCodes.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleAddNewCodes}
+                          disabled={submitting}
+                          className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50"
+                        >
+                          Save New Codes
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Unused Codes */}
+                {unusedCodes.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-white font-semibold mb-3">Available Codes</h3>
+                    <div className="space-y-2">
+                      {unusedCodes.map((code, index) => (
+                        <div key={code.id} className="bg-white/5 border border-white/10 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-gray-400">Code #{index + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCode(code.id)}
+                              className="text-red-400 hover:text-red-300 text-sm font-semibold"
+                            >
+                              Delete
+                            </button>
                           </div>
-                          <div>
-                            <p className="text-white font-semibold">{review.profiles.username}</p>
-                            <div className="flex items-center">
-                              {[...Array(5)].map((_, i) => (
-                                <span key={i} className={i < review.rating ? 'text-yellow-400' : 'text-gray-600'}>
-                                  ★
-                                </span>
-                              ))}
-                            </div>
+                          <textarea
+                            value={code.code_text}
+                            onChange={(e) => handleUpdateCode(code.id, e.target.value)}
+                            rows={2}
+                            maxLength={1000}
+                            className="w-full px-3 py-2 rounded bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">{code.code_text.length}/1000 characters</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Used Codes (Read-only) */}
+                {usedCodes.length > 0 && (
+                  <div>
+                    <h3 className="text-white font-semibold mb-3">Sold Codes (Read-only)</h3>
+                    <div className="space-y-2">
+                      {usedCodes.map((code, index) => (
+                        <div key={code.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-gray-400">Sold Code #{index + 1}</span>
+                            <span className="text-xs text-green-400">✓ Delivered</span>
+                          </div>
+                          <div className="text-sm text-gray-500 font-mono bg-black/20 rounded p-2">
+                            {code.code_text.substring(0, 50)}...
                           </div>
                         </div>
-                        <span className="text-sm text-gray-400">
-                          {new Date(review.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className="text-gray-300 text-sm">{review.comment}</p>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column - Purchase Card & Seller Info */}
-          <div className="space-y-6">
-            {/* Purchase Card */}
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
-              <div className="mb-6">
-                <p className="text-gray-400 text-sm mb-2">Price</p>
-                <p className="text-4xl font-bold text-green-400">${listing.price.toFixed(2)}</p>
-              </div>
-
-              {/* Quantity Selector */}
-              <div className="mb-6">
-                <label className="block text-white font-semibold mb-2">Quantity</label>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-lg text-white font-bold transition"
-                  >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, Math.min(listing.stock, parseInt(e.target.value) || 1)))}
-                    className="w-20 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <button
-                    onClick={() => setQuantity(Math.min(listing.stock, quantity + 1))}
-                    className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-lg text-white font-bold transition"
-                  >
-                    +
-                  </button>
-                </div>
-                <p className="text-sm text-gray-400 mt-2">{listing.stock} in stock</p>
-              </div>
-
-              {/* Total */}
-              <div className="mb-6 pb-6 border-b border-white/10">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Total</span>
-                  <span className="text-2xl font-bold text-white">${totalPrice.toFixed(2)}</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-3">
-                <button
-                  onClick={handleBuyNow}
-                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition"
-                >
-                  Buy Now
-                </button>
-                <button
-                  onClick={handleAddToCart}
-                  className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-lg font-semibold border border-white/20 transition"
-                >
-                  Add to Cart
-                </button>
-                <button
-                  onClick={handleContactSeller}
-                  className="w-full bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-semibold border border-white/10 transition"
-                >
-                  Contact Seller
-                </button>
-              </div>
-
-              {/* Trust Badges */}
-              <div className="mt-6 pt-6 border-t border-white/10 space-y-3">
-                <div className="flex items-center space-x-3 text-sm">
-                  <span className="text-green-400">✓</span>
-                  <span className="text-gray-300">Secure Payment</span>
-                </div>
-                <div className="flex items-center space-x-3 text-sm">
-                  <span className="text-green-400">✓</span>
-                  <span className="text-gray-300">Buyer Protection</span>
-                </div>
-                <div className="flex items-center space-x-3 text-sm">
-                  <span className="text-green-400">✓</span>
-                  <span className="text-gray-300">Instant Delivery</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Seller Info Card */}
-            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
-              <h3 className="text-xl font-bold text-white mb-4">Seller Information</h3>
-              
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">
-                    {listing.profiles.username.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <Link href={`/seller/${listing.profiles.id}`} className="text-white font-semibold hover:text-purple-400 transition">
-                      {listing.profiles.username}
-                    </Link>
-                    {listing.profiles.verified && (
-                      <span className="text-blue-400" title="Verified Seller">✓</span>
-                    )}
                   </div>
-                  <p className="text-sm text-gray-400">Member since {sellerJoinDate}</p>
-                </div>
+                )}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+              <div className="flex gap-4">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition disabled:opacity-50"
+                >
+                  {submitting ? 'Saving...' : 'Save Changes'}
+                </button>
+                <Link
+                  href="/dashboard"
+                  className="px-8 py-3 bg-white/5 hover:bg-white/10 text-white rounded-lg font-semibold border border-white/10 transition text-center"
+                >
+                  Cancel
+                </Link>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex justify-between py-2 border-b border-white/10">
-                  <span className="text-gray-400">Rating</span>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-yellow-400">★</span>
-                    <span className="text-white font-semibold">
-                      {listing.profiles.rating > 0 ? listing.profiles.rating.toFixed(1) : 'New'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex justify-between py-2 border-b border-white/10">
-                  <span className="text-gray-400">Total Sales</span>
-                  <span className="text-white font-semibold">{listing.profiles.total_sales}</span>
-                </div>
-              </div>
-
-              <Link
-                href={`/seller/${listing.profiles.id}`}
-                className="block w-full mt-4 bg-white/5 hover:bg-white/10 text-white py-2 rounded-lg font-semibold text-center border border-white/10 transition"
+              <button
+                type="button"
+                onClick={handleDeleteListing}
+                className="w-full mt-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 py-3 rounded-lg font-semibold border border-red-500/50 transition"
               >
-                View Profile
-              </Link>
+                Delete Listing
+              </button>
             </div>
-          </div>
+          </form>
         </div>
       </div>
     </div>
