@@ -1,5 +1,3 @@
-// app/admin/page.tsx - ADMIN DASHBOARD WITH PAGINATION
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -15,11 +13,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('users')
   const [disputeSubTab, setDisputeSubTab] = useState('active')
-  
-  // Pagination states
+  const [verificationSubTab, setVerificationSubTab] = useState('pending')
   const [currentPage, setCurrentPage] = useState(1)
-  
-  // Data states
   const [users, setUsers] = useState<any[]>([])
   const [listings, setListings] = useState<any[]>([])
   const [orders, setOrders] = useState<any[]>([])
@@ -29,6 +24,8 @@ export default function AdminDashboard() {
   const [reviews, setReviews] = useState<any[]>([])
   const [pendingWithdrawals, setPendingWithdrawals] = useState<any[]>([])
   const [processedWithdrawals, setProcessedWithdrawals] = useState<any[]>([])
+  const [pendingVerifications, setPendingVerifications] = useState<any[]>([])
+  const [pastVerifications, setPastVerifications] = useState<any[]>([])
   const [editingReview, setEditingReview] = useState<any>(null)
   const [editedComment, setEditedComment] = useState('')
   const [showRejectModal, setShowRejectModal] = useState(false)
@@ -38,14 +35,22 @@ export default function AdminDashboard() {
   const [approvingWithdrawalId, setApprovingWithdrawalId] = useState<string | null>(null)
   const [transactionId, setTransactionId] = useState('')
   const [approveNotes, setApproveNotes] = useState('')
+  const [showVerificationDetailsModal, setShowVerificationDetailsModal] = useState(false)
+  const [selectedVerification, setSelectedVerification] = useState<any>(null)
+  const [showAgreementModal, setShowAgreementModal] = useState(false)
+  const [agreementAccepted, setAgreementAccepted] = useState(false)
+  const [verificationDecisionModal, setVerificationDecisionModal] = useState<'approve' | 'reject' | null>(null)
+  const [verificationRejectionReason, setVerificationRejectionReason] = useState('')
+  const [verificationAdminNotes, setVerificationAdminNotes] = useState('')
+  const [rejectionType, setRejectionType] = useState<'resubmission_required' | 'permanent'>('resubmission_required')
+  const [resubmissionFields, setResubmissionFields] = useState<string[]>([])
+  const [resubmissionInstructions, setResubmissionInstructions] = useState('')
   
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    checkAdmin()
-  }, [])
-
+  useEffect(() => { checkAdmin() }, [])
+  
   useEffect(() => {
     if (profile?.is_admin) {
       if (activeTab === 'users') fetchUsers()
@@ -55,1636 +60,237 @@ export default function AdminDashboard() {
       if (activeTab === 'disputes') fetchDisputes()
       if (activeTab === 'reviews') fetchReviews()
       if (activeTab === 'withdrawals') fetchWithdrawals()
+      if (activeTab === 'verifications') fetchVerifications()
     }
   }, [activeTab, profile])
-
-  // Reset to page 1 when changing tabs
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [activeTab, disputeSubTab])
+  
+  useEffect(() => { setCurrentPage(1) }, [activeTab, disputeSubTab, verificationSubTab])
 
   const checkAdmin = async () => {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
-      
-      if (userError || !user) {
-        router.push('/login')
-        return
-      }
-
+      if (userError || !user) { router.push('/login'); return }
       setUser(user)
-
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (profileError || !profileData?.is_admin) {
-        router.push('/')
-        return
-      }
-
+      const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      if (profileError || !profileData?.is_admin) { router.push('/'); return }
       setProfile(profileData)
       setLoading(false)
-    } catch (error) {
-      console.error('Check admin error:', error)
-      router.push('/')
-    }
+    } catch (error) { router.push('/') }
   }
 
-  const fetchUsers = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (!error) setUsers(data || [])
-  }
-
-  const fetchListings = async () => {
-    const { data, error } = await supabase
-      .from('listings')
-      .select('*, profiles(username)')
-      .order('created_at', { ascending: false })
-
-    if (!error) setListings(data || [])
-  }
-
-  const fetchOrders = async () => {
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        buyer:profiles!buyer_id(username),
-        seller:profiles!seller_id(username)
-      `)
-      .order('created_at', { ascending: false })
-
-    if (!error) setOrders(data || [])
-  }
-
-  const fetchConversations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select(`
-          *,
-          listing:listings(title, game, image_url),
-          buyer:profiles!conversations_buyer_id_fkey(username),
-          seller:profiles!conversations_seller_id_fkey(username),
-          order:orders(status, amount)
-        `)
-        .order('last_message_at', { ascending: false })
-
-      if (error) throw error
-      setConversations(data || [])
-    } catch (error) {
-      console.error('Error fetching conversations:', error)
-    }
-  }
-
+  const fetchUsers = async () => { const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); if (data) setUsers(data) }
+  const fetchListings = async () => { const { data } = await supabase.from('listings').select('*, profiles(username)').order('created_at', { ascending: false }); if (data) setListings(data) }
+  const fetchOrders = async () => { const { data } = await supabase.from('orders').select('*, buyer:profiles!buyer_id(username), seller:profiles!seller_id(username)').order('created_at', { ascending: false }); if (data) setOrders(data) }
+  const fetchConversations = async () => { const { data } = await supabase.from('conversations').select('*, listing:listings(title, game, image_url), buyer:profiles!conversations_buyer_id_fkey(username), seller:profiles!conversations_seller_id_fkey(username), order:orders(status, amount)').order('last_message_at', { ascending: false }); if (data) setConversations(data) }
+  
   const fetchDisputes = async () => {
-    try {
-      // Fetch active disputes (status = dispute_raised)
-      const { data: activeData, error: activeError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          buyer:profiles!orders_buyer_id_fkey(username, id),
-          seller:profiles!orders_seller_id_fkey(username, id)
-        `)
-        .eq('status', 'dispute_raised')
-        .order('dispute_opened_at', { ascending: false })
-
-      if (activeError) throw activeError
-      setActiveDisputes(activeData || [])
-
-      // Fetch solved disputes - orders that HAD a dispute but are now resolved
-      // These are orders with dispute_opened_at set but status is NOT dispute_raised
-      const { data: solvedData, error: solvedError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          buyer:profiles!orders_buyer_id_fkey(username, id),
-          seller:profiles!orders_seller_id_fkey(username, id)
-        `)
-        .not('dispute_opened_at', 'is', null)
-        .neq('status', 'dispute_raised')
-        .order('completed_at', { ascending: false })
-
-      if (solvedError) throw solvedError
-      setSolvedDisputes(solvedData || [])
-    } catch (error) {
-      console.error('Error fetching disputes:', error)
-    }
+    const { data: activeData } = await supabase.from('orders').select('*, buyer:profiles!orders_buyer_id_fkey(username, id), seller:profiles!orders_seller_id_fkey(username, id)').eq('status', 'dispute_raised').order('dispute_opened_at', { ascending: false })
+    setActiveDisputes(activeData || [])
+    const { data: solvedData } = await supabase.from('orders').select('*, buyer:profiles!orders_buyer_id_fkey(username, id), seller:profiles!orders_seller_id_fkey(username, id)').not('dispute_opened_at', 'is', null).neq('status', 'dispute_raised').order('completed_at', { ascending: false })
+    setSolvedDisputes(solvedData || [])
   }
-
+  
   const fetchReviews = async () => {
-    try {
-      // First fetch reviews with buyer info
-      const { data, error } = await supabase
-        .from('reviews')
-        .select(`
-          *,
-          buyer:profiles!buyer_id(username)
-        `)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching reviews:', error.message, error.details, error.hint)
-        throw error
-      }
-
-      // If reviews have seller_id, fetch seller info separately
-      const reviewsWithSellers = await Promise.all((data || []).map(async (review) => {
-        if (review.seller_id) {
-          const { data: sellerData } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', review.seller_id)
-            .single()
-          return { ...review, seller: sellerData }
-        }
-        return { ...review, seller: null }
-      }))
-
-      setReviews(reviewsWithSellers)
-    } catch (error: any) {
-      console.error('Error fetching reviews:', error.message || error)
-    }
+    const { data } = await supabase.from('reviews').select('*, buyer:profiles!buyer_id(username)').order('created_at', { ascending: false })
+    const reviewsWithSellers = await Promise.all((data || []).map(async (review) => {
+      if (review.seller_id) { const { data: sellerData } = await supabase.from('profiles').select('username').eq('id', review.seller_id).single(); return { ...review, seller: sellerData } }
+      return { ...review, seller: null }
+    }))
+    setReviews(reviewsWithSellers)
   }
-
-  const handleEditReview = (review: any) => {
-    setEditingReview(review)
-    setEditedComment(review.comment || '')
-  }
-
-  const handleSaveReview = async () => {
-    if (!editingReview) return
-
-    try {
-      const { error } = await supabase
-        .from('reviews')
-        .update({ 
-          comment: editedComment.trim() || null,
-          edited_by_admin: true,
-          edited_at: new Date().toISOString()
-        })
-        .eq('id', editingReview.id)
-
-      if (error) throw error
-
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: user.id,
-        action_type: 'review_edited',
-        target_type: 'review',
-        target_id: editingReview.id,
-        description: `Edited review comment for order ${editingReview.order_id}`,
-        metadata: {
-          original_comment: editingReview.comment,
-          new_comment: editedComment.trim(),
-          rating: editingReview.rating
-        }
-      })
-
-      alert('Review updated successfully')
-      setEditingReview(null)
-      fetchReviews()
-    } catch (error) {
-      console.error('Error updating review:', error)
-      alert('Failed to update review')
-    }
-  }
-
-  const handleDeleteReview = async (reviewId: string) => {
-    if (!confirm('Are you sure you want to delete this review? This action cannot be undone.')) return
-
-    try {
-      const { error } = await supabase
-        .from('reviews')
-        .delete()
-        .eq('id', reviewId)
-
-      if (error) throw error
-
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: user.id,
-        action_type: 'review_deleted',
-        target_type: 'review',
-        target_id: reviewId,
-        description: 'Deleted review',
-        metadata: {}
-      })
-
-      alert('Review deleted')
-      fetchReviews()
-    } catch (error) {
-      console.error('Error deleting review:', error)
-      alert('Failed to delete review')
-    }
-  }
-
+  
   const fetchWithdrawals = async () => {
+    const { data: pendingData } = await supabase.from('withdrawals').select('*, user:profiles!user_id(username, id)').eq('status', 'pending').order('created_at', { ascending: false })
+    setPendingWithdrawals(pendingData || [])
+    const { data: processedData } = await supabase.from('withdrawals').select('*, user:profiles!user_id(username, id), processor:profiles!processed_by(username)').in('status', ['completed', 'rejected']).order('processed_at', { ascending: false })
+    setProcessedWithdrawals(processedData || [])
+  }
+  
+  const fetchVerifications = async () => {
+    const { data: pendingData } = await supabase.from('vendor_verifications').select('*, user:profiles!user_id(username, id, created_at)').eq('status', 'pending').order('created_at', { ascending: false })
+    setPendingVerifications(pendingData || [])
+    const { data: pastData } = await supabase.from('vendor_verifications').select('*, user:profiles!user_id(username, id), reviewer:profiles!reviewed_by(username)').neq('status', 'pending').order('reviewed_at', { ascending: false })
+    setPastVerifications(pastData || [])
+  }
+
+  const handleViewVerificationDetails = (v: any) => { 
+    setSelectedVerification(v)
+    if (v.documents_viewed_at || v.documents_cleared) { 
+      setShowVerificationDetailsModal(true) 
+    } else { 
+      setShowAgreementModal(true) 
+    } 
+  }
+  
+  const handleAcceptAgreement = async () => {
+    if (!agreementAccepted) { alert('You must accept the agreement.'); return }
     try {
-      // Fetch pending withdrawals
-      const { data: pendingData, error: pendingError } = await supabase
-        .from('withdrawals')
-        .select(`
-          *,
-          user:profiles!user_id(username, id)
-        `)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-
-      if (pendingError) throw pendingError
-      setPendingWithdrawals(pendingData || [])
-
-      // Fetch processed withdrawals (completed or rejected)
-      const { data: processedData, error: processedError } = await supabase
-        .from('withdrawals')
-        .select(`
-          *,
-          user:profiles!user_id(username, id),
-          processor:profiles!processed_by(username)
-        `)
-        .in('status', ['completed', 'rejected'])
-        .order('processed_at', { ascending: false })
-
-      if (processedError) throw processedError
-      setProcessedWithdrawals(processedData || [])
-    } catch (error) {
-      console.error('Error fetching withdrawals:', error)
+      const { error } = await supabase.from('vendor_verifications').update({ documents_viewed_by: user.id, documents_viewed_at: new Date().toISOString() }).eq('id', selectedVerification.id)
+      if (error) { console.error('Agreement error:', error); throw error }
+      setShowAgreementModal(false)
+      setShowVerificationDetailsModal(true)
+      setAgreementAccepted(false)
+    } catch (error) { 
+      console.error('Error:', error)
+      alert('Failed to record agreement.') 
     }
   }
-
-  const handleApproveWithdrawal = async (withdrawalId: string) => {
-    setApprovingWithdrawalId(withdrawalId)
-    setTransactionId('')
-    setApproveNotes('')
-    setShowApproveModal(true)
-  }
-
-  const confirmApproveWithdrawal = async () => {
-    if (!transactionId.trim()) {
-      alert('Transaction ID is required to approve withdrawal')
-      return
-    }
-
+  
+  const handleApproveVerification = async () => {
+    if (!selectedVerification) return
     try {
-      const { error } = await supabase
-        .from('withdrawals')
-        .update({
-          status: 'completed',
-          processed_by: user.id,
-          processed_at: new Date().toISOString(),
-          transaction_id: transactionId.trim(),
-          admin_notes: approveNotes.trim() || null
-        })
-        .eq('id', approvingWithdrawalId)
-
-      if (error) throw error
-
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: user.id,
-        action_type: 'withdrawal_approved',
-        target_type: 'withdrawal',
-        target_id: approvingWithdrawalId,
-        description: `Approved withdrawal with transaction ID: ${transactionId}`,
-        metadata: { transaction_id: transactionId, notes: approveNotes }
-      })
-
-      alert('✅ Withdrawal approved successfully!')
-      setShowApproveModal(false)
-      setApprovingWithdrawalId(null)
-      fetchWithdrawals()
-    } catch (error) {
-      console.error('Error approving withdrawal:', error)
-      alert('Failed to approve withdrawal')
-    }
-  }
-
-  const handleRejectWithdrawal = async (withdrawalId: string) => {
-    setRejectingWithdrawalId(withdrawalId)
-    setRejectionReason('')
-    setShowRejectModal(true)
-  }
-
-  const confirmRejectWithdrawal = async () => {
-    if (!rejectionReason.trim() || rejectionReason.trim().length < 5) {
-      alert('Please provide a valid rejection reason (at least 5 characters)')
-      return
-    }
-
-    try {
-      const { error } = await supabase
-        .from('withdrawals')
-        .update({
-          status: 'rejected',
-          processed_by: user.id,
-          processed_at: new Date().toISOString(),
-          admin_notes: rejectionReason.trim()
-        })
-        .eq('id', rejectingWithdrawalId)
-
-      if (error) throw error
-
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: user.id,
-        action_type: 'withdrawal_rejected',
-        target_type: 'withdrawal',
-        target_id: rejectingWithdrawalId,
-        description: `Rejected withdrawal: ${rejectionReason}`,
-        metadata: { reason: rejectionReason }
-      })
-
-      alert('❌ Withdrawal rejected. Funds have been returned to vendor\'s balance.')
-      setShowRejectModal(false)
-      setRejectingWithdrawalId(null)
-      fetchWithdrawals()
-    } catch (error) {
-      console.error('Error rejecting withdrawal:', error)
-      alert('Failed to reject withdrawal')
-    }
-  }
-
-  const handleBanUser = async (userId: string, currentlyBanned: boolean) => {
-    const action = currentlyBanned ? 'unban' : 'ban'
-    const reason = currentlyBanned ? null : prompt('Ban reason:')
-    
-    if (!currentlyBanned && !reason) return
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_banned: !currentlyBanned,
-        banned_at: !currentlyBanned ? new Date().toISOString() : null,
-        ban_reason: reason
-      })
-      .eq('id', userId)
-
-    if (!error) {
-      alert(`User ${action}ned successfully`)
+      const { error: updateError } = await supabase.from('vendor_verifications').update({ 
+        status: 'approved', 
+        reviewed_by: user.id, 
+        reviewed_at: new Date().toISOString(), 
+        admin_notes: verificationAdminNotes.trim() || null 
+      }).eq('id', selectedVerification.id)
+      
+      if (updateError) { console.error('Update error:', updateError); throw updateError }
+      
+      const { error: profileError } = await supabase.from('profiles').update({ 
+        role: 'vendor', 
+        vendor_since: new Date().toISOString(), 
+        verified: true 
+      }).eq('id', selectedVerification.user_id)
+      
+      if (profileError) { console.error('Profile error:', profileError); throw profileError }
+      
+      await supabase.from('vendor_verifications').update({ 
+        id_front_url: null, 
+        id_back_url: null, 
+        documents_cleared: true 
+      }).eq('id', selectedVerification.id)
+      
+      alert('✅ Verification approved!')
+      setVerificationDecisionModal(null)
+      setShowVerificationDetailsModal(false)
+      setSelectedVerification(null)
+      setVerificationAdminNotes('')
+      fetchVerifications()
       fetchUsers()
+    } catch (error) { 
+      console.error('Approve error:', error)
+      alert('Failed to approve.') 
     }
   }
-
-  const handleDeleteListing = async (listingId: string) => {
-    if (!confirm('Delete this listing?')) return
-
-    const { error } = await supabase
-      .from('listings')
-      .delete()
-      .eq('id', listingId)
-
-    if (!error) {
-      alert('Listing deleted')
-      fetchListings()
-    }
-  }
-
-  const handleResolveDispute = async (orderId: string, resolution: 'buyer' | 'seller') => {
-    let confirmMsg = ''
-    let newStatus = ''
-    let actionType = ''
-    let resolutionType = ''
-    let description = ''
+  
+  const handleRejectVerification = async () => {
+    if (!selectedVerification) return
     
-    if (resolution === 'buyer') {
-      confirmMsg = 'Resolve dispute in favor of BUYER?\n\nThis will:\n• Mark the order as REFUNDED\n• The buyer will receive their money back\n• The seller will not be paid'
-      newStatus = 'refunded'
-      actionType = 'dispute_resolved_buyer'
-      resolutionType = 'refunded'
-      description = 'Dispute resolved in favor of buyer - Order refunded'
+    if (rejectionType === 'resubmission_required') {
+      if (resubmissionFields.length === 0) { alert('Please select at least one field.'); return }
+      if (resubmissionInstructions.trim().length < 20) { alert('Please provide detailed instructions (min 20 chars).'); return }
     } else {
-      confirmMsg = 'Resolve dispute in favor of SELLER?\n\nThis will:\n• Mark the order as COMPLETED\n• The seller will keep the payment\n• The buyer will not receive a refund'
-      newStatus = 'completed'
-      actionType = 'dispute_resolved_seller'
-      resolutionType = 'completed'
-      description = 'Dispute resolved in favor of seller - Order completed'
+      if (verificationRejectionReason.trim().length < 10) { alert('Please provide a reason (min 10 chars).'); return }
     }
-    
-    if (!confirm(confirmMsg)) return
-
-    // Optional: Ask for resolution notes
-    const notes = prompt('Add resolution notes (optional):')
 
     try {
-      // Get current order status for logging
-      const { data: currentOrder } = await supabase
-        .from('orders')
-        .select('status')
-        .eq('id', orderId)
-        .single()
-
-      const previousStatus = currentOrder?.status || 'dispute_raised'
-
-      // Update the order
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({
-          status: newStatus,
-          completed_at: new Date().toISOString(),
-          resolved_by: user.id,
-          resolution_notes: notes || null,
-          resolution_type: resolutionType
-        })
-        .eq('id', orderId)
-
-      if (updateError) throw updateError
-
-      // Log the admin action using existing table structure
-      const { error: logError } = await supabase
-        .from('admin_actions')
-        .insert({
-          admin_id: user.id,
-          action_type: actionType,
-          target_type: 'order',
-          target_id: orderId,
-          description: description + (notes ? ` | Notes: ${notes}` : ''),
-          metadata: {
-            previous_status: previousStatus,
-            new_status: newStatus,
-            resolution_type: resolutionType,
-            notes: notes || null
-          }
-        })
-
-      if (logError) {
-        console.error('Failed to log admin action:', logError)
-        // Don't fail the whole operation if logging fails
+      let updateData: any = {
+        status: 'rejected',
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+        rejection_type: rejectionType,
+        admin_notes: verificationAdminNotes.trim() || null,
+        id_front_url: null,
+        id_back_url: null,
+        documents_cleared: true
       }
-      
-      if (resolution === 'buyer') {
-        alert('✅ Dispute resolved in favor of BUYER\n\nOrder has been marked as REFUNDED.')
+
+      if (rejectionType === 'resubmission_required') {
+        updateData.can_resubmit = true
+        updateData.resubmission_fields = resubmissionFields
+        updateData.resubmission_instructions = resubmissionInstructions.trim()
+        updateData.rejection_reason = `Resubmission required for: ${resubmissionFields.join(', ')}`
       } else {
-        alert('✅ Dispute resolved in favor of SELLER\n\nOrder has been marked as COMPLETED.')
+        updateData.can_resubmit = false
+        updateData.rejection_reason = verificationRejectionReason.trim()
+        updateData.resubmission_fields = null
+        updateData.resubmission_instructions = null
       }
+
+      console.log('Updating verification with:', updateData)
       
-      fetchDisputes()
-      fetchOrders()
-    } catch (error) {
-      console.error('Error resolving dispute:', error)
-      alert('Failed to resolve dispute')
+      const { error } = await supabase
+        .from('vendor_verifications')
+        .update(updateData)
+        .eq('id', selectedVerification.id)
+      
+      console.log('Update error:', error)
+      
+      if (error) throw error
+
+      alert(rejectionType === 'permanent' ? '❌ Permanently rejected.' : '🔄 Resubmission requested.')
+      setVerificationDecisionModal(null)
+      setShowVerificationDetailsModal(false)
+      setSelectedVerification(null)
+      setVerificationRejectionReason('')
+      setVerificationAdminNotes('')
+      setRejectionType('resubmission_required')
+      setResubmissionFields([])
+      setResubmissionInstructions('')
+      fetchVerifications()
+    } catch (error) { 
+      console.error('Reject error:', error)
+      alert('Failed to reject. Check console for details.') 
     }
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-  }
+  const handleEditReview = (r: any) => { setEditingReview(r); setEditedComment(r.comment || '') }
+  const handleSaveReview = async () => { if (!editingReview) return; await supabase.from('reviews').update({ comment: editedComment.trim() || null, edited_by_admin: true, edited_at: new Date().toISOString() }).eq('id', editingReview.id); alert('Review updated'); setEditingReview(null); fetchReviews() }
+  const handleDeleteReview = async (id: string) => { if (!confirm('Delete this review?')) return; await supabase.from('reviews').delete().eq('id', id); alert('Review deleted'); fetchReviews() }
+  const handleApproveWithdrawal = (id: string) => { setApprovingWithdrawalId(id); setTransactionId(''); setApproveNotes(''); setShowApproveModal(true) }
+  const confirmApproveWithdrawal = async () => { if (!transactionId.trim()) { alert('Transaction ID required'); return }; await supabase.from('withdrawals').update({ status: 'completed', processed_by: user.id, processed_at: new Date().toISOString(), transaction_id: transactionId.trim(), admin_notes: approveNotes.trim() || null }).eq('id', approvingWithdrawalId); alert('✅ Approved!'); setShowApproveModal(false); setApprovingWithdrawalId(null); fetchWithdrawals() }
+  const handleRejectWithdrawal = (id: string) => { setRejectingWithdrawalId(id); setRejectionReason(''); setShowRejectModal(true) }
+  const confirmRejectWithdrawal = async () => { if (rejectionReason.trim().length < 5) { alert('Provide reason (min 5 chars)'); return }; await supabase.from('withdrawals').update({ status: 'rejected', processed_by: user.id, processed_at: new Date().toISOString(), admin_notes: rejectionReason.trim() }).eq('id', rejectingWithdrawalId); alert('❌ Rejected.'); setShowRejectModal(false); setRejectingWithdrawalId(null); fetchWithdrawals() }
+  const handleBanUser = async (id: string, banned: boolean) => { const reason = banned ? null : prompt('Ban reason:'); if (!banned && !reason) return; await supabase.from('profiles').update({ is_banned: !banned, banned_at: !banned ? new Date().toISOString() : null, ban_reason: reason }).eq('id', id); alert(`User ${banned ? 'unbanned' : 'banned'}`); fetchUsers() }
+  const handleDeleteListing = async (id: string) => { if (!confirm('Delete listing?')) return; await supabase.from('listings').delete().eq('id', id); alert('Listing deleted'); fetchListings() }
+  const handleResolveDispute = async (id: string, res: 'buyer' | 'seller') => { const isBuyer = res === 'buyer'; if (!confirm(isBuyer ? 'Refund buyer?' : 'Complete for seller?')) return; const notes = prompt('Resolution notes (optional):'); const newStatus = isBuyer ? 'refunded' : 'completed'; await supabase.from('orders').update({ status: newStatus, completed_at: new Date().toISOString(), resolved_by: user.id, resolution_notes: notes || null }).eq('id', id); alert(`✅ Resolved for ${res}`); fetchDisputes(); fetchOrders() }
+  const handleLogout = async () => { await supabase.auth.signOut(); router.push('/') }
+  const getCurrentPageData = (d: any[]) => d.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+  const getTotalPages = (d: any[]) => Math.ceil(d.length / ITEMS_PER_PAGE)
+  const renderPagination = (d: any[]) => { const t = getTotalPages(d); if (t <= 1) return null; return (<div className="flex items-center justify-center gap-2 mt-6"><button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 bg-white/10 text-white rounded-lg disabled:opacity-50">← Prev</button>{Array.from({ length: Math.min(5, t) }, (_, i) => i + 1).map(p => (<button key={p} onClick={() => setCurrentPage(p)} className={`w-10 h-10 rounded-lg font-semibold ${currentPage === p ? 'bg-purple-500 text-white' : 'bg-white/10 text-white'}`}>{p}</button>))}<button onClick={() => setCurrentPage(p => Math.min(t, p + 1))} disabled={currentPage === t} className="px-4 py-2 bg-white/10 text-white rounded-lg disabled:opacity-50">Next →</button></div>) }
 
-  // Pagination logic
-  const getCurrentPageData = (data: any[]) => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-    const endIndex = startIndex + ITEMS_PER_PAGE
-    return data.slice(startIndex, endIndex)
-  }
+  if (loading) return <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>
 
-  const getTotalPages = (data: any[]) => {
-    return Math.ceil(data.length / ITEMS_PER_PAGE)
-  }
-
-  const renderPagination = (data: any[]) => {
-    const totalPages = getTotalPages(data)
-    if (totalPages <= 1) return null
-
-    const pageNumbers = []
-    const showEllipsis = totalPages > 7
-
-    if (showEllipsis) {
-      // Show first page
-      pageNumbers.push(1)
-      
-      // Show ellipsis or pages around current page
-      if (currentPage > 3) {
-        pageNumbers.push('...')
-      }
-      
-      // Show pages around current page
-      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-        pageNumbers.push(i)
-      }
-      
-      // Show ellipsis or last page
-      if (currentPage < totalPages - 2) {
-        pageNumbers.push('...')
-      }
-      
-      // Show last page
-      pageNumbers.push(totalPages)
-    } else {
-      // Show all pages
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i)
-      }
-    }
-
-    return (
-      <div className="flex items-center justify-center gap-2 mt-6">
-        {/* Previous Button */}
-        <button
-          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-          disabled={currentPage === 1}
-          className={`px-4 py-2 rounded-lg font-semibold transition ${
-            currentPage === 1
-              ? 'bg-white/5 text-gray-600 cursor-not-allowed'
-              : 'bg-white/10 text-white hover:bg-white/20'
-          }`}
-        >
-          ← Previous
-        </button>
-
-        {/* Page Numbers */}
-        {pageNumbers.map((pageNum, index) => (
-          pageNum === '...' ? (
-            <span key={`ellipsis-${index}`} className="text-gray-400 px-2">...</span>
-          ) : (
-            <button
-              key={pageNum}
-              onClick={() => setCurrentPage(pageNum as number)}
-              className={`w-10 h-10 rounded-lg font-semibold transition ${
-                currentPage === pageNum
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
-            >
-              {pageNum}
-            </button>
-          )
-        ))}
-
-        {/* Next Button */}
-        <button
-          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-          disabled={currentPage === totalPages}
-          className={`px-4 py-2 rounded-lg font-semibold transition ${
-            currentPage === totalPages
-              ? 'bg-white/5 text-gray-600 cursor-not-allowed'
-              : 'bg-white/10 text-white hover:bg-white/20'
-          }`}
-        >
-          Next →
-        </button>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
-    )
-  }
-
-  const stats = {
-    totalUsers: users.length,
-    totalListings: listings.length,
-    totalOrders: orders.length,
-    totalConversations: conversations.length,
-    activeListings: listings.filter(l => l.status === 'active').length,
-    bannedUsers: users.filter(u => u.is_banned).length,
-    pendingOrders: orders.filter(o => o.status === 'pending').length,
-    activeDisputes: activeDisputes.length,
-    solvedDisputes: solvedDisputes.length
-  }
-
-  // Get current page data
-  const currentUsers = getCurrentPageData(users)
-  const currentListings = getCurrentPageData(listings)
-  const currentOrders = getCurrentPageData(orders)
-  const currentConversations = getCurrentPageData(conversations)
-  const currentActiveDisputes = getCurrentPageData(activeDisputes)
-  const currentSolvedDisputes = getCurrentPageData(solvedDisputes)
+  const stats = { totalUsers: users.length, totalListings: listings.length, totalOrders: orders.length, activeDisputes: activeDisputes.length, solvedDisputes: solvedDisputes.length, pendingVerifications: pendingVerifications.length }
+  const currentUsers = getCurrentPageData(users), currentListings = getCurrentPageData(listings), currentOrders = getCurrentPageData(orders), currentConversations = getCurrentPageData(conversations), currentActiveDisputes = getCurrentPageData(activeDisputes), currentSolvedDisputes = getCurrentPageData(solvedDisputes), currentPendingVerifications = getCurrentPageData(pendingVerifications), currentPastVerifications = getCurrentPageData(pastVerifications)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Navigation */}
-      <nav className="bg-black/30 backdrop-blur-lg border-b border-white/10">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">👑</span>
-              </div>
-              <span className="text-xl font-bold text-white">Admin Panel</span>
-            </Link>
-
-            <div className="flex items-center space-x-4">
-              <Link href="/" className="text-gray-300 hover:text-white transition">
-                Main Site
-              </Link>
-              <div className="relative group">
-                <button className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition">
-                  <span className="text-white">{profile?.username}</span>
-                </button>
-                <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-2xl border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/10 rounded-lg">
-                    Logout
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+      <nav className="bg-black/30 backdrop-blur-lg border-b border-white/10"><div className="container mx-auto px-4"><div className="flex items-center justify-between h-16"><Link href="/" className="flex items-center space-x-2"><div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center"><span className="text-2xl">👑</span></div><span className="text-xl font-bold text-white">Admin Panel</span></Link><div className="flex items-center space-x-4"><Link href="/" className="text-gray-300 hover:text-white">Main Site</Link><button onClick={handleLogout} className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-white">{profile?.username} (Logout)</button></div></div></div></nav>
+      <div className="container mx-auto px-4 py-12"><div className="max-w-7xl mx-auto">
+        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 mb-8"><h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1><p className="text-gray-300">Manage users, listings, orders, disputes, and verifications</p></div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">👥</div><div className="text-gray-400 text-xs">Users</div><div className="text-2xl font-bold text-white">{stats.totalUsers}</div></div>
+          <div className="bg-gradient-to-br from-green-500/20 to-blue-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">📦</div><div className="text-gray-400 text-xs">Listings</div><div className="text-2xl font-bold text-white">{stats.totalListings}</div></div>
+          <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">💰</div><div className="text-gray-400 text-xs">Orders</div><div className="text-2xl font-bold text-white">{stats.totalOrders}</div></div>
+          <div className="bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">⚠️</div><div className="text-gray-400 text-xs">Active Disputes</div><div className="text-2xl font-bold text-white">{stats.activeDisputes}</div></div>
+          <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">✅</div><div className="text-gray-400 text-xs">Solved Disputes</div><div className="text-2xl font-bold text-white">{stats.solvedDisputes}</div></div>
+          <div className="bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">🔍</div><div className="text-gray-400 text-xs">Pending Verifications</div><div className="text-2xl font-bold text-white">{stats.pendingVerifications}</div></div>
         </div>
-      </nav>
-
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
-            <p className="text-gray-300">Manage users, listings, orders, messages, and disputes</p>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 backdrop-blur-lg border border-white/10 rounded-xl p-4">
-              <div className="text-2xl mb-1">👥</div>
-              <div className="text-gray-400 text-xs">Total Users</div>
-              <div className="text-2xl font-bold text-white">{stats.totalUsers}</div>
-              <div className="text-red-400 text-xs mt-1">{stats.bannedUsers} banned</div>
-            </div>
-            <div className="bg-gradient-to-br from-green-500/20 to-blue-500/20 backdrop-blur-lg border border-white/10 rounded-xl p-4">
-              <div className="text-2xl mb-1">📦</div>
-              <div className="text-gray-400 text-xs">Total Listings</div>
-              <div className="text-2xl font-bold text-white">{stats.totalListings}</div>
-              <div className="text-green-400 text-xs mt-1">{stats.activeListings} active</div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-lg border border-white/10 rounded-xl p-4">
-              <div className="text-2xl mb-1">💰</div>
-              <div className="text-gray-400 text-xs">Total Orders</div>
-              <div className="text-2xl font-bold text-white">{stats.totalOrders}</div>
-              <div className="text-yellow-400 text-xs mt-1">{stats.pendingOrders} pending</div>
-            </div>
-            <div className="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 backdrop-blur-lg border border-white/10 rounded-xl p-4">
-              <div className="text-2xl mb-1">💬</div>
-              <div className="text-gray-400 text-xs">Conversations</div>
-              <div className="text-2xl font-bold text-white">{stats.totalConversations}</div>
-            </div>
-            <div className="bg-gradient-to-br from-red-500/20 to-orange-500/20 backdrop-blur-lg border border-white/10 rounded-xl p-4">
-              <div className="text-2xl mb-1">⚠️</div>
-              <div className="text-gray-400 text-xs">Active Disputes</div>
-              <div className="text-2xl font-bold text-white">{stats.activeDisputes}</div>
-            </div>
-            <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-lg border border-white/10 rounded-xl p-4">
-              <div className="text-2xl mb-1">✅</div>
-              <div className="text-gray-400 text-xs">Solved Disputes</div>
-              <div className="text-2xl font-bold text-white">{stats.solvedDisputes}</div>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`px-6 py-3 rounded-lg font-semibold transition ${
-                activeTab === 'users'
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
-            >
-              Users
-            </button>
-            <button
-              onClick={() => setActiveTab('listings')}
-              className={`px-6 py-3 rounded-lg font-semibold transition ${
-                activeTab === 'listings'
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
-            >
-              Listings
-            </button>
-            <button
-              onClick={() => setActiveTab('orders')}
-              className={`px-6 py-3 rounded-lg font-semibold transition ${
-                activeTab === 'orders'
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
-            >
-              Orders
-            </button>
-            <button
-              onClick={() => setActiveTab('messages')}
-              className={`px-6 py-3 rounded-lg font-semibold transition ${
-                activeTab === 'messages'
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
-            >
-              Messages
-            </button>
-            <button
-              onClick={() => setActiveTab('disputes')}
-              className={`px-6 py-3 rounded-lg font-semibold transition ${
-                activeTab === 'disputes'
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
-            >
-              Disputes
-            </button>
-            <button
-              onClick={() => setActiveTab('reviews')}
-              className={`px-6 py-3 rounded-lg font-semibold transition ${
-                activeTab === 'reviews'
-                  ? 'bg-yellow-500 text-white'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
-            >
-              Reviews ⭐
-            </button>
-            <button
-              onClick={() => setActiveTab('withdrawals')}
-              className={`px-6 py-3 rounded-lg font-semibold transition ${
-                activeTab === 'withdrawals'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
-            >
-              Withdrawals 💸
-            </button>
-          </div>
-
-          {/* Content */}
-          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
-            {/* Users Tab */}
-            {activeTab === 'users' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-white">All Users</h2>
-                  <span className="text-gray-400 text-sm">
-                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, users.length)} of {users.length}
-                  </span>
-                </div>
-                <div className="space-y-4">
-                  {currentUsers.map((u) => (
-                    <div key={u.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            <h3 className="text-white font-semibold">{u.username}</h3>
-                            {u.is_admin ? (
-                              <span className="px-2 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400">
-                                ADMIN
-                              </span>
-                            ) : (
-                              <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                                u.role === 'vendor' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
-                              }`}>
-                                {u.role}
-                              </span>
-                            )}
-                            {u.is_banned && (
-                              <span className="px-2 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400">
-                                BANNED
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-400">
-                            Rating: {u.rating} | Sales: {u.total_sales} | Joined: {new Date(u.created_at).toLocaleDateString()}
-                          </p>
-                          {u.is_banned && u.ban_reason && (
-                            <p className="text-sm text-red-400 mt-1">Ban reason: {u.ban_reason}</p>
-                          )}
-                        </div>
-                        {!u.is_admin && (
-                          <button
-                            onClick={() => handleBanUser(u.id, u.is_banned)}
-                            className={`px-4 py-2 rounded-lg font-semibold transition ${
-                              u.is_banned
-                                ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                                : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                            }`}
-                          >
-                            {u.is_banned ? 'Unban' : 'Ban'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {renderPagination(users)}
-              </div>
-            )}
-
-            {/* Listings Tab */}
-            {activeTab === 'listings' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-white">All Listings</h2>
-                  <span className="text-gray-400 text-sm">
-                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, listings.length)} of {listings.length}
-                  </span>
-                </div>
-                <div className="space-y-4">
-                  {currentListings.map((l) => (
-                    <div key={l.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            <h3 className="text-white font-semibold">{l.title}</h3>
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                              l.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                              l.status === 'sold' ? 'bg-gray-500/20 text-gray-400' :
-                              'bg-red-500/20 text-red-400'
-                            }`}>
-                              {l.status}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-400">
-                            {l.game} | ${l.price} | Stock: {l.stock} | Seller: {l.profiles?.username}
-                          </p>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Link
-                            href={`/listing/${l.id}`}
-                            className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm font-semibold hover:bg-blue-500/30 transition"
-                          >
-                            View
-                          </Link>
-                          <button
-                            onClick={() => handleDeleteListing(l.id)}
-                            className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm font-semibold hover:bg-red-500/30 transition"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {renderPagination(listings)}
-              </div>
-            )}
-
-            {/* Orders Tab */}
-            {activeTab === 'orders' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-white">All Orders</h2>
-                  <span className="text-gray-400 text-sm">
-                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, orders.length)} of {orders.length}
-                  </span>
-                </div>
-                <div className="space-y-4">
-                  {currentOrders.map((o) => (
-                    <div key={o.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            <h3 className="text-white font-semibold">{o.listing_title || 'Unknown Item'}</h3>
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                              o.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                              o.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                              o.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400' :
-                              o.status === 'dispute_solved' ? 'bg-purple-500/20 text-purple-400' :
-                              'bg-gray-500/20 text-gray-400'
-                            }`}>
-                              {o.status}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-400">
-                            {o.listing_game || 'N/A'} | ${o.amount} | Buyer: {o.buyer?.username} | Seller: {o.seller?.username}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(o.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                        <Link
-                          href={`/order/${o.id}`}
-                          className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm font-semibold hover:bg-blue-500/30 transition"
-                        >
-                          View
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {renderPagination(orders)}
-              </div>
-            )}
-
-            {/* Messages Tab */}
-            {activeTab === 'messages' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-white">All Conversations</h2>
-                  <span className="text-gray-400 text-sm">
-                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, conversations.length)} of {conversations.length}
-                  </span>
-                </div>
-                {conversations.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-5xl mb-4">💬</div>
-                    <p className="text-gray-400">No conversations yet</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-4">
-                      {currentConversations.map((conv) => (
-                        <div key={conv.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                              {conv.listing?.image_url ? (
-                                <img src={conv.listing.image_url} alt={conv.listing.title} className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-2xl">🎮</div>
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="text-white font-semibold mb-1">{conv.listing?.title || 'Unknown Item'}</h3>
-                              <p className="text-sm text-gray-400 mb-1">
-                                <span className="text-blue-400">{conv.buyer?.username}</span> ↔ <span className="text-green-400">{conv.seller?.username}</span>
-                              </p>
-                              <p className="text-xs text-gray-500 truncate mb-1">
-                                Last: {conv.last_message}
-                              </p>
-                              <p className="text-xs text-gray-600">
-                                {new Date(conv.last_message_at).toLocaleString()}
-                              </p>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              {conv.order && (
-                                <span className={`px-3 py-1 rounded text-xs font-semibold text-center ${
-                                  conv.order.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                                  conv.order.status === 'delivered' ? 'bg-blue-500/20 text-blue-400' :
-                                  conv.order.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400' :
-                                  'bg-yellow-500/20 text-yellow-400'
-                                }`}>
-                                  {conv.order.status}
-                                </span>
-                              )}
-                              <Link
-                                href={`/admin/messages/${conv.id}`}
-                                className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-4 py-2 rounded-lg text-xs font-semibold transition text-center whitespace-nowrap"
-                              >
-                                👁️ View Chat
-                              </Link>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {renderPagination(conversations)}
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Disputes Tab */}
-            {activeTab === 'disputes' && (
-              <div>
-                {/* Dispute Sub-Tabs */}
-                <div className="flex gap-3 mb-6">
-                  <button
-                    onClick={() => setDisputeSubTab('active')}
-                    className={`px-4 py-2 rounded-lg font-semibold transition ${
-                      disputeSubTab === 'active'
-                        ? 'bg-red-500 text-white'
-                        : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                    }`}
-                  >
-                    Active Disputes ({stats.activeDisputes})
-                  </button>
-                  <button
-                    onClick={() => setDisputeSubTab('solved')}
-                    className={`px-4 py-2 rounded-lg font-semibold transition ${
-                      disputeSubTab === 'solved'
-                        ? 'bg-green-500 text-white'
-                        : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                    }`}
-                  >
-                    Solved Disputes ({stats.solvedDisputes})
-                  </button>
-                </div>
-
-                {/* Active Disputes */}
-                {disputeSubTab === 'active' && (
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-2xl font-bold text-white">Active Disputes</h2>
-                      {activeDisputes.length > 0 && (
-                        <span className="text-gray-400 text-sm">
-                          Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, activeDisputes.length)} of {activeDisputes.length}
-                        </span>
-                      )}
-                    </div>
-                    {activeDisputes.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="text-5xl mb-4">✅</div>
-                        <p className="text-gray-400">No active disputes</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="space-y-4">
-                          {currentActiveDisputes.map((order) => (
-                            <div key={order.id} className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-                              <div className="flex items-start gap-4">
-                                <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                                  {order.listing_image_url ? (
-                                    <img src={order.listing_image_url} alt={order.listing_title} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-2xl">🎮</div>
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <h3 className="text-white font-bold">{order.listing_title || 'Unknown Item'}</h3>
-                                    <span className="px-2 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400">
-                                      DISPUTE RAISED
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-gray-300 mb-2">
-                                    <strong>Buyer:</strong> {order.buyer?.username} | <strong>Seller:</strong> {order.seller?.username}
-                                  </p>
-                                  <p className="text-sm text-gray-400 mb-2">
-                                    Amount: ${order.amount} | Game: {order.listing_game || 'N/A'} | Category: {order.listing_category || 'N/A'}
-                                  </p>
-                                  {order.dispute_reason && (
-                                    <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-3">
-                                      <p className="text-xs text-gray-400 mb-1">Dispute Reason:</p>
-                                      <p className="text-sm text-white">{order.dispute_reason}</p>
-                                    </div>
-                                  )}
-                                  <p className="text-xs text-gray-500">
-                                    Opened: {order.dispute_opened_at ? new Date(order.dispute_opened_at).toLocaleString() : 'N/A'}
-                                  </p>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                  <Link
-                                    href={`/admin/disputes/${order.id}/chat`}
-                                    className="bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 px-4 py-2 rounded-lg text-sm font-semibold transition text-center whitespace-nowrap"
-                                  >
-                                    💬 Join Chat
-                                  </Link>
-                                  <button
-                                    onClick={() => handleResolveDispute(order.id, 'buyer')}
-                                    className="bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-                                  >
-                                    💰 Refund Buyer
-                                  </button>
-                                  <button
-                                    onClick={() => handleResolveDispute(order.id, 'seller')}
-                                    className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-                                  >
-                                    ✓ Complete Order
-                                  </button>
-                                  <Link
-                                    href={`/order/${order.id}`}
-                                    className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-4 py-2 rounded-lg text-sm font-semibold transition text-center"
-                                  >
-                                    View Order
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {renderPagination(activeDisputes)}
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* Solved Disputes */}
-                {disputeSubTab === 'solved' && (
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-2xl font-bold text-white">Solved Disputes</h2>
-                      {solvedDisputes.length > 0 && (
-                        <span className="text-gray-400 text-sm">
-                          Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, solvedDisputes.length)} of {solvedDisputes.length}
-                        </span>
-                      )}
-                    </div>
-                    {solvedDisputes.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="text-5xl mb-4">📋</div>
-                        <p className="text-gray-400">No solved disputes yet</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="space-y-4">
-                          {currentSolvedDisputes.map((order) => (
-                            <div key={order.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                              <div className="flex items-start gap-4">
-                                <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                                  {order.listing_image_url ? (
-                                    <img src={order.listing_image_url} alt={order.listing_title} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-2xl">🎮</div>
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <h3 className="text-white font-bold">{order.listing_title || 'Unknown Item'}</h3>
-                                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                                      order.status === 'refunded' 
-                                        ? 'bg-orange-500/20 text-orange-400' 
-                                        : 'bg-green-500/20 text-green-400'
-                                    }`}>
-                                      {order.status === 'refunded' ? '💰 REFUNDED' : '✓ COMPLETED'}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-gray-300 mb-2">
-                                    <strong>Buyer:</strong> {order.buyer?.username} | <strong>Seller:</strong> {order.seller?.username}
-                                  </p>
-                                  <p className="text-sm text-gray-400 mb-2">
-                                    Amount: ${order.amount} | Game: {order.listing_game || 'N/A'} | Category: {order.listing_category || 'N/A'}
-                                  </p>
-                                  
-                                  {/* Resolution Info */}
-                                  <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-2">
-                                    <p className="text-xs text-gray-400 mb-1">Resolution:</p>
-                                    <p className="text-sm text-white font-semibold">
-                                      {order.status === 'refunded' 
-                                        ? '💰 Buyer won - Order refunded' 
-                                        : '✓ Seller won - Order completed'}
-                                    </p>
-                                    {order.resolution_notes && (
-                                      <p className="text-xs text-gray-400 mt-2">
-                                        <strong>Admin Notes:</strong> {order.resolution_notes}
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  {order.dispute_reason && (
-                                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-2">
-                                      <p className="text-xs text-red-400 mb-1">Original Dispute Reason:</p>
-                                      <p className="text-sm text-white">{order.dispute_reason}</p>
-                                    </div>
-                                  )}
-                                  
-                                  <div className="text-xs text-gray-500 space-y-1">
-                                    <p>Dispute Opened: {order.dispute_opened_at ? new Date(order.dispute_opened_at).toLocaleString() : 'N/A'}</p>
-                                    <p>Resolved: {order.completed_at ? new Date(order.completed_at).toLocaleString() : 'N/A'}</p>
-                                  </div>
-                                </div>
-                                <Link
-                                  href={`/order/${order.id}`}
-                                  className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-4 py-2 rounded-lg text-sm font-semibold transition"
-                                >
-                                  View History
-                                </Link>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {renderPagination(solvedDisputes)}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Reviews Tab */}
-            {activeTab === 'reviews' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-white">All Reviews</h2>
-                  <span className="text-gray-400 text-sm">
-                    {reviews.length > 0 && `Showing ${((currentPage - 1) * ITEMS_PER_PAGE) + 1}-${Math.min(currentPage * ITEMS_PER_PAGE, reviews.length)} of ${reviews.length}`}
-                  </span>
-                </div>
-                {reviews.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-5xl mb-4">⭐</div>
-                    <p className="text-gray-400">No reviews yet</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-4">
-                      {getCurrentPageData(reviews).map((review) => (
-                        <div key={review.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                          <div className="flex items-start gap-4">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                {/* Star Rating */}
-                                <div className="flex">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <span key={star} className={`text-lg ${star <= review.rating ? 'text-yellow-400' : 'text-gray-600'}`}>
-                                      ★
-                                    </span>
-                                  ))}
-                                </div>
-                                <span className="text-white font-semibold">{review.rating}/5</span>
-                                {review.edited_by_admin && (
-                                  <span className="px-2 py-0.5 rounded text-xs font-semibold bg-orange-500/20 text-orange-400">
-                                    Edited by Admin
-                                  </span>
-                                )}
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-4 mb-3">
-                                <div>
-                                  <p className="text-xs text-gray-400">Reviewer (Buyer)</p>
-                                  <p className="text-white font-semibold">{review.buyer?.username || 'Unknown'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-gray-400">Seller</p>
-                                  <p className="text-white font-semibold">{review.seller?.username || 'Unknown'}</p>
-                                </div>
-                              </div>
-
-                              <div className="mb-3">
-                                <p className="text-xs text-gray-400">Order ID</p>
-                                <p className="text-sm text-purple-400 font-mono">
-                                  {review.order_id ? review.order_id.substring(0, 8) + '...' : 'N/A'}
-                                </p>
-                              </div>
-
-                              {/* Review Comment */}
-                              {editingReview?.id === review.id ? (
-                                <div className="mb-3">
-                                  <label className="block text-xs text-gray-400 mb-1">Edit Comment</label>
-                                  <textarea
-                                    value={editedComment}
-                                    onChange={(e) => setEditedComment(e.target.value)}
-                                    rows={3}
-                                    maxLength={500}
-                                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500/50 resize-none"
-                                    placeholder="Edit review comment..."
-                                  />
-                                  <p className="text-xs text-gray-500 mt-1">{editedComment.length}/500 characters</p>
-                                </div>
-                              ) : (
-                                <div className="mb-3">
-                                  <p className="text-xs text-gray-400 mb-1">Comment</p>
-                                  <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                                    <p className="text-sm text-white">
-                                      {review.comment || <span className="text-gray-500 italic">No comment provided</span>}
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="text-xs text-gray-500">
-                                Created: {new Date(review.created_at).toLocaleString()}
-                                {review.edited_at && ` | Edited: ${new Date(review.edited_at).toLocaleString()}`}
-                              </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex flex-col gap-2">
-                              {editingReview?.id === review.id ? (
-                                <>
-                                  <button
-                                    onClick={handleSaveReview}
-                                    className="bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-                                  >
-                                    ✓ Save
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingReview(null)}
-                                    className="bg-gray-500/20 hover:bg-gray-500/30 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-                                  >
-                                    Cancel
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => handleEditReview(review)}
-                                    className="bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-                                  >
-                                    ✏️ Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteReview(review.id)}
-                                    className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-                                  >
-                                    🗑️ Delete
-                                  </button>
-                                  <Link
-                                    href={`/order/${review.order_id}`}
-                                    className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-4 py-2 rounded-lg text-sm font-semibold transition text-center whitespace-nowrap"
-                                  >
-                                    View Order
-                                  </Link>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {renderPagination(reviews)}
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Withdrawals Tab */}
-            {activeTab === 'withdrawals' && (
-              <div>
-                {/* Sub-tabs for Pending/Processed */}
-                <div className="flex space-x-4 mb-6">
-                  <button
-                    onClick={() => setDisputeSubTab('active')}
-                    className={`px-4 py-2 rounded-lg font-semibold transition ${
-                      disputeSubTab === 'active'
-                        ? 'bg-yellow-500/30 text-yellow-400'
-                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                    }`}
-                  >
-                    ⏳ Pending Requests ({pendingWithdrawals.length})
-                  </button>
-                  <button
-                    onClick={() => setDisputeSubTab('solved')}
-                    className={`px-4 py-2 rounded-lg font-semibold transition ${
-                      disputeSubTab === 'solved'
-                        ? 'bg-green-500/30 text-green-400'
-                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                    }`}
-                  >
-                    ✅ Processed ({processedWithdrawals.length})
-                  </button>
-                </div>
-
-                {/* Pending Withdrawals */}
-                {disputeSubTab === 'active' && (
-                  <div>
-                    <h2 className="text-2xl font-bold text-white mb-4">Pending Withdrawal Requests</h2>
-                    {pendingWithdrawals.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="text-5xl mb-4">✅</div>
-                        <p className="text-gray-400">No pending withdrawal requests</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {pendingWithdrawals.map((withdrawal) => (
-                          <div key={withdrawal.id} className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
-                            <div className="flex items-start gap-4">
-                              <div className="w-16 h-16 flex-shrink-0 rounded-lg bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center">
-                                <span className="text-3xl">{withdrawal.method === 'bitcoin' ? '₿' : '💳'}</span>
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h3 className="text-white font-bold">{withdrawal.method === 'bitcoin' ? 'Bitcoin' : 'Skrill'} Withdrawal</h3>
-                                  <span className="px-2 py-1 rounded text-xs font-semibold bg-yellow-500/20 text-yellow-400">
-                                    PENDING
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-300 mb-2">
-                                  <strong>Vendor:</strong> {withdrawal.user?.username || 'Unknown'}
-                                </p>
-                                <div className="grid grid-cols-2 gap-4 mb-3">
-                                  <div>
-                                    <p className="text-xs text-gray-400">Requested Amount</p>
-                                    <p className="text-white font-bold text-xl">${parseFloat(withdrawal.amount).toFixed(2)}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-gray-400">After Fees</p>
-                                    <p className="text-green-400 font-bold text-xl">${parseFloat(withdrawal.net_amount).toFixed(2)}</p>
-                                  </div>
-                                </div>
-                                <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-3">
-                                  <p className="text-xs text-gray-400 mb-1">
-                                    {withdrawal.method === 'bitcoin' ? 'Bitcoin Wallet Address' : 'Skrill Email'}
-                                  </p>
-                                  <p className="text-white font-mono text-sm break-all">{withdrawal.address}</p>
-                                </div>
-                                <div className="flex items-center gap-4 text-xs text-gray-500">
-                                  <span>Fee: ${parseFloat(withdrawal.fee_total).toFixed(2)} ({withdrawal.fee_percentage}% + ${withdrawal.fee_flat})</span>
-                                  <span>•</span>
-                                  <span>Requested: {new Date(withdrawal.created_at).toLocaleString()}</span>
-                                </div>
-                              </div>
-                              <div className="flex flex-col gap-2">
-                                <button
-                                  onClick={() => handleApproveWithdrawal(withdrawal.id)}
-                                  className="bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-                                >
-                                  ✅ Approve
-                                </button>
-                                <button
-                                  onClick={() => handleRejectWithdrawal(withdrawal.id)}
-                                  className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
-                                >
-                                  ❌ Reject
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Processed Withdrawals */}
-                {disputeSubTab === 'solved' && (
-                  <div>
-                    <h2 className="text-2xl font-bold text-white mb-4">Processed Withdrawals</h2>
-                    {processedWithdrawals.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="text-5xl mb-4">📋</div>
-                        <p className="text-gray-400">No processed withdrawals yet</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {processedWithdrawals.map((withdrawal) => (
-                          <div key={withdrawal.id} className={`border rounded-xl p-4 ${
-                            withdrawal.status === 'completed' 
-                              ? 'bg-green-500/10 border-green-500/30' 
-                              : 'bg-red-500/10 border-red-500/30'
-                          }`}>
-                            <div className="flex items-start gap-4">
-                              <div className={`w-16 h-16 flex-shrink-0 rounded-lg flex items-center justify-center ${
-                                withdrawal.status === 'completed'
-                                  ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20'
-                                  : 'bg-gradient-to-br from-red-500/20 to-orange-500/20'
-                              }`}>
-                                <span className="text-3xl">{withdrawal.method === 'bitcoin' ? '₿' : '💳'}</span>
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h3 className="text-white font-bold">{withdrawal.method === 'bitcoin' ? 'Bitcoin' : 'Skrill'} Withdrawal</h3>
-                                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                                    withdrawal.status === 'completed'
-                                      ? 'bg-green-500/20 text-green-400'
-                                      : 'bg-red-500/20 text-red-400'
-                                  }`}>
-                                    {withdrawal.status.toUpperCase()}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-300 mb-2">
-                                  <strong>Vendor:</strong> {withdrawal.user?.username || 'Unknown'}
-                                </p>
-                                <div className="grid grid-cols-2 gap-4 mb-3">
-                                  <div>
-                                    <p className="text-xs text-gray-400">Amount</p>
-                                    <p className="text-white font-bold">${parseFloat(withdrawal.amount).toFixed(2)}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-gray-400">
-                                      {withdrawal.status === 'completed' ? 'Sent Amount' : 'Would Have Received'}
-                                    </p>
-                                    <p className={`font-bold ${withdrawal.status === 'completed' ? 'text-green-400' : 'text-gray-400'}`}>
-                                      ${parseFloat(withdrawal.net_amount).toFixed(2)}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-3">
-                                  <p className="text-xs text-gray-400 mb-1">
-                                    {withdrawal.method === 'bitcoin' ? 'Bitcoin Wallet Address' : 'Skrill Email'}
-                                  </p>
-                                  <p className="text-white font-mono text-sm break-all">{withdrawal.address}</p>
-                                </div>
-                                {withdrawal.transaction_id && (
-                                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-3">
-                                    <p className="text-xs text-blue-400 mb-1">Transaction ID</p>
-                                    <p className="text-white font-mono text-xs break-all">{withdrawal.transaction_id}</p>
-                                  </div>
-                                )}
-                                {withdrawal.admin_notes && (
-                                  <div className={`rounded-lg p-3 mb-3 ${
-                                    withdrawal.status === 'completed'
-                                      ? 'bg-green-500/10 border border-green-500/20'
-                                      : 'bg-red-500/10 border border-red-500/20'
-                                  }`}>
-                                    <p className="text-xs text-gray-400 mb-1">Admin Notes</p>
-                                    <p className="text-white text-sm">{withdrawal.admin_notes}</p>
-                                  </div>
-                                )}
-                                <div className="text-xs text-gray-500 space-y-1">
-                                  <p>Requested: {new Date(withdrawal.created_at).toLocaleString()}</p>
-                                  <p>Processed: {withdrawal.processed_at ? new Date(withdrawal.processed_at).toLocaleString() : 'N/A'}</p>
-                                  <p>Processed by: {withdrawal.processor?.username || 'Unknown'}</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        <div className="flex flex-wrap gap-2 mb-6">{['users', 'listings', 'orders', 'messages', 'disputes', 'verifications', 'reviews', 'withdrawals'].map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-3 rounded-lg font-semibold transition relative ${activeTab === tab ? tab === 'verifications' ? 'bg-cyan-500 text-white' : tab === 'reviews' ? 'bg-yellow-500 text-white' : tab === 'withdrawals' ? 'bg-green-500 text-white' : 'bg-purple-500 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}>{tab.charAt(0).toUpperCase() + tab.slice(1)} {tab === 'verifications' && '🔍'}{tab === 'reviews' && '⭐'}{tab === 'withdrawals' && '💸'}{tab === 'verifications' && stats.pendingVerifications > 0 && (<span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{stats.pendingVerifications}</span>)}</button>))}</div>
+        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+          {activeTab === 'users' && (<div><h2 className="text-2xl font-bold text-white mb-4">All Users ({users.length})</h2><div className="space-y-4">{currentUsers.map((u) => (<div key={u.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between"><div><div className="flex items-center gap-2"><span className="text-white font-semibold">{u.username}</span><span className={`px-2 py-1 rounded text-xs ${u.is_admin ? 'bg-red-500/20 text-red-400' : u.role === 'vendor' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'}`}>{u.is_admin ? 'ADMIN' : u.role}</span>{u.is_banned && <span className="px-2 py-1 rounded text-xs bg-red-500/20 text-red-400">BANNED</span>}</div><p className="text-sm text-gray-400">Rating: {u.rating} | Sales: {u.total_sales} | Joined: {new Date(u.created_at).toLocaleDateString()}</p></div>{!u.is_admin && <button onClick={() => handleBanUser(u.id, u.is_banned)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${u.is_banned ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{u.is_banned ? 'Unban' : 'Ban'}</button>}</div>))}</div>{renderPagination(users)}</div>)}
+          {activeTab === 'listings' && (<div><h2 className="text-2xl font-bold text-white mb-4">All Listings ({listings.length})</h2><div className="space-y-4">{currentListings.map((l) => (<div key={l.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between"><div><div className="flex items-center gap-2"><span className="text-white font-semibold">{l.title}</span><span className={`px-2 py-1 rounded text-xs ${l.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>{l.status}</span></div><p className="text-sm text-gray-400">{l.game} | ${l.price} | Stock: {l.stock} | Seller: {l.profiles?.username}</p></div><div className="flex gap-2"><Link href={`/listing/${l.id}`} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm">View</Link><button onClick={() => handleDeleteListing(l.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm">Delete</button></div></div>))}</div>{renderPagination(listings)}</div>)}
+          {activeTab === 'orders' && (<div><h2 className="text-2xl font-bold text-white mb-4">All Orders ({orders.length})</h2><div className="space-y-4">{currentOrders.map((o) => (<div key={o.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between"><div><div className="flex items-center gap-2"><span className="text-white font-semibold">{o.listing_title || 'Unknown'}</span><span className={`px-2 py-1 rounded text-xs ${o.status === 'completed' ? 'bg-green-500/20 text-green-400' : o.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{o.status}</span></div><p className="text-sm text-gray-400">${o.amount} | Buyer: {o.buyer?.username} | Seller: {o.seller?.username}</p></div><Link href={`/order/${o.id}`} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm">View</Link></div>))}</div>{renderPagination(orders)}</div>)}
+          {activeTab === 'messages' && (<div><h2 className="text-2xl font-bold text-white mb-4">Conversations ({conversations.length})</h2><div className="space-y-4">{currentConversations.map((c) => (<div key={c.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4"><div className="w-16 h-16 rounded-lg bg-purple-500/20 flex items-center justify-center text-2xl">🎮</div><div className="flex-1"><h3 className="text-white font-semibold">{c.listing?.title || 'Unknown'}</h3><p className="text-sm text-gray-400">{c.buyer?.username} ↔ {c.seller?.username}</p><p className="text-xs text-gray-500 truncate">{c.last_message}</p></div><Link href={`/admin/messages/${c.id}`} className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm">View Chat</Link></div>))}</div>{renderPagination(conversations)}</div>)}
+          {activeTab === 'disputes' && (<div><div className="flex gap-3 mb-6"><button onClick={() => setDisputeSubTab('active')} className={`px-4 py-2 rounded-lg font-semibold ${disputeSubTab === 'active' ? 'bg-red-500 text-white' : 'bg-white/5 text-gray-300'}`}>Active ({activeDisputes.length})</button><button onClick={() => setDisputeSubTab('solved')} className={`px-4 py-2 rounded-lg font-semibold ${disputeSubTab === 'solved' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-300'}`}>Solved ({solvedDisputes.length})</button></div>{disputeSubTab === 'active' && (<div className="space-y-4">{currentActiveDisputes.map((o) => (<div key={o.id} className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"><div className="flex items-start justify-between"><div><h3 className="text-white font-bold">{o.listing_title || 'Unknown'}</h3><p className="text-gray-300 text-sm">Buyer: {o.buyer?.username} | Seller: {o.seller?.username}</p><p className="text-gray-400 text-sm">${o.amount}</p></div><div className="flex flex-col gap-2"><button onClick={() => handleResolveDispute(o.id, 'buyer')} className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm">💰 Refund Buyer</button><button onClick={() => handleResolveDispute(o.id, 'seller')} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm">✓ Complete</button></div></div></div>))}{renderPagination(activeDisputes)}</div>)}{disputeSubTab === 'solved' && (<div className="space-y-4">{currentSolvedDisputes.map((o) => (<div key={o.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex justify-between"><div><h3 className="text-white font-bold">{o.listing_title}</h3><p className="text-gray-400 text-sm">{o.buyer?.username} ↔ {o.seller?.username} | ${o.amount}</p><span className={`inline-block mt-2 px-2 py-1 rounded text-xs ${o.status === 'refunded' ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400'}`}>{o.status}</span></div></div>))}{renderPagination(solvedDisputes)}</div>)}</div>)}
+          {activeTab === 'verifications' && (<div><div className="flex gap-3 mb-6"><button onClick={() => setVerificationSubTab('pending')} className={`px-4 py-2 rounded-lg font-semibold ${verificationSubTab === 'pending' ? 'bg-cyan-500 text-white' : 'bg-white/5 text-gray-300'}`}>Pending ({pendingVerifications.length})</button><button onClick={() => setVerificationSubTab('past')} className={`px-4 py-2 rounded-lg font-semibold ${verificationSubTab === 'past' ? 'bg-gray-500 text-white' : 'bg-white/5 text-gray-300'}`}>Past ({pastVerifications.length})</button></div>{verificationSubTab === 'pending' && (<div className="space-y-4">{pendingVerifications.length === 0 ? <div className="text-center py-12"><div className="text-5xl mb-4">✅</div><p className="text-gray-400">No pending verifications</p></div> : currentPendingVerifications.map((v) => (<div key={v.id} className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 flex items-start gap-4"><div className="w-16 h-16 rounded-lg bg-cyan-500/20 flex items-center justify-center text-3xl">🔍</div><div className="flex-1"><div className="flex items-center gap-2 mb-2"><h3 className="text-white font-bold">{v.full_name}</h3><span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-400">PENDING</span>{v.resubmission_count > 0 && <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-400">🔄 RESUBMISSION #{v.resubmission_count}</span>}</div><p className="text-gray-300 text-sm">Username: {v.user?.username}</p><p className="text-gray-400 text-sm">{v.city}, {v.country} | ID: {v.id_type?.replace('_', ' ')}</p>{v.resubmission_count > 0 && <p className="text-orange-400 text-xs mt-1">⚠️ This is a resubmission - check previous rejection</p>}<p className="text-gray-500 text-xs mt-2">Submitted: {new Date(v.created_at).toLocaleString()}</p></div><button onClick={() => handleViewVerificationDetails(v)} className="px-6 py-3 bg-cyan-500/20 text-cyan-400 rounded-lg font-semibold">🔎 Review</button></div>))}{renderPagination(pendingVerifications)}</div>)}{verificationSubTab === 'past' && (<div className="space-y-4">{pastVerifications.length === 0 ? <div className="text-center py-12"><div className="text-5xl mb-4">📋</div><p className="text-gray-400">No past verifications</p></div> : currentPastVerifications.map((v) => (<div key={v.id} className={`border rounded-xl p-4 ${v.status === 'approved' ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}><div className="flex items-center gap-2 mb-2"><span className="text-3xl">{v.status === 'approved' ? '✅' : '❌'}</span><h3 className="text-white font-bold">{v.full_name}</h3><span className={`px-2 py-1 rounded text-xs ${v.status === 'approved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{v.status?.toUpperCase()}</span>{v.rejection_type === 'resubmission_required' && <span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-400">CAN RESUBMIT</span>}</div><p className="text-gray-300 text-sm">Username: {v.user?.username} | Reviewed by: {v.reviewer?.username}</p><p className="text-gray-400 text-sm">{v.city}, {v.country}</p>{v.rejection_reason && <div className="bg-red-500/10 border border-red-500/20 rounded p-2 mt-2"><p className="text-red-400 text-xs">Reason: {v.rejection_reason}</p></div>}<p className="text-gray-500 text-xs mt-2">Reviewed: {v.reviewed_at ? new Date(v.reviewed_at).toLocaleString() : 'N/A'}</p></div>))}{renderPagination(pastVerifications)}</div>)}</div>)}
+          {activeTab === 'reviews' && (<div><h2 className="text-2xl font-bold text-white mb-4">Reviews ({reviews.length})</h2><div className="space-y-4">{getCurrentPageData(reviews).map((r) => (<div key={r.id} className="bg-white/5 border border-white/10 rounded-xl p-4"><div className="flex items-center gap-2 mb-2"><div className="flex">{[1,2,3,4,5].map(s => <span key={s} className={s <= r.rating ? 'text-yellow-400' : 'text-gray-600'}>★</span>)}</div><span className="text-white">{r.rating}/5</span>{r.edited_by_admin && <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-400">Edited</span>}</div><p className="text-gray-300 text-sm">Buyer: {r.buyer?.username} → Seller: {r.seller?.username}</p>{editingReview?.id === r.id ? (<div className="mt-2"><textarea value={editedComment} onChange={(e) => setEditedComment(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded p-2 text-white text-sm" rows={3} /><div className="flex gap-2 mt-2"><button onClick={handleSaveReview} className="px-4 py-2 bg-green-500/20 text-green-400 rounded text-sm">Save</button><button onClick={() => setEditingReview(null)} className="px-4 py-2 bg-gray-500/20 text-gray-400 rounded text-sm">Cancel</button></div></div>) : (<div className="mt-2"><p className="text-white text-sm bg-white/5 p-2 rounded">{r.comment || 'No comment'}</p><div className="flex gap-2 mt-2"><button onClick={() => handleEditReview(r)} className="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded text-sm">✏️ Edit</button><button onClick={() => handleDeleteReview(r.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded text-sm">🗑️ Delete</button></div></div>)}</div>))}</div>{renderPagination(reviews)}</div>)}
+          {activeTab === 'withdrawals' && (<div><div className="flex gap-3 mb-6"><button onClick={() => setDisputeSubTab('active')} className={`px-4 py-2 rounded-lg font-semibold ${disputeSubTab === 'active' ? 'bg-yellow-500/30 text-yellow-400' : 'bg-white/5 text-gray-400'}`}>Pending ({pendingWithdrawals.length})</button><button onClick={() => setDisputeSubTab('solved')} className={`px-4 py-2 rounded-lg font-semibold ${disputeSubTab === 'solved' ? 'bg-green-500/30 text-green-400' : 'bg-white/5 text-gray-400'}`}>Processed ({processedWithdrawals.length})</button></div>{disputeSubTab === 'active' && (<div className="space-y-4">{pendingWithdrawals.map((w) => (<div key={w.id} className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex justify-between"><div><h3 className="text-white font-bold">{w.method === 'bitcoin' ? '₿ Bitcoin' : '💳 Skrill'}</h3><p className="text-gray-300">User: {w.user?.username}</p><p className="text-white font-bold text-xl">${parseFloat(w.amount).toFixed(2)} → ${parseFloat(w.net_amount).toFixed(2)}</p><p className="text-gray-400 text-xs break-all">{w.address}</p></div><div className="flex flex-col gap-2"><button onClick={() => handleApproveWithdrawal(w.id)} className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm">✅ Approve</button><button onClick={() => handleRejectWithdrawal(w.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm">❌ Reject</button></div></div>))}</div>)}{disputeSubTab === 'solved' && (<div className="space-y-4">{processedWithdrawals.map((w) => (<div key={w.id} className={`border rounded-xl p-4 ${w.status === 'completed' ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}><h3 className="text-white font-bold">{w.method === 'bitcoin' ? '₿' : '💳'} {w.user?.username}</h3><p className="text-white">${parseFloat(w.net_amount).toFixed(2)}</p><span className={`inline-block px-2 py-1 rounded text-xs ${w.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{w.status?.toUpperCase()}</span></div>))}</div>)}</div>)}
         </div>
-      </div>
+      </div></div>
 
-      {/* Approve Withdrawal Modal */}
-      {showApproveModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-slate-900 to-green-900 border-2 border-green-500/50 rounded-2xl p-8 max-w-md w-full shadow-2xl">
-            <h2 className="text-2xl font-bold text-white mb-2">✅ Approve Withdrawal</h2>
-            <p className="text-gray-300 mb-6">Enter the transaction details to approve this withdrawal request.</p>
+      {showAgreementModal && selectedVerification && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"><div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-lg w-full"><div className="text-center mb-6"><div className="text-5xl mb-4">⚠️</div><h2 className="text-2xl font-bold text-white mb-2">Sensitive Document Access</h2><p className="text-gray-300">Viewing documents for <strong className="text-white">{selectedVerification.user?.username}</strong></p></div><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6 text-sm text-gray-300"><p>• Access will be logged</p><p>• One-time view only</p><p>• Documents deleted after decision</p><p>• Do not screenshot or share</p></div><div className="flex items-start gap-3 mb-6"><input type="checkbox" checked={agreementAccepted} onChange={(e) => setAgreementAccepted(e.target.checked)} className="w-5 h-5 mt-0.5" /><label className="text-white text-sm">I agree to handle this information responsibly.</label></div><div className="flex gap-3"><button onClick={handleAcceptAgreement} disabled={!agreementAccepted} className="flex-1 bg-red-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50">View Documents</button><button onClick={() => { setShowAgreementModal(false); setSelectedVerification(null); setAgreementAccepted(false) }} className="flex-1 bg-white/10 text-white py-3 rounded-lg">Cancel</button></div></div></div>)}
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-white mb-2">
-                  Transaction ID <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={transactionId}
-                  onChange={(e) => setTransactionId(e.target.value)}
-                  placeholder="Bitcoin hash or Skrill reference..."
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none"
-                />
-                <p className="text-xs text-gray-400 mt-1">Required for record keeping</p>
-              </div>
+      {showVerificationDetailsModal && selectedVerification && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-gradient-to-br from-slate-900 to-purple-900 border border-white/20 rounded-2xl p-8 max-w-4xl w-full my-8"><div className="flex justify-between mb-6"><h2 className="text-2xl font-bold text-white">Verification Review</h2><button onClick={() => { setShowVerificationDetailsModal(false); setSelectedVerification(null) }} className="text-gray-400 hover:text-white text-2xl">✕</button></div><div className="grid md:grid-cols-2 gap-6"><div className="bg-white/5 border border-white/10 rounded-xl p-4"><h3 className="text-lg font-semibold text-white mb-4">Personal Info</h3><p className="text-gray-400 text-xs">Name</p><p className="text-white mb-2">{selectedVerification.full_name}</p><p className="text-gray-400 text-xs">DOB</p><p className="text-white mb-2">{new Date(selectedVerification.date_of_birth).toLocaleDateString()}</p><p className="text-gray-400 text-xs">Phone</p><p className="text-white mb-2">{selectedVerification.phone_number}</p><p className="text-gray-400 text-xs">Username</p><p className="text-purple-400 font-semibold">{selectedVerification.user?.username}</p></div><div className="bg-white/5 border border-white/10 rounded-xl p-4"><h3 className="text-lg font-semibold text-white mb-4">Address</h3><p className="text-white mb-2">{selectedVerification.street_address}</p><p className="text-white mb-2">{selectedVerification.city}, {selectedVerification.state_province}</p><p className="text-white">{selectedVerification.postal_code}, {selectedVerification.country}</p></div>{!selectedVerification.documents_cleared && selectedVerification.id_front_url && (<div className="bg-white/5 border border-white/10 rounded-xl p-4 md:col-span-2"><h3 className="text-lg font-semibold text-white mb-4">ID Documents <span className="text-xs text-red-400">(One-time view)</span></h3><p className="text-gray-400 text-xs mb-2">Type: {selectedVerification.id_type?.replace('_', ' ')}</p><div className="grid md:grid-cols-2 gap-4"><div><p className="text-xs text-gray-400 mb-2">Front</p><img src={selectedVerification.id_front_url} alt="ID Front" className="w-full rounded-lg" /></div>{selectedVerification.id_back_url && <div><p className="text-xs text-gray-400 mb-2">Back</p><img src={selectedVerification.id_back_url} alt="ID Back" className="w-full rounded-lg" /></div>}</div></div>)}{selectedVerification.documents_cleared && <div className="bg-gray-500/10 border border-gray-500/30 rounded-xl p-4 md:col-span-2 text-center"><span className="text-3xl">🔒</span><p className="text-gray-400 mt-2">Documents permanently deleted</p></div>}{selectedVerification.has_previous_experience && (<div className="bg-white/5 border border-white/10 rounded-xl p-4 md:col-span-2"><h3 className="text-lg font-semibold text-white mb-4">Vendor Experience</h3>{selectedVerification.platform_names && <p className="text-white mb-2">Platforms: {selectedVerification.platform_names}</p>}{selectedVerification.platform_usernames && <p className="text-white mb-2">Usernames: {selectedVerification.platform_usernames}</p>}{selectedVerification.experience_description && <p className="text-white">{selectedVerification.experience_description}</p>}</div>)}</div>{selectedVerification.status === 'pending' && (<div className="flex gap-4 mt-8"><button onClick={() => setVerificationDecisionModal('approve')} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-lg font-semibold text-lg">✅ Approve</button><button onClick={() => setVerificationDecisionModal('reject')} className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 rounded-lg font-semibold text-lg">❌ Reject</button></div>)}</div></div>)}
 
-              <div>
-                <label className="block text-sm font-semibold text-white mb-2">
-                  Admin Notes (Optional)
-                </label>
-                <textarea
-                  value={approveNotes}
-                  onChange={(e) => setApproveNotes(e.target.value)}
-                  placeholder="Any additional notes..."
-                  rows={3}
-                  maxLength={500}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none resize-none"
-                />
-              </div>
-            </div>
+      {verificationDecisionModal && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto"><div className={`border-2 rounded-2xl p-8 max-w-2xl w-full my-8 ${verificationDecisionModal === 'approve' ? 'bg-gradient-to-br from-slate-900 to-green-900 border-green-500/50' : 'bg-gradient-to-br from-slate-900 to-red-900 border-red-500/50'}`}><h2 className="text-2xl font-bold text-white mb-2">{verificationDecisionModal === 'approve' ? '✅ Approve Vendor' : '❌ Reject Application'}</h2><p className="text-gray-300 mb-6">{verificationDecisionModal === 'approve' ? 'User will become a vendor and can start selling.' : 'Choose rejection type below.'}</p>{verificationDecisionModal === 'reject' && (<><div className="mb-6"><label className="block text-white font-semibold mb-3">Rejection Type</label><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><button onClick={() => setRejectionType('resubmission_required')} className={`p-4 rounded-lg border-2 text-left transition ${rejectionType === 'resubmission_required' ? 'border-yellow-500 bg-yellow-500/20' : 'border-white/20 bg-white/5 hover:bg-white/10'}`}><div className="text-2xl mb-2">🔄</div><div className="text-white font-semibold">Request Resubmission</div><div className="text-gray-400 text-sm mt-1">User can fix issues and reapply.</div></button><button onClick={() => setRejectionType('permanent')} className={`p-4 rounded-lg border-2 text-left transition ${rejectionType === 'permanent' ? 'border-red-500 bg-red-500/20' : 'border-white/20 bg-white/5 hover:bg-white/10'}`}><div className="text-2xl mb-2">🚫</div><div className="text-white font-semibold">Permanent Rejection</div><div className="text-gray-400 text-sm mt-1">User cannot reapply.</div></button></div></div>{rejectionType === 'resubmission_required' && (<><div className="mb-4"><label className="block text-white font-semibold mb-3">Fields That Need Resubmission <span className="text-red-400">*</span></label><div className="grid grid-cols-2 gap-2">{[{ id: 'id_front', label: 'ID Front Photo' },{ id: 'id_back', label: 'ID Back Photo' },{ id: 'full_name', label: 'Full Name' },{ id: 'date_of_birth', label: 'Date of Birth' },{ id: 'phone_number', label: 'Phone Number' },{ id: 'address', label: 'Address Information' },{ id: 'id_type', label: 'ID Type Selection' },{ id: 'experience', label: 'Vendor Experience Info' }].map((field) => (<label key={field.id} className="flex items-center gap-2 text-white text-sm bg-white/5 p-2 rounded cursor-pointer hover:bg-white/10"><input type="checkbox" checked={resubmissionFields.includes(field.id)} onChange={(e) => { if (e.target.checked) { setResubmissionFields([...resubmissionFields, field.id]) } else { setResubmissionFields(resubmissionFields.filter(f => f !== field.id)) } }} className="w-4 h-4 rounded" />{field.label}</label>))}</div></div><div className="mb-4"><label className="block text-white font-semibold mb-2">Resubmission Instructions <span className="text-red-400">*</span></label><textarea value={resubmissionInstructions} onChange={(e) => setResubmissionInstructions(e.target.value)} placeholder="Explain clearly what the user needs to fix..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none" /><p className="text-xs text-gray-400 mt-1">{resubmissionInstructions.length}/1000 (minimum 20)</p></div></>)}{rejectionType === 'permanent' && (<div className="mb-4"><label className="block text-white font-semibold mb-2">Permanent Rejection Reason <span className="text-red-400">*</span></label><textarea value={verificationRejectionReason} onChange={(e) => setVerificationRejectionReason(e.target.value)} placeholder="Explain why this application is permanently rejected..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none" /><p className="text-xs text-gray-400 mt-1">{verificationRejectionReason.length}/500 (minimum 10)</p></div>)}</>)}<div className="mb-6"><label className="block text-white font-semibold mb-2">Admin Notes (Internal Only)</label><textarea value={verificationAdminNotes} onChange={(e) => setVerificationAdminNotes(e.target.value)} placeholder="Notes for other admins..." rows={3} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none" /></div><div className="flex gap-3"><button onClick={verificationDecisionModal === 'approve' ? handleApproveVerification : handleRejectVerification} disabled={verificationDecisionModal === 'reject' && ((rejectionType === 'resubmission_required' && (resubmissionFields.length === 0 || resubmissionInstructions.trim().length < 20)) || (rejectionType === 'permanent' && verificationRejectionReason.trim().length < 10))} className={`flex-1 text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${verificationDecisionModal === 'approve' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : rejectionType === 'permanent' ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-yellow-500 to-orange-500'}`}>{verificationDecisionModal === 'approve' ? 'Confirm Approval' : rejectionType === 'permanent' ? 'Permanently Reject' : 'Request Resubmission'}</button><button onClick={() => { setVerificationDecisionModal(null); setVerificationRejectionReason(''); setVerificationAdminNotes(''); setRejectionType('resubmission_required'); setResubmissionFields([]); setResubmissionInstructions('') }} className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-semibold border border-white/10">Cancel</button></div></div></div>)}
 
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={confirmApproveWithdrawal}
-                disabled={!transactionId.trim()}
-                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-green-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Confirm Approval
-              </button>
-              <button
-                onClick={() => {
-                  setShowApproveModal(false)
-                  setApprovingWithdrawalId(null)
-                }}
-                className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-semibold border border-white/10 transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showApproveModal && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"><div className="bg-gradient-to-br from-slate-900 to-green-900 border-2 border-green-500/50 rounded-2xl p-8 max-w-md w-full"><h2 className="text-2xl font-bold text-white mb-6">✅ Approve Withdrawal</h2><div className="mb-4"><label className="block text-white text-sm mb-2">Transaction ID *</label><input value={transactionId} onChange={(e) => setTransactionId(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white" placeholder="BTC hash or Skrill ref..." /></div><div className="mb-6"><label className="block text-white text-sm mb-2">Notes (Optional)</label><textarea value={approveNotes} onChange={(e) => setApproveNotes(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white" rows={3} /></div><div className="flex gap-3"><button onClick={confirmApproveWithdrawal} disabled={!transactionId.trim()} className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50">Confirm</button><button onClick={() => { setShowApproveModal(false); setApprovingWithdrawalId(null) }} className="flex-1 bg-white/10 text-white py-3 rounded-lg">Cancel</button></div></div></div>)}
 
-      {/* Reject Withdrawal Modal */}
-      {showRejectModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-md w-full shadow-2xl">
-            <h2 className="text-2xl font-bold text-white mb-2">❌ Reject Withdrawal</h2>
-            <p className="text-gray-300 mb-6">The funds will be returned to the vendor's balance. Please provide a reason for rejection.</p>
-
-            <div>
-              <label className="block text-sm font-semibold text-white mb-2">
-                Rejection Reason <span className="text-red-400">*</span>
-              </label>
-              <textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Please explain why this withdrawal is being rejected..."
-                rows={4}
-                maxLength={500}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-red-500/50 focus:outline-none resize-none"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                {rejectionReason.length}/500 characters (minimum 5 required)
-              </p>
-            </div>
-
-            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mt-4">
-              <p className="text-yellow-400 text-sm">
-                ⚠️ This reason will be visible to the vendor. Be professional and clear.
-              </p>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={confirmRejectWithdrawal}
-                disabled={rejectionReason.trim().length < 5}
-                className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-red-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Confirm Rejection
-              </button>
-              <button
-                onClick={() => {
-                  setShowRejectModal(false)
-                  setRejectingWithdrawalId(null)
-                }}
-                className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-semibold border border-white/10 transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showRejectModal && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"><div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-md w-full"><h2 className="text-2xl font-bold text-white mb-6">❌ Reject Withdrawal</h2><div className="mb-6"><label className="block text-white text-sm mb-2">Rejection Reason *</label><textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white" rows={4} placeholder="Min 5 characters..." /></div><div className="flex gap-3"><button onClick={confirmRejectWithdrawal} disabled={rejectionReason.trim().length < 5} className="flex-1 bg-red-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50">Confirm</button><button onClick={() => { setShowRejectModal(false); setRejectingWithdrawalId(null) }} className="flex-1 bg-white/10 text-white py-3 rounded-lg">Cancel</button></div></div></div>)}
     </div>
   )
 }
