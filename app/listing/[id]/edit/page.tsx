@@ -142,6 +142,13 @@ export default function EditListingPage() {
 
       if (error) throw error
 
+      // Update stock count after deleting a code
+      const newUnusedCount = unusedCodes.filter(c => c.id !== codeId).length
+      await supabase
+        .from('listings')
+        .update({ stock: newUnusedCount })
+        .eq('id', params.id)
+
       alert('Delivery code deleted successfully!')
       await fetchDeliveryCodes()
     } catch (error: any) {
@@ -188,8 +195,61 @@ export default function EditListingPage() {
     setSaving(true)
 
     try {
-      // Update listing
-      const { error: listingError } = await supabase
+      // Calculate current unused codes from state
+      const currentUnusedCodes = deliveryCodes.filter(c => !c.is_used)
+      let finalStock = deliveryType === 'manual' ? parseInt(stock) : currentUnusedCodes.length
+
+      console.log('=== DEBUG: Stock Update ===')
+      console.log('Delivery Type:', deliveryType)
+      console.log('Current unused codes count:', currentUnusedCodes.length)
+      console.log('Initial final stock:', finalStock)
+
+      // If automatic delivery, handle new codes first
+      if (deliveryType === 'automatic') {
+        const validNewCodes = newCodes.filter(code => code.trim().length > 0)
+        
+        console.log('Valid new codes to add:', validNewCodes.length, validNewCodes)
+        
+        if (validNewCodes.length > 0) {
+          const codesToInsert = validNewCodes.map(code => ({
+            listing_id: params.id,
+            code_text: code.trim()
+          }))
+
+          console.log('Inserting codes:', codesToInsert)
+
+          const { data: insertedCodes, error: codesError } = await supabase
+            .from('delivery_codes')
+            .insert(codesToInsert)
+            .select()
+
+          if (codesError) {
+            console.error('Error inserting codes:', codesError)
+            throw codesError
+          }
+
+          console.log('Codes inserted successfully:', insertedCodes)
+
+          // Update final stock count with new codes
+          finalStock = currentUnusedCodes.length + validNewCodes.length
+          console.log('Updated final stock (after adding codes):', finalStock)
+        }
+      }
+
+      console.log('Updating listing with stock:', finalStock)
+
+      // Determine the correct status based on stock
+      let newStatus = listing.status
+      if (finalStock > 0 && listing.status === 'out_of_stock') {
+        newStatus = 'active' // Reactivate listing when stock is replenished
+      } else if (finalStock === 0 && listing.status === 'active') {
+        newStatus = 'out_of_stock' // Mark as out of stock when no stock
+      }
+
+      console.log('New status:', newStatus)
+
+      // Update listing with correct stock count AND status
+      const { data: updatedListing, error: listingError } = await supabase
         .from('listings')
         .update({
           title,
@@ -198,34 +258,26 @@ export default function EditListingPage() {
           description,
           price: parseFloat(price),
           platform,
-          stock: deliveryType === 'manual' ? parseInt(stock) : 0, // Stock for manual, will be auto-calculated for automatic
+          stock: finalStock,
+          status: newStatus,
           image_url: imageUrl,
           delivery_type: deliveryType
         })
         .eq('id', params.id)
+        .select()
 
-      if (listingError) throw listingError
+      if (listingError) {
+        console.error('Error updating listing:', listingError)
+        throw listingError
+      }
 
-      // If automatic delivery, handle new codes
+      console.log('Listing updated successfully:', updatedListing)
+      console.log('=== END DEBUG ===')
+
+      // Reset new codes and refresh
       if (deliveryType === 'automatic') {
-        const validNewCodes = newCodes.filter(code => code.trim().length > 0)
-        
-        if (validNewCodes.length > 0) {
-          const codesToInsert = validNewCodes.map(code => ({
-            listing_id: params.id,
-            code_text: code.trim()
-          }))
-
-          const { error: codesError } = await supabase
-            .from('delivery_codes')
-            .insert(codesToInsert)
-
-          if (codesError) throw codesError
-
-          // Reset new codes
-          setNewCodes([''])
-          await fetchDeliveryCodes()
-        }
+        setNewCodes([''])
+        await fetchDeliveryCodes()
       }
 
       alert('Listing updated successfully!')

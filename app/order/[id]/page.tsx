@@ -585,11 +585,46 @@ export default function OrderDetailPage() {
                 </div>
                 <div className="border-t border-white/10 pt-3">
                   <div className="flex justify-between">
-                    <span className="text-white font-bold">Total</span>
+                    <span className="text-white font-bold">Total Paid by Buyer</span>
                     <span className="text-green-400 font-bold text-xl">${totalAmount.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
+
+              {/* Vendor Commission Info - Only visible to seller */}
+              {isSeller && (
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 mb-4">
+                  <h4 className="text-orange-400 font-semibold mb-3">💰 Your Earnings</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Order Amount</span>
+                      <span className="text-white">${order.amount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Platform Commission (5%)</span>
+                      <span className="text-red-400">-${(order.amount * 0.05).toFixed(2)}</span>
+                    </div>
+                    <div className="border-t border-orange-500/20 pt-2">
+                      <div className="flex justify-between">
+                        <span className="text-white font-bold">Your Net Earnings</span>
+                        <span className="text-green-400 font-bold">${(order.amount * 0.95).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {order.status === 'completed' && (
+                    <p className="text-xs text-green-400 mt-2">✓ Funds have been released to your balance</p>
+                  )}
+                  {order.status === 'delivered' && (
+                    <p className="text-xs text-yellow-400 mt-2">⏳ Funds on hold until buyer confirms (48h)</p>
+                  )}
+                  {order.status === 'paid' && (
+                    <p className="text-xs text-blue-400 mt-2">📦 Deliver the item to release funds</p>
+                  )}
+                  {order.status === 'dispute_raised' && (
+                    <p className="text-xs text-red-400 mt-2">⚠️ Funds frozen due to active dispute</p>
+                  )}
+                </div>
+              )}
 
               <div className="flex items-center space-x-2 mb-4">
                 <span className="text-sm text-gray-400">Payment Status:</span>

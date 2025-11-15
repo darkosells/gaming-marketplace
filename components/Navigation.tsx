@@ -1,4 +1,4 @@
-// components/Navigation.tsx - REUSABLE NAVIGATION COMPONENT
+// components/Navigation.tsx - REUSABLE NAVIGATION COMPONENT WITH SETTINGS
 
 'use client'
 
@@ -120,6 +120,9 @@ export default function Navigation() {
                     )}
                     <Link href="/messages" className="block px-4 py-3 text-white hover:bg-white/10">
                       Messages
+                    </Link>
+                    <Link href="/settings" className="block px-4 py-3 text-white hover:bg-white/10">
+                      Settings
                     </Link>
                     <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/10 rounded-b-lg">
                       Logout

@@ -27,8 +27,17 @@ export default function AdminDashboard() {
   const [activeDisputes, setActiveDisputes] = useState<any[]>([])
   const [solvedDisputes, setSolvedDisputes] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
+  const [pendingWithdrawals, setPendingWithdrawals] = useState<any[]>([])
+  const [processedWithdrawals, setProcessedWithdrawals] = useState<any[]>([])
   const [editingReview, setEditingReview] = useState<any>(null)
   const [editedComment, setEditedComment] = useState('')
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectingWithdrawalId, setRejectingWithdrawalId] = useState<string | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [showApproveModal, setShowApproveModal] = useState(false)
+  const [approvingWithdrawalId, setApprovingWithdrawalId] = useState<string | null>(null)
+  const [transactionId, setTransactionId] = useState('')
+  const [approveNotes, setApproveNotes] = useState('')
   
   const router = useRouter()
   const supabase = createClient()
@@ -45,6 +54,7 @@ export default function AdminDashboard() {
       if (activeTab === 'messages') fetchConversations()
       if (activeTab === 'disputes') fetchDisputes()
       if (activeTab === 'reviews') fetchReviews()
+      if (activeTab === 'withdrawals') fetchWithdrawals()
     }
   }, [activeTab, profile])
 
@@ -274,6 +284,131 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error deleting review:', error)
       alert('Failed to delete review')
+    }
+  }
+
+  const fetchWithdrawals = async () => {
+    try {
+      // Fetch pending withdrawals
+      const { data: pendingData, error: pendingError } = await supabase
+        .from('withdrawals')
+        .select(`
+          *,
+          user:profiles!user_id(username, id)
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      if (pendingError) throw pendingError
+      setPendingWithdrawals(pendingData || [])
+
+      // Fetch processed withdrawals (completed or rejected)
+      const { data: processedData, error: processedError } = await supabase
+        .from('withdrawals')
+        .select(`
+          *,
+          user:profiles!user_id(username, id),
+          processor:profiles!processed_by(username)
+        `)
+        .in('status', ['completed', 'rejected'])
+        .order('processed_at', { ascending: false })
+
+      if (processedError) throw processedError
+      setProcessedWithdrawals(processedData || [])
+    } catch (error) {
+      console.error('Error fetching withdrawals:', error)
+    }
+  }
+
+  const handleApproveWithdrawal = async (withdrawalId: string) => {
+    setApprovingWithdrawalId(withdrawalId)
+    setTransactionId('')
+    setApproveNotes('')
+    setShowApproveModal(true)
+  }
+
+  const confirmApproveWithdrawal = async () => {
+    if (!transactionId.trim()) {
+      alert('Transaction ID is required to approve withdrawal')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('withdrawals')
+        .update({
+          status: 'completed',
+          processed_by: user.id,
+          processed_at: new Date().toISOString(),
+          transaction_id: transactionId.trim(),
+          admin_notes: approveNotes.trim() || null
+        })
+        .eq('id', approvingWithdrawalId)
+
+      if (error) throw error
+
+      // Log admin action
+      await supabase.from('admin_actions').insert({
+        admin_id: user.id,
+        action_type: 'withdrawal_approved',
+        target_type: 'withdrawal',
+        target_id: approvingWithdrawalId,
+        description: `Approved withdrawal with transaction ID: ${transactionId}`,
+        metadata: { transaction_id: transactionId, notes: approveNotes }
+      })
+
+      alert('✅ Withdrawal approved successfully!')
+      setShowApproveModal(false)
+      setApprovingWithdrawalId(null)
+      fetchWithdrawals()
+    } catch (error) {
+      console.error('Error approving withdrawal:', error)
+      alert('Failed to approve withdrawal')
+    }
+  }
+
+  const handleRejectWithdrawal = async (withdrawalId: string) => {
+    setRejectingWithdrawalId(withdrawalId)
+    setRejectionReason('')
+    setShowRejectModal(true)
+  }
+
+  const confirmRejectWithdrawal = async () => {
+    if (!rejectionReason.trim() || rejectionReason.trim().length < 5) {
+      alert('Please provide a valid rejection reason (at least 5 characters)')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('withdrawals')
+        .update({
+          status: 'rejected',
+          processed_by: user.id,
+          processed_at: new Date().toISOString(),
+          admin_notes: rejectionReason.trim()
+        })
+        .eq('id', rejectingWithdrawalId)
+
+      if (error) throw error
+
+      // Log admin action
+      await supabase.from('admin_actions').insert({
+        admin_id: user.id,
+        action_type: 'withdrawal_rejected',
+        target_type: 'withdrawal',
+        target_id: rejectingWithdrawalId,
+        description: `Rejected withdrawal: ${rejectionReason}`,
+        metadata: { reason: rejectionReason }
+      })
+
+      alert('❌ Withdrawal rejected. Funds have been returned to vendor\'s balance.')
+      setShowRejectModal(false)
+      setRejectingWithdrawalId(null)
+      fetchWithdrawals()
+    } catch (error) {
+      console.error('Error rejecting withdrawal:', error)
+      alert('Failed to reject withdrawal')
     }
   }
 
@@ -665,6 +800,16 @@ export default function AdminDashboard() {
               }`}
             >
               Reviews ⭐
+            </button>
+            <button
+              onClick={() => setActiveTab('withdrawals')}
+              className={`px-6 py-3 rounded-lg font-semibold transition ${
+                activeTab === 'withdrawals'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+              }`}
+            >
+              Withdrawals 💸
             </button>
           </div>
 
@@ -1237,9 +1382,309 @@ export default function AdminDashboard() {
                 )}
               </div>
             )}
+
+            {/* Withdrawals Tab */}
+            {activeTab === 'withdrawals' && (
+              <div>
+                {/* Sub-tabs for Pending/Processed */}
+                <div className="flex space-x-4 mb-6">
+                  <button
+                    onClick={() => setDisputeSubTab('active')}
+                    className={`px-4 py-2 rounded-lg font-semibold transition ${
+                      disputeSubTab === 'active'
+                        ? 'bg-yellow-500/30 text-yellow-400'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                    }`}
+                  >
+                    ⏳ Pending Requests ({pendingWithdrawals.length})
+                  </button>
+                  <button
+                    onClick={() => setDisputeSubTab('solved')}
+                    className={`px-4 py-2 rounded-lg font-semibold transition ${
+                      disputeSubTab === 'solved'
+                        ? 'bg-green-500/30 text-green-400'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                    }`}
+                  >
+                    ✅ Processed ({processedWithdrawals.length})
+                  </button>
+                </div>
+
+                {/* Pending Withdrawals */}
+                {disputeSubTab === 'active' && (
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-4">Pending Withdrawal Requests</h2>
+                    {pendingWithdrawals.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="text-5xl mb-4">✅</div>
+                        <p className="text-gray-400">No pending withdrawal requests</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {pendingWithdrawals.map((withdrawal) => (
+                          <div key={withdrawal.id} className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                            <div className="flex items-start gap-4">
+                              <div className="w-16 h-16 flex-shrink-0 rounded-lg bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center">
+                                <span className="text-3xl">{withdrawal.method === 'bitcoin' ? '₿' : '💳'}</span>
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h3 className="text-white font-bold">{withdrawal.method === 'bitcoin' ? 'Bitcoin' : 'Skrill'} Withdrawal</h3>
+                                  <span className="px-2 py-1 rounded text-xs font-semibold bg-yellow-500/20 text-yellow-400">
+                                    PENDING
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-300 mb-2">
+                                  <strong>Vendor:</strong> {withdrawal.user?.username || 'Unknown'}
+                                </p>
+                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                  <div>
+                                    <p className="text-xs text-gray-400">Requested Amount</p>
+                                    <p className="text-white font-bold text-xl">${parseFloat(withdrawal.amount).toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-gray-400">After Fees</p>
+                                    <p className="text-green-400 font-bold text-xl">${parseFloat(withdrawal.net_amount).toFixed(2)}</p>
+                                  </div>
+                                </div>
+                                <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-3">
+                                  <p className="text-xs text-gray-400 mb-1">
+                                    {withdrawal.method === 'bitcoin' ? 'Bitcoin Wallet Address' : 'Skrill Email'}
+                                  </p>
+                                  <p className="text-white font-mono text-sm break-all">{withdrawal.address}</p>
+                                </div>
+                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                  <span>Fee: ${parseFloat(withdrawal.fee_total).toFixed(2)} ({withdrawal.fee_percentage}% + ${withdrawal.fee_flat})</span>
+                                  <span>•</span>
+                                  <span>Requested: {new Date(withdrawal.created_at).toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <div className="flex flex-col gap-2">
+                                <button
+                                  onClick={() => handleApproveWithdrawal(withdrawal.id)}
+                                  className="bg-green-500/20 hover:bg-green-500/30 text-green-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
+                                >
+                                  ✅ Approve
+                                </button>
+                                <button
+                                  onClick={() => handleRejectWithdrawal(withdrawal.id)}
+                                  className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg text-sm font-semibold transition whitespace-nowrap"
+                                >
+                                  ❌ Reject
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Processed Withdrawals */}
+                {disputeSubTab === 'solved' && (
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-4">Processed Withdrawals</h2>
+                    {processedWithdrawals.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="text-5xl mb-4">📋</div>
+                        <p className="text-gray-400">No processed withdrawals yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {processedWithdrawals.map((withdrawal) => (
+                          <div key={withdrawal.id} className={`border rounded-xl p-4 ${
+                            withdrawal.status === 'completed' 
+                              ? 'bg-green-500/10 border-green-500/30' 
+                              : 'bg-red-500/10 border-red-500/30'
+                          }`}>
+                            <div className="flex items-start gap-4">
+                              <div className={`w-16 h-16 flex-shrink-0 rounded-lg flex items-center justify-center ${
+                                withdrawal.status === 'completed'
+                                  ? 'bg-gradient-to-br from-green-500/20 to-emerald-500/20'
+                                  : 'bg-gradient-to-br from-red-500/20 to-orange-500/20'
+                              }`}>
+                                <span className="text-3xl">{withdrawal.method === 'bitcoin' ? '₿' : '💳'}</span>
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h3 className="text-white font-bold">{withdrawal.method === 'bitcoin' ? 'Bitcoin' : 'Skrill'} Withdrawal</h3>
+                                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                    withdrawal.status === 'completed'
+                                      ? 'bg-green-500/20 text-green-400'
+                                      : 'bg-red-500/20 text-red-400'
+                                  }`}>
+                                    {withdrawal.status.toUpperCase()}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-300 mb-2">
+                                  <strong>Vendor:</strong> {withdrawal.user?.username || 'Unknown'}
+                                </p>
+                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                  <div>
+                                    <p className="text-xs text-gray-400">Amount</p>
+                                    <p className="text-white font-bold">${parseFloat(withdrawal.amount).toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-gray-400">
+                                      {withdrawal.status === 'completed' ? 'Sent Amount' : 'Would Have Received'}
+                                    </p>
+                                    <p className={`font-bold ${withdrawal.status === 'completed' ? 'text-green-400' : 'text-gray-400'}`}>
+                                      ${parseFloat(withdrawal.net_amount).toFixed(2)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-3">
+                                  <p className="text-xs text-gray-400 mb-1">
+                                    {withdrawal.method === 'bitcoin' ? 'Bitcoin Wallet Address' : 'Skrill Email'}
+                                  </p>
+                                  <p className="text-white font-mono text-sm break-all">{withdrawal.address}</p>
+                                </div>
+                                {withdrawal.transaction_id && (
+                                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-3">
+                                    <p className="text-xs text-blue-400 mb-1">Transaction ID</p>
+                                    <p className="text-white font-mono text-xs break-all">{withdrawal.transaction_id}</p>
+                                  </div>
+                                )}
+                                {withdrawal.admin_notes && (
+                                  <div className={`rounded-lg p-3 mb-3 ${
+                                    withdrawal.status === 'completed'
+                                      ? 'bg-green-500/10 border border-green-500/20'
+                                      : 'bg-red-500/10 border border-red-500/20'
+                                  }`}>
+                                    <p className="text-xs text-gray-400 mb-1">Admin Notes</p>
+                                    <p className="text-white text-sm">{withdrawal.admin_notes}</p>
+                                  </div>
+                                )}
+                                <div className="text-xs text-gray-500 space-y-1">
+                                  <p>Requested: {new Date(withdrawal.created_at).toLocaleString()}</p>
+                                  <p>Processed: {withdrawal.processed_at ? new Date(withdrawal.processed_at).toLocaleString() : 'N/A'}</p>
+                                  <p>Processed by: {withdrawal.processor?.username || 'Unknown'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Approve Withdrawal Modal */}
+      {showApproveModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-slate-900 to-green-900 border-2 border-green-500/50 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <h2 className="text-2xl font-bold text-white mb-2">✅ Approve Withdrawal</h2>
+            <p className="text-gray-300 mb-6">Enter the transaction details to approve this withdrawal request.</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-white mb-2">
+                  Transaction ID <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={transactionId}
+                  onChange={(e) => setTransactionId(e.target.value)}
+                  placeholder="Bitcoin hash or Skrill reference..."
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none"
+                />
+                <p className="text-xs text-gray-400 mt-1">Required for record keeping</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-white mb-2">
+                  Admin Notes (Optional)
+                </label>
+                <textarea
+                  value={approveNotes}
+                  onChange={(e) => setApproveNotes(e.target.value)}
+                  placeholder="Any additional notes..."
+                  rows={3}
+                  maxLength={500}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-green-500/50 focus:outline-none resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={confirmApproveWithdrawal}
+                disabled={!transactionId.trim()}
+                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-green-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm Approval
+              </button>
+              <button
+                onClick={() => {
+                  setShowApproveModal(false)
+                  setApprovingWithdrawalId(null)
+                }}
+                className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-semibold border border-white/10 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Withdrawal Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <h2 className="text-2xl font-bold text-white mb-2">❌ Reject Withdrawal</h2>
+            <p className="text-gray-300 mb-6">The funds will be returned to the vendor's balance. Please provide a reason for rejection.</p>
+
+            <div>
+              <label className="block text-sm font-semibold text-white mb-2">
+                Rejection Reason <span className="text-red-400">*</span>
+              </label>
+              <textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="Please explain why this withdrawal is being rejected..."
+                rows={4}
+                maxLength={500}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-red-500/50 focus:outline-none resize-none"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                {rejectionReason.length}/500 characters (minimum 5 required)
+              </p>
+            </div>
+
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mt-4">
+              <p className="text-yellow-400 text-sm">
+                ⚠️ This reason will be visible to the vendor. Be professional and clear.
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={confirmRejectWithdrawal}
+                disabled={rejectionReason.trim().length < 5}
+                className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-red-500/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm Rejection
+              </button>
+              <button
+                onClick={() => {
+                  setShowRejectModal(false)
+                  setRejectingWithdrawalId(null)
+                }}
+                className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-semibold border border-white/10 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
