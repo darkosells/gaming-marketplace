@@ -39,7 +39,7 @@ function BrowseContent() {
     try {
       const { data, error } = await supabase
         .from('listings')
-        .select('*, profiles(username, rating, total_sales)')
+        .select('*, profiles(username, average_rating, total_reviews)')
         .eq('status', 'active')
         .order('created_at', { ascending: false })
 
@@ -301,7 +301,7 @@ function BrowseContent() {
                               <p className="text-white font-semibold text-sm">{listing.profiles?.username}</p>
                               <div className="flex items-center justify-end gap-1">
                                 <span className="text-yellow-400">★</span>
-                                <span className="text-gray-400 text-xs">{listing.profiles?.rating || '0.0'} ({listing.profiles?.total_sales || 0})</span>
+                                <span className="text-gray-400 text-xs">{listing.profiles?.average_rating?.toFixed(1) || '0.0'} ({listing.profiles?.total_reviews || 0})</span>
                               </div>
                             </div>
                           </div>
