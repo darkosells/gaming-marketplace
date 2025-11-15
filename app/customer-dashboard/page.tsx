@@ -1,4 +1,4 @@
-// app/customer-dashboard/page.tsx - FIXED CUSTOMER DASHBOARD
+// app/customer-dashboard/page.tsx - CUSTOMER DASHBOARD WITH ORDER PAGINATION
 
 'use client'
 
@@ -6,33 +6,21 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
+import Navigation from '@/components/Navigation'
 
 export default function CustomerDashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [cartItemCount, setCartItemCount] = useState(0)
   const [myOrders, setMyOrders] = useState<any[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const ordersPerPage = 5
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     checkUser()
-    checkCart()
-    
-    const handleStorageChange = () => checkCart()
-    window.addEventListener('storage', handleStorageChange)
-    window.addEventListener('cart-updated', handleStorageChange)
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      window.removeEventListener('cart-updated', handleStorageChange)
-    }
   }, [])
-
-  const checkCart = () => {
-    const cart = localStorage.getItem('cart')
-    setCartItemCount(cart ? 1 : 0)
-  }
 
   const checkUser = async () => {
     try {
@@ -76,8 +64,6 @@ export default function CustomerDashboardPage() {
 
   const fetchMyOrders = async (userId: string) => {
     try {
-      console.log('🔍 Fetching orders for user:', userId)
-      
       const { data, error } = await supabase
         .from('orders')
         .select('*')
@@ -85,15 +71,12 @@ export default function CustomerDashboardPage() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('❌ Fetch orders error:', error)
+        console.error('Fetch orders error:', error)
         return
       }
       
-      console.log('📦 Raw orders data from database:', data)
-      
       // Use snapshot data stored in the order
       const ordersWithListings = (data || []).map((order: any) => {
-        // Use snapshot data from order columns (fallback to 'Unknown' if not available)
         const listingSnapshot = {
           title: order.listing_title || 'Unknown Item',
           game: order.listing_game || 'N/A',
@@ -101,22 +84,15 @@ export default function CustomerDashboardPage() {
           image_url: order.listing_image_url || null
         }
         
-        console.log(`Order ${order.id}:`, {
-          hasSnapshot: !!order.listing_title,
-          listingTitle: listingSnapshot.title,
-          snapshotData: listingSnapshot
-        })
-        
         return {
           ...order,
           listing: listingSnapshot
         }
       })
       
-      console.log('✅ Final orders with listings:', ordersWithListings)
       setMyOrders(ordersWithListings)
     } catch (error) {
-      console.error('💥 Error fetching orders:', error)
+      console.error('Error fetching orders:', error)
     }
   }
 
@@ -143,11 +119,6 @@ export default function CustomerDashboardPage() {
     }
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
@@ -171,68 +142,25 @@ export default function CustomerDashboardPage() {
     )
   }
 
-  const pendingOrders = myOrders.filter(o => o.status === 'pending')
+  const pendingOrders = myOrders.filter(o => o.status === 'pending' || o.status === 'paid' || o.status === 'delivered')
   const completedOrders = myOrders.filter(o => o.status === 'completed')
+
+  // Pagination calculations
+  const totalPages = Math.ceil(myOrders.length / ordersPerPage)
+  const startIndex = (currentPage - 1) * ordersPerPage
+  const endIndex = startIndex + ordersPerPage
+  const currentOrders = myOrders.slice(startIndex, endIndex)
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page)
+    // Scroll to top of orders section
+    document.getElementById('orders-section')?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Navigation */}
-      <nav className="bg-black/30 backdrop-blur-lg border-b border-white/10 relative z-50">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🎮</span>
-              </div>
-              <span className="text-xl font-bold text-white">GameVault</span>
-            </Link>
-
-            <div className="flex items-center space-x-4">
-              <Link href="/browse" className="text-gray-300 hover:text-white transition">
-                Browse
-              </Link>
-              <Link href="/messages" className="text-gray-300 hover:text-white transition">
-                Messages
-              </Link>
-              <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                {cartItemCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
-                    {cartItemCount}
-                  </span>
-                )}
-              </Link>
-              <div className="relative group z-[9999]">
-                <button className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-semibold text-sm">
-                      {profile?.username?.charAt(0).toUpperCase() || 'C'}
-                    </span>
-                  </div>
-                  <span className="text-white">{profile?.username || 'Customer'}</span>
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-                
-                <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-2xl border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[9999]">
-                  <Link href="/customer-dashboard" className="block px-4 py-3 text-white hover:bg-white/10 rounded-t-lg">
-                    My Account
-                  </Link>
-                  <Link href="/messages" className="block px-4 py-3 text-white hover:bg-white/10">
-                    Messages
-                  </Link>
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-red-400 hover:bg-white/10 rounded-b-lg">
-                    Logout
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navigation />
 
       {/* Dashboard Content */}
       <div className="container mx-auto px-4 py-12">
@@ -285,7 +213,7 @@ export default function CustomerDashboardPage() {
               <p className="text-gray-400 text-sm">Chat with sellers</p>
             </Link>
             <Link
-              href="/customer-dashboard"
+              href="/settings"
               className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 hover:border-purple-500/50 transition group"
             >
               <div className="text-4xl mb-3">⚙️</div>
@@ -295,8 +223,15 @@ export default function CustomerDashboardPage() {
           </div>
 
           {/* Recent Orders */}
-          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 mb-8">
-            <h2 className="text-2xl font-bold text-white mb-6">Recent Orders</h2>
+          <div id="orders-section" className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Recent Orders</h2>
+              {myOrders.length > 0 && (
+                <span className="text-sm text-gray-400">
+                  Showing {startIndex + 1}-{Math.min(endIndex, myOrders.length)} of {myOrders.length} orders
+                </span>
+              )}
+            </div>
 
             {myOrders.length === 0 ? (
               <div className="text-center py-12">
@@ -311,48 +246,115 @@ export default function CustomerDashboardPage() {
                 </Link>
               </div>
             ) : (
-              <div className="space-y-4">
-                {myOrders.map((order: any) => (
-                  <div key={order.id} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:border-purple-500/50 transition">
-                    <div className="flex items-center gap-4">
-                      {/* ✅ FIXED: Added optional chaining for all listing properties */}
-                      <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                        {order.listing?.image_url ? (
-                          <img src={order.listing.image_url} alt={order.listing.title || 'Item'} className="w-full h-full object-cover rounded-lg" />
-                        ) : (
-                          <span className="text-2xl">
-                            {order.listing?.category === 'account' ? '🎮' : order.listing?.category === 'topup' ? '💰' : '🔑'}
+              <>
+                <div className="space-y-4">
+                  {currentOrders.map((order: any) => (
+                    <div key={order.id} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:border-purple-500/50 transition">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                          {order.listing?.image_url ? (
+                            <img src={order.listing.image_url} alt={order.listing.title || 'Item'} className="w-full h-full object-cover rounded-lg" />
+                          ) : (
+                            <span className="text-2xl">
+                              {order.listing?.category === 'account' ? '🎮' : order.listing?.category === 'topup' ? '💰' : '🔑'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-white font-semibold">{order.listing?.title || 'Unknown Item'}</h4>
+                          <p className="text-sm text-gray-400">{order.listing?.game || 'N/A'}</p>
+                          <p className="text-sm text-gray-500">
+                            {new Date(order.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-white">${parseFloat(order.amount).toFixed(2)}</p>
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                            order.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                            order.status === 'pending' || order.status === 'paid' ? 'bg-yellow-500/20 text-yellow-400' :
+                            order.status === 'delivered' ? 'bg-blue-500/20 text-blue-400' :
+                            order.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400' :
+                            order.status === 'refunded' ? 'bg-orange-500/20 text-orange-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {order.status === 'paid' ? 'Paid' :
+                             order.status === 'delivered' ? 'Delivered' :
+                             order.status === 'dispute_raised' ? 'Dispute' :
+                             order.status === 'refunded' ? 'Refunded' :
+                             order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                           </span>
-                        )}
+                        </div>
+                        <Link
+                          href={`/order/${order.id}`}
+                          className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition inline-block"
+                        >
+                          View Details
+                        </Link>
                       </div>
-                      <div className="flex-1">
-                        <h4 className="text-white font-semibold">{order.listing?.title || 'Unknown Item'}</h4>
-                        <p className="text-sm text-gray-400">{order.listing?.game || 'N/A'}</p>
-                        <p className="text-sm text-gray-500">
-                          {new Date(order.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-white">${order.amount}</p>
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                          order.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                          order.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                          order.status === 'disputed' ? 'bg-red-500/20 text-red-400' :
-                          'bg-gray-500/20 text-gray-400'
-                        }`}>
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                        </span>
-                      </div>
-                      <Link
-                        href={`/order/${order.id}`}
-                        className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition inline-block"
-                      >
-                        View Details
-                      </Link>
                     </div>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-8">
+                    {/* Previous Button */}
+                    <button
+                      onClick={() => goToPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ← Previous
+                    </button>
+
+                    {/* Page Numbers */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                        // Show first page, last page, current page, and pages around current
+                        const showPage = 
+                          page === 1 || 
+                          page === totalPages || 
+                          (page >= currentPage - 1 && page <= currentPage + 1)
+
+                        if (!showPage) {
+                          // Show ellipsis for gaps
+                          if (page === currentPage - 2 || page === currentPage + 2) {
+                            return (
+                              <span key={page} className="px-2 text-gray-500">
+                                ...
+                              </span>
+                            )
+                          }
+                          return null
+                        }
+
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => goToPage(page)}
+                            className={`w-10 h-10 rounded-lg font-semibold transition ${
+                              currentPage === page
+                                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                                : 'bg-white/5 hover:bg-white/10 text-white'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Next Button */}
+                    <button
+                      onClick={() => goToPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
 

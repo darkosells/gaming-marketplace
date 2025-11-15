@@ -11,6 +11,7 @@ export default function Navigation() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [cartItemCount, setCartItemCount] = useState(0)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const router = useRouter()
   const supabase = createClient()
 
@@ -19,13 +20,57 @@ export default function Navigation() {
     checkCart()
     
     const handleStorageChange = () => checkCart()
+    const handleMessagesRead = () => {
+      if (user) fetchUnreadCount()
+    }
+    
     window.addEventListener('storage', handleStorageChange)
     window.addEventListener('cart-updated', handleStorageChange)
+    window.addEventListener('messages-read', handleMessagesRead)
+    
     return () => {
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('cart-updated', handleStorageChange)
+      window.removeEventListener('messages-read', handleMessagesRead)
     }
-  }, [])
+  }, [user])
+
+  useEffect(() => {
+    if (user) {
+      fetchUnreadCount()
+      
+      // Set up real-time subscription for new messages
+      const channel = supabase
+        .channel('unread-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages'
+          },
+          () => {
+            fetchUnreadCount()
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages'
+          },
+          () => {
+            fetchUnreadCount()
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [user])
 
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -44,6 +89,27 @@ export default function Navigation() {
   const checkCart = () => {
     const cart = localStorage.getItem('cart')
     setCartItemCount(cart ? 1 : 0)
+  }
+
+  const fetchUnreadCount = async () => {
+    if (!user) return
+
+    try {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('read', false)
+
+      if (error) {
+        console.error('Error fetching unread count:', error)
+        return
+      }
+
+      setUnreadMessageCount(count || 0)
+    } catch (error) {
+      console.error('Error fetching unread messages:', error)
+    }
   }
 
   const handleLogout = async () => {
@@ -83,8 +149,15 @@ export default function Navigation() {
                     Sell
                   </Link>
                 )}
-                <Link href="/messages" className="text-gray-300 hover:text-white transition">
-                  Messages
+                <Link href="/messages" className="relative text-gray-300 hover:text-white transition">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  {unreadMessageCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-pink-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                      {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                    </span>
+                  )}
                 </Link>
                 <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

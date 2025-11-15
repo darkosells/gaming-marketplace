@@ -1,4 +1,4 @@
-// app/listing/[id]/edit/page.tsx - EDIT LISTING WITH DELIVERY CODE MANAGEMENT
+// app/listing/[id]/edit/page.tsx - EDIT LISTING WITH IMAGE UPLOAD AND DELIVERY CODE MANAGEMENT
 
 'use client'
 
@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import ImageUploader from '@/components/ImageUploader'
 
 interface DeliveryCode {
   id: string
@@ -36,7 +37,7 @@ export default function EditListingPage() {
   const [price, setPrice] = useState('')
   const [platform, setPlatform] = useState('')
   const [stock, setStock] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
+  const [imageUrls, setImageUrls] = useState<string[]>([])
   const [deliveryType, setDeliveryType] = useState<'manual' | 'automatic'>('manual')
 
   useEffect(() => {
@@ -85,8 +86,16 @@ export default function EditListingPage() {
       setPrice(data.price.toString())
       setPlatform(data.platform || '')
       setStock(data.stock.toString())
-      setImageUrl(data.image_url || '')
       setDeliveryType(data.delivery_type || 'manual')
+
+      // Handle images - support both old single image and new array
+      if (data.image_urls && data.image_urls.length > 0) {
+        setImageUrls(data.image_urls)
+      } else if (data.image_url) {
+        setImageUrls([data.image_url])
+      } else {
+        setImageUrls([])
+      }
 
       // Fetch delivery codes if automatic
       if (data.delivery_type === 'automatic') {
@@ -115,6 +124,10 @@ export default function EditListingPage() {
     } catch (error: any) {
       console.error('Error fetching delivery codes:', error)
     }
+  }
+
+  const handleImagesChange = (urls: string[]) => {
+    setImageUrls(urls)
   }
 
   const handleAddCodeField = () => {
@@ -260,7 +273,8 @@ export default function EditListingPage() {
           platform,
           stock: finalStock,
           status: newStatus,
-          image_url: imageUrl,
+          image_url: imageUrls[0] || null, // Keep for backward compatibility
+          image_urls: imageUrls, // New array field
           delivery_type: deliveryType
         })
         .eq('id', params.id)
@@ -335,7 +349,7 @@ export default function EditListingPage() {
               ← Back to Dashboard
             </Link>
             <h1 className="text-4xl font-bold text-white mb-2">Edit Listing</h1>
-            <p className="text-gray-400">Update your listing details and manage delivery codes</p>
+            <p className="text-gray-400">Update your listing details, images, and delivery codes</p>
           </div>
 
           {/* Form */}
@@ -420,18 +434,22 @@ export default function EditListingPage() {
                     />
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-white mb-2 font-semibold">Image URL</label>
-                  <input
-                    type="url"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
-                    placeholder="https://example.com/image.jpg"
-                  />
-                </div>
               </div>
+            </div>
+
+            {/* Product Images Card */}
+            <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+              <h2 className="text-2xl font-bold text-white mb-6">Product Images</h2>
+              
+              {user && (
+                <ImageUploader
+                  userId={user.id}
+                  listingId={params.id as string}
+                  existingImages={imageUrls}
+                  onImagesChange={handleImagesChange}
+                  maxImages={3}
+                />
+              )}
             </div>
 
             {/* Delivery Type Card */}

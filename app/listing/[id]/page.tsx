@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import ImageGallery from '@/components/ImageGallery'
 
 interface Listing {
   id: string
@@ -15,6 +16,7 @@ interface Listing {
   category: string
   platform: string
   image_url: string
+  image_urls: string[]
   status: string
   stock: number
   created_at: string
@@ -29,6 +31,23 @@ interface Listing {
     verified: boolean
     created_at: string
   }
+}
+
+interface SimilarListing {
+  id: string
+  title: string
+  price: number
+  game: string
+  category: string
+  image_url: string
+  image_urls: string[]
+  profiles: {
+    username: string
+    average_rating: number
+  } | {
+    username: string
+    average_rating: number
+  }[]
 }
 
 interface Review {
@@ -47,10 +66,13 @@ export default function ListingDetailPage() {
   const router = useRouter()
   const [listing, setListing] = useState<Listing | null>(null)
   const [reviews, setReviews] = useState<Review[]>([])
+  const [similarListings, setSimilarListings] = useState<SimilarListing[]>([])
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
   const [activeTab, setActiveTab] = useState('description')
   const [user, setUser] = useState<any>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [modalMessage, setModalMessage] = useState({ title: '', message: '', type: 'info' })
   
   const supabase = createClient()
 
@@ -90,6 +112,47 @@ export default function ListingDetailPage() {
       console.error('Error fetching listing:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchSimilarListings = async () => {
+    if (!listing) return
+
+    try {
+      // Fetch listings with same game OR same category, excluding current listing
+      const { data, error } = await supabase
+        .from('listings')
+        .select(`
+          id,
+          title,
+          price,
+          game,
+          category,
+          image_url,
+          image_urls,
+          profiles (
+            username,
+            average_rating
+          )
+        `)
+        .eq('status', 'active')
+        .neq('id', listing.id)
+        .or(`game.eq.${listing.game},category.eq.${listing.category}`)
+        .limit(4)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      // Sort to prioritize same game matches
+      const sorted = (data || []).sort((a, b) => {
+        const aScore = (a.game === listing.game ? 2 : 0) + (a.category === listing.category ? 1 : 0)
+        const bScore = (b.game === listing.game ? 2 : 0) + (b.category === listing.category ? 1 : 0)
+        return bScore - aScore
+      })
+
+      setSimilarListings(sorted.slice(0, 4))
+    } catch (error) {
+      console.error('Error fetching similar listings:', error)
     }
   }
 
@@ -136,6 +199,7 @@ export default function ListingDetailPage() {
   useEffect(() => {
     if (listing) {
       fetchReviews()
+      fetchSimilarListings()
     }
   }, [listing])
 
@@ -178,8 +242,6 @@ export default function ListingDetailPage() {
 
     try {
       // Create the order with status 'paid' and payment_status 'pending'
-      // In production, payment_status would be 'pending' until Stripe confirms
-      // For now, we'll create it as 'pending' and user can simulate payment
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -188,9 +250,9 @@ export default function ListingDetailPage() {
           seller_id: listing.seller_id,
           amount: totalPrice,
           quantity: quantity,
-          status: 'paid', // Start as 'paid' for testing (will be 'pending' with real payments)
-          payment_status: 'pending', // Will change to 'paid' after payment confirmation
-          payment_method: 'test' // Will be 'stripe' or similar in production
+          status: 'paid',
+          payment_status: 'pending',
+          payment_method: 'test'
         })
         .select()
         .single()
@@ -265,6 +327,17 @@ export default function ListingDetailPage() {
 
     if (!listing) return
 
+    // Check if user is the seller of this listing
+    if (listing.seller_id === user.id) {
+      setModalMessage({
+        title: 'This is your listing!',
+        message: 'You cannot contact yourself. This is your own product listing.',
+        type: 'warning'
+      })
+      setShowModal(true)
+      return
+    }
+
     try {
       // Check if conversation already exists
       const { data: existingConv, error: checkError } = await supabase
@@ -304,6 +377,23 @@ export default function ListingDetailPage() {
     }
   }
 
+  // Get images array (handle both old single image and new array)
+  const getListingImages = (): string[] => {
+    if (!listing) return []
+    
+    // If image_urls array exists and has images, use it
+    if (listing.image_urls && listing.image_urls.length > 0) {
+      return listing.image_urls
+    }
+    
+    // Fallback to single image_url for backward compatibility
+    if (listing.image_url) {
+      return [listing.image_url]
+    }
+    
+    return []
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
@@ -327,6 +417,7 @@ export default function ListingDetailPage() {
 
   const totalPrice = listing.price * quantity
   const sellerJoinDate = new Date(listing.profiles.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const listingImages = getListingImages()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -352,34 +443,21 @@ export default function ListingDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Main Product Card */}
             <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
-              {/* Image */}
-              <div className="relative h-96 bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                {listing.image_url ? (
-                  <img
-                    src={listing.image_url}
-                    alt={listing.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-9xl">
-                      {listing.category === 'account' ? '🎮' : listing.category === 'topup' ? '💰' : '🔑'}
-                    </span>
-                  </div>
-                )}
-                {/* Category Badge */}
-                <div className="absolute top-4 left-4">
-                  <span className="bg-black/50 backdrop-blur-lg px-4 py-2 rounded-full text-sm text-white font-semibold">
-                    {listing.category === 'account' ? 'Gaming Account' : listing.category === 'topup' ? 'Top-Up' : 'Game Key'}
-                  </span>
-                </div>
+              {/* Image Gallery - Compact Version */}
+              <div className="p-6">
+                <ImageGallery images={listingImages} title={listing.title} compact={true} />
               </div>
 
               {/* Product Details */}
-              <div className="p-6">
+              <div className="p-6 border-t border-white/10">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <p className="text-purple-400 font-semibold mb-2">{listing.game}</p>
+                    <div className="flex items-center gap-3 mb-2">
+                      <p className="text-purple-400 font-semibold">{listing.game}</p>
+                      <span className="bg-black/50 backdrop-blur-lg px-3 py-1 rounded-full text-xs text-white font-semibold">
+                        {listing.category === 'account' ? 'Gaming Account' : listing.category === 'topup' ? 'Top-Up' : 'Game Key'}
+                      </span>
+                    </div>
                     <h1 className="text-3xl font-bold text-white mb-2">{listing.title}</h1>
                     {listing.platform && (
                       <span className="inline-block bg-white/5 px-3 py-1 rounded-full text-sm text-gray-300">
@@ -445,6 +523,10 @@ export default function ListingDetailPage() {
                       <span className="text-white font-semibold">{listing.stock} available</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-white/10">
+                      <span className="text-gray-400">Images</span>
+                      <span className="text-white font-semibold">{listingImages.length} photo(s)</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-white/10">
                       <span className="text-gray-400">Listed</span>
                       <span className="text-white font-semibold">
                         {new Date(listing.created_at).toLocaleDateString()}
@@ -454,6 +536,63 @@ export default function ListingDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Similar Products Section */}
+            {similarListings.length > 0 && (
+              <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
+                <h2 className="text-2xl font-bold text-white mb-6">Similar Products</h2>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {similarListings.map((item) => {
+                    const itemImage = item.image_urls?.[0] || item.image_url
+                    const sellerData = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles
+                    
+                    return (
+                      <Link
+                        key={item.id}
+                        href={`/listing/${item.id}`}
+                        className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 hover:bg-white/10 transition group"
+                      >
+                        <div className="relative aspect-square bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                          {itemImage ? (
+                            <img
+                              src={itemImage}
+                              alt={item.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-4xl">
+                              {item.category === 'account' ? '🎮' : item.category === 'topup' ? '💰' : '🔑'}
+                            </div>
+                          )}
+                          {item.game === listing.game && (
+                            <div className="absolute top-2 left-2">
+                              <span className="bg-purple-500/90 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                                Same Game
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <p className="text-xs text-purple-400 mb-1">{item.game}</p>
+                          <h3 className="text-white font-semibold text-sm mb-2 line-clamp-2 group-hover:text-purple-300 transition">
+                            {item.title}
+                          </h3>
+                          <div className="flex items-center justify-between">
+                            <span className="text-green-400 font-bold">${item.price.toFixed(2)}</span>
+                            {sellerData?.average_rating > 0 && (
+                              <span className="text-xs text-yellow-400">
+                                ★ {sellerData.average_rating.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Seller Reviews Section */}
             <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
@@ -500,7 +639,7 @@ export default function ListingDetailPage() {
           </div>
 
           {/* Right Column - Purchase Card & Seller Info */}
-          <div className="space-y-6">
+          <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
             {/* Purchase Card */}
             <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
               <div className="mb-6">
@@ -634,6 +773,50 @@ export default function ListingDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Custom Modal Popup */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-white/20 rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="text-center">
+              {/* Icon based on type */}
+              <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
+                modalMessage.type === 'warning' 
+                  ? 'bg-yellow-500/20' 
+                  : modalMessage.type === 'error'
+                  ? 'bg-red-500/20'
+                  : modalMessage.type === 'success'
+                  ? 'bg-green-500/20'
+                  : 'bg-blue-500/20'
+              }`}>
+                <span className="text-3xl">
+                  {modalMessage.type === 'warning' ? '⚠️' :
+                   modalMessage.type === 'error' ? '❌' :
+                   modalMessage.type === 'success' ? '✅' : 'ℹ️'}
+                </span>
+              </div>
+              
+              {/* Title */}
+              <h3 className="text-xl font-bold text-white mb-2">
+                {modalMessage.title}
+              </h3>
+              
+              {/* Message */}
+              <p className="text-gray-300 mb-6">
+                {modalMessage.message}
+              </p>
+              
+              {/* Close Button */}
+              <button
+                onClick={() => setShowModal(false)}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

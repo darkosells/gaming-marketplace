@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import ImageUploader from '@/components/ImageUploader'
 
 export default function CreateListingPage() {
   const router = useRouter()
@@ -14,6 +15,7 @@ export default function CreateListingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [createdListingId, setCreatedListingId] = useState<string | null>(null)
 
   // Form fields
   const [category, setCategory] = useState('account')
@@ -23,7 +25,7 @@ export default function CreateListingPage() {
   const [price, setPrice] = useState('')
   const [platform, setPlatform] = useState('')
   const [stock, setStock] = useState('1')
-  const [imageUrl, setImageUrl] = useState('')
+  const [imageUrls, setImageUrls] = useState<string[]>([])
   
   // Delivery fields
   const [deliveryType, setDeliveryType] = useState<'manual' | 'automatic'>('manual')
@@ -96,6 +98,10 @@ export default function CreateListingPage() {
     setDeliveryCodes(newCodes)
   }
 
+  const handleImagesChange = (urls: string[]) => {
+    setImageUrls(urls)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -150,7 +156,8 @@ export default function CreateListingPage() {
             price: parseFloat(price),
             platform,
             stock: parseInt(stock),
-            image_url: imageUrl || null,
+            image_url: imageUrls[0] || null, // Keep for backward compatibility
+            image_urls: imageUrls, // New array field
             status: 'active',
             delivery_type: deliveryType
           }
@@ -179,6 +186,7 @@ export default function CreateListingPage() {
         }
       }
 
+      setCreatedListingId(listingData?.id || null)
       setSuccess(true)
       
       // Redirect to the new listing after 2 seconds
@@ -488,39 +496,18 @@ export default function CreateListingPage() {
               </div>
             )}
 
-            {/* Image URL */}
+            {/* Image Upload */}
             <div className="mb-6">
-              <label className="block text-white font-semibold mb-2">
-                Image URL
-              </label>
-              <input
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://example.com/image.jpg"
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              <p className="text-sm text-gray-400 mt-1">
-                Optional: Add an image URL for your listing
-              </p>
+              {user && (
+                <ImageUploader
+                  userId={user.id}
+                  listingId="new"
+                  existingImages={imageUrls}
+                  onImagesChange={handleImagesChange}
+                  maxImages={3}
+                />
+              )}
             </div>
-
-            {/* Preview */}
-            {imageUrl && (
-              <div className="mb-6">
-                <label className="block text-white font-semibold mb-2">Preview</label>
-                <div className="relative h-48 bg-white/5 rounded-lg overflow-hidden">
-                  <img
-                    src={imageUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none'
-                    }}
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Terms */}
             <div className="mb-6">

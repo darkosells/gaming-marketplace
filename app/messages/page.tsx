@@ -29,6 +29,7 @@ interface Conversation {
     status: string
     amount: number
   }
+  unread_count?: number
 }
 
 interface Message {
@@ -36,7 +37,8 @@ interface Message {
   sender_id: string
   content: string
   created_at: string
-  message_type: string // Added message_type
+  message_type: string
+  read: boolean
   sender: {
     username: string
     is_admin: boolean
@@ -78,6 +80,7 @@ function MessagesContent() {
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages()
+      markConversationAsRead(selectedConversation.id)
       
       // Set up real-time subscription
       const channel = supabase
@@ -92,6 +95,9 @@ function MessagesContent() {
           },
           (payload) => {
             fetchMessages()
+            // Auto-mark as read if we're viewing this conversation
+            markConversationAsRead(selectedConversation.id)
+            fetchConversations() // Refresh to update last message
           }
         )
         .subscribe()
@@ -112,12 +118,11 @@ function MessagesContent() {
 
   // Check if we need to show a date separator between messages
   const shouldShowDateSeparator = (currentMsg: Message, previousMsg: Message | null) => {
-    if (!previousMsg) return true // Always show date for first message
+    if (!previousMsg) return true
     
     const currentDate = new Date(currentMsg.created_at)
     const previousDate = new Date(previousMsg.created_at)
     
-    // Show separator if messages are from different days
     return currentDate.toDateString() !== previousDate.toDateString()
   }
 
@@ -176,9 +181,54 @@ function MessagesContent() {
         .order('last_message_at', { ascending: false })
 
       if (error) throw error
-      setConversations(data || [])
+
+      // Fetch unread counts for each conversation
+      const conversationsWithUnread = await Promise.all(
+        (data || []).map(async (conv) => {
+          const { count } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', conv.id)
+            .eq('receiver_id', user.id)
+            .eq('read', false)
+
+          return {
+            ...conv,
+            unread_count: count || 0
+          }
+        })
+      )
+
+      setConversations(conversationsWithUnread)
     } catch (error) {
       console.error('Error fetching conversations:', error)
+    }
+  }
+
+  const markConversationAsRead = async (conversationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('conversation_id', conversationId)
+        .eq('receiver_id', user.id)
+        .eq('read', false)
+
+      if (error) throw error
+
+      // Update the unread count in the conversations list
+      setConversations(prev => 
+        prev.map(conv => 
+          conv.id === conversationId 
+            ? { ...conv, unread_count: 0 }
+            : conv
+        )
+      )
+
+      // Dispatch event to update the Navigation badge
+      window.dispatchEvent(new Event('messages-read'))
+    } catch (error) {
+      console.error('Error marking messages as read:', error)
     }
   }
 
@@ -186,13 +236,29 @@ function MessagesContent() {
     const conv = conversations.find(c => c.id === conversationId)
     if (conv) {
       setSelectedConversation(conv)
-      
-      // Mark messages as read
-      await supabase
-        .from('messages')
-        .update({ read: true })
-        .eq('conversation_id', conversationId)
-        .eq('receiver_id', user.id)
+      await markConversationAsRead(conversationId)
+    } else {
+      // If conversation not in list yet, fetch it
+      try {
+        const { data, error } = await supabase
+          .from('conversations')
+          .select(`
+            *,
+            listing:listings(title, image_url, game),
+            buyer:profiles!conversations_buyer_id_fkey(username),
+            seller:profiles!conversations_seller_id_fkey(username),
+            order:orders(status, amount)
+          `)
+          .eq('id', conversationId)
+          .single()
+
+        if (error) throw error
+
+        setSelectedConversation(data)
+        await markConversationAsRead(conversationId)
+      } catch (error) {
+        console.error('Error opening conversation:', error)
+      }
     }
   }
 
@@ -236,7 +302,8 @@ function MessagesContent() {
           listing_id: selectedConversation.listing_id,
           order_id: selectedConversation.order_id,
           content: newMessage.trim(),
-          message_type: 'user' // Regular user message
+          message_type: 'user',
+          read: false // New messages are unread
         })
 
       if (error) throw error
@@ -318,16 +385,30 @@ function MessagesContent() {
                 ) : (
                   conversations.map((conv) => {
                     const otherUser = conv.buyer_id === user.id ? conv.seller : conv.buyer
+                    const hasUnread = (conv.unread_count || 0) > 0
+                    
                     return (
                       <button
                         key={conv.id}
-                        onClick={() => setSelectedConversation(conv)}
-                        className={`w-full text-left p-4 border-b border-white/10 hover:bg-white/5 transition ${
+                        onClick={() => {
+                          setSelectedConversation(conv)
+                          markConversationAsRead(conv.id)
+                        }}
+                        className={`w-full text-left p-4 border-b border-white/10 hover:bg-white/5 transition relative ${
                           selectedConversation?.id === conv.id ? 'bg-white/10' : ''
-                        }`}
+                        } ${hasUnread ? 'bg-purple-500/10' : ''}`}
                       >
+                        {/* Unread Indicator Badge */}
+                        {hasUnread && (
+                          <div className="absolute top-3 right-3">
+                            <span className="bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center">
+                              {conv.unread_count}
+                            </span>
+                          </div>
+                        )}
+                        
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                          <div className="relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
                             {conv.listing?.image_url ? (
                               <img
                                 src={conv.listing.image_url}
@@ -339,24 +420,48 @@ function MessagesContent() {
                                 🎮
                               </div>
                             )}
+                            {/* Unread dot indicator */}
+                            {hasUnread && (
+                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-pink-500 rounded-full border-2 border-slate-900 animate-pulse"></div>
+                            )}
                           </div>
-                          <div className="flex-1 min-w-0">
+                          <div className="flex-1 min-w-0 pr-8">
                             <div className="flex items-center justify-between mb-1">
-                              <p className="text-white font-semibold truncate">
+                              <p className={`font-semibold truncate ${hasUnread ? 'text-white' : 'text-white'}`}>
                                 {otherUser.username}
                               </p>
+                            </div>
+                            <p className="text-xs text-purple-400 mb-1 truncate">{conv.listing?.title || 'Unknown Item'}</p>
+                            <p className={`text-xs truncate ${hasUnread ? 'text-gray-300 font-semibold' : 'text-gray-400'}`}>
+                              {conv.last_message}
+                            </p>
+                            <div className="flex items-center justify-between mt-1">
+                              <p className="text-xs text-gray-500">
+                                {new Date(conv.last_message_at).toLocaleDateString()}
+                              </p>
                               {conv.order?.status && (
-                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
                                   conv.order.status === 'completed' 
                                     ? 'bg-green-500/20 text-green-400'
+                                    : conv.order.status === 'dispute_raised'
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : conv.order.status === 'refunded'
+                                    ? 'bg-orange-500/20 text-orange-400'
+                                    : conv.order.status === 'delivered'
+                                    ? 'bg-blue-500/20 text-blue-400'
                                     : 'bg-yellow-500/20 text-yellow-400'
                                 }`}>
-                                  {conv.order.status}
+                                  {conv.order.status === 'completed' ? 'Completed' :
+                                   conv.order.status === 'dispute_raised' ? 'Dispute' :
+                                   conv.order.status === 'refunded' ? 'Refunded' :
+                                   conv.order.status === 'delivered' ? 'Delivered' :
+                                   conv.order.status === 'paid' ? 'Paid' :
+                                   conv.order.status === 'pending' ? 'Pending' :
+                                   conv.order.status === 'cancelled' ? 'Cancelled' :
+                                   conv.order.status.charAt(0).toUpperCase() + conv.order.status.slice(1).replace('_', ' ')}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-purple-400 mb-1">{conv.listing?.title || 'Unknown Item'}</p>
-                            <p className="text-xs text-gray-400 truncate">{conv.last_message}</p>
                           </div>
                         </div>
                       </button>
@@ -386,7 +491,18 @@ function MessagesContent() {
                             ? selectedConversation.seller.username 
                             : selectedConversation.buyer.username}
                         </h3>
-                        <p className="text-sm text-purple-400">{selectedConversation.listing?.title || 'Unknown Item'}</p>
+                        {selectedConversation.listing ? (
+                          <Link 
+                            href={`/listing/${selectedConversation.listing_id}`}
+                            className="text-sm text-purple-400 hover:text-purple-300 hover:underline transition"
+                          >
+                            {selectedConversation.listing.title} →
+                          </Link>
+                        ) : (
+                          <p className="text-sm text-gray-500 italic">
+                            ⚠️ Listing no longer available
+                          </p>
+                        )}
                       </div>
                       {isSeller && selectedConversation.order && selectedConversation.order.status === 'pending' && (
                         <button
