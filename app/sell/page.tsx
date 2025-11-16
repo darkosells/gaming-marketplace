@@ -7,6 +7,14 @@ import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import ImageUploader from '@/components/ImageUploader'
 
+// Category to Games mapping
+const categoryGamesMap: { [key: string]: string[] } = {
+  account: ['GTA 5', 'Fortnite', 'Roblox', 'Valorant', 'League of Legends', 'Clash Royale', 'Clash of Clans', 'Steam'],
+  items: ['Steal a Brainrot', 'Grow a Garden', 'Adopt me', 'Blox Fruits', 'Plants vs Brainrots'],
+  currency: ['Roblox', 'Fortnite'],
+  key: ['Steam', 'Playstation', 'Xbox']
+}
+
 export default function CreateListingPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -31,24 +39,6 @@ export default function CreateListingPage() {
   const [deliveryType, setDeliveryType] = useState<'manual' | 'automatic'>('manual')
   const [deliveryCodes, setDeliveryCodes] = useState<string[]>([''])
 
-  const popularGames = [
-    'Fortnite',
-    'League of Legends',
-    'Valorant',
-    'Genshin Impact',
-    'GTA 5',
-    'Clash of Clans',
-    'Roblox',
-    'Minecraft',
-    'CS:GO',
-    'Apex Legends',
-    'Call of Duty',
-    'FIFA',
-    'Rocket League',
-    'World of Warcraft',
-    'Other'
-  ]
-
   const platforms = [
     'PC',
     'PlayStation',
@@ -61,6 +51,11 @@ export default function CreateListingPage() {
   useEffect(() => {
     checkAuth()
   }, [])
+
+  // Reset game when category changes
+  useEffect(() => {
+    setGame('') // Reset game selection when category changes
+  }, [category])
 
   // Update delivery codes array when stock changes
   useEffect(() => {
@@ -100,6 +95,30 @@ export default function CreateListingPage() {
 
   const handleImagesChange = (urls: string[]) => {
     setImageUrls(urls)
+  }
+
+  const getAvailableGames = () => {
+    return categoryGamesMap[category] || []
+  }
+
+  const getCategoryEmoji = (cat: string) => {
+    switch (cat) {
+      case 'account': return '🎮'
+      case 'items': return '🎒'
+      case 'currency': return '💰'
+      case 'key': return '🔑'
+      default: return '📦'
+    }
+  }
+
+  const getCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case 'account': return 'Account'
+      case 'items': return 'Items'
+      case 'currency': return 'Currency'
+      case 'key': return 'Game Key'
+      default: return cat
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -262,7 +281,7 @@ export default function CreateListingPage() {
               <label className="block text-white font-semibold mb-3">
                 Category <span className="text-red-400">*</span>
               </label>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <button
                   type="button"
                   onClick={() => setCategory('account')}
@@ -272,20 +291,32 @@ export default function CreateListingPage() {
                       : 'border-white/10 bg-white/5 hover:border-white/20'
                   }`}
                 >
-                  <div className="text-4xl mb-2">🎮</div>
-                  <div className="text-white font-semibold">Account</div>
+                  <div className="text-3xl mb-2">🎮</div>
+                  <div className="text-white font-semibold text-sm">Accounts</div>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCategory('topup')}
+                  onClick={() => setCategory('items')}
                   className={`p-4 rounded-lg border-2 transition ${
-                    category === 'topup'
+                    category === 'items'
                       ? 'border-purple-500 bg-purple-500/20'
                       : 'border-white/10 bg-white/5 hover:border-white/20'
                   }`}
                 >
-                  <div className="text-4xl mb-2">💰</div>
-                  <div className="text-white font-semibold">Top-Up</div>
+                  <div className="text-3xl mb-2">🎒</div>
+                  <div className="text-white font-semibold text-sm">Items</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCategory('currency')}
+                  className={`p-4 rounded-lg border-2 transition ${
+                    category === 'currency'
+                      ? 'border-purple-500 bg-purple-500/20'
+                      : 'border-white/10 bg-white/5 hover:border-white/20'
+                  }`}
+                >
+                  <div className="text-3xl mb-2">💰</div>
+                  <div className="text-white font-semibold text-sm">Currency</div>
                 </button>
                 <button
                   type="button"
@@ -296,16 +327,19 @@ export default function CreateListingPage() {
                       : 'border-white/10 bg-white/5 hover:border-white/20'
                   }`}
                 >
-                  <div className="text-4xl mb-2">🔑</div>
-                  <div className="text-white font-semibold">Game Key</div>
+                  <div className="text-3xl mb-2">🔑</div>
+                  <div className="text-white font-semibold text-sm">Game Keys</div>
                 </button>
               </div>
             </div>
 
-            {/* Game Selection */}
+            {/* Game Selection - Dynamic based on category */}
             <div className="mb-6">
               <label className="block text-white font-semibold mb-2">
                 Game <span className="text-red-400">*</span>
+                <span className="text-purple-400 text-sm font-normal ml-2">
+                  ({getAvailableGames().length} options for {getCategoryLabel(category)})
+                </span>
               </label>
               <select
                 value={game}
@@ -320,20 +354,14 @@ export default function CreateListingPage() {
                   paddingRight: '3rem'
                 }}
               >
-                <option value="" className="bg-slate-800 text-gray-400">Select a game</option>
-                {popularGames.map((g) => (
+                <option value="" className="bg-slate-800 text-gray-400">Select a game for {getCategoryLabel(category)}</option>
+                {getAvailableGames().map((g) => (
                   <option key={g} value={g} className="bg-slate-800 text-white py-2">{g}</option>
                 ))}
               </select>
-              {game === 'Other' && (
-                <input
-                  type="text"
-                  placeholder="Enter game name"
-                  value={game === 'Other' ? '' : game}
-                  onChange={(e) => setGame(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 mt-2"
-                />
-              )}
+              <p className="text-xs text-gray-500 mt-2">
+                {getCategoryEmoji(category)} Available games depend on the category you selected
+              </p>
             </div>
 
             {/* Title */}
@@ -345,7 +373,12 @@ export default function CreateListingPage() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Rare Fortnite Account - 50+ Skins"
+                placeholder={
+                  category === 'account' ? 'e.g., Rare Fortnite Account - 50+ Skins' :
+                  category === 'items' ? 'e.g., Legendary Pet Bundle - Adopt me' :
+                  category === 'currency' ? 'e.g., 10,000 Robux - Instant Delivery' :
+                  'e.g., Steam Gift Card $50 Value'
+                }
                 required
                 maxLength={100}
                 className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"

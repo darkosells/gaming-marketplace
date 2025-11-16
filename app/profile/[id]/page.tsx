@@ -14,6 +14,8 @@ interface SellerProfile {
   total_reviews: number
   average_rating: number
   total_sales: number
+  avatar_url: string | null
+  verified: boolean
 }
 
 interface Review {
@@ -37,6 +39,7 @@ interface Listing {
   category: string
   price: number
   image_url: string
+  image_urls: string[]
   delivery_type: string
   stock: number
   status: string
@@ -59,10 +62,9 @@ export default function SellerProfilePage() {
 
   const fetchSellerProfile = async () => {
     try {
-      // Fetch seller profile
       const { data: sellerData, error: sellerError } = await supabase
         .from('profiles')
-        .select('id, username, role, vendor_since, total_reviews, average_rating, total_sales')
+        .select('id, username, role, vendor_since, total_reviews, average_rating, total_sales, avatar_url, verified')
         .eq('id', params.id)
         .single()
 
@@ -76,7 +78,6 @@ export default function SellerProfilePage() {
 
       setSeller(sellerData)
 
-      // Fetch seller's listings
       const { data: listingsData, error: listingsError } = await supabase
         .from('listings')
         .select('*')
@@ -87,7 +88,6 @@ export default function SellerProfilePage() {
       if (listingsError) throw listingsError
       setListings(listingsData || [])
 
-      // Fetch seller's reviews
       const { data: reviewsData, error: reviewsError } = await supabase
         .from('reviews')
         .select(`
@@ -103,7 +103,6 @@ export default function SellerProfilePage() {
 
       if (reviewsError) throw reviewsError
 
-      // Fetch order/listing info for each review
       const reviewsWithListings = await Promise.all(
         (reviewsData || []).map(async (review: any) => {
           const { data: orderData } = await supabase
@@ -112,10 +111,7 @@ export default function SellerProfilePage() {
             .eq('id', review.order_id)
             .single()
 
-          // Fix buyer type - Supabase returns it as an array with one object
           const buyerData = Array.isArray(review.buyer) ? review.buyer[0] : review.buyer
-          
-          // Fix listing type - same issue
           const listingData = orderData?.listing 
             ? (Array.isArray(orderData.listing) ? orderData.listing[0] : orderData.listing)
             : null
@@ -158,31 +154,53 @@ export default function SellerProfilePage() {
     )
   }
 
-  // Censor username for privacy (e.g., "john123" -> "jo****3")
   const censorUsername = (username: string) => {
     if (!username || username.length <= 3) return username
     
     const firstTwo = username.substring(0, 2)
     const lastOne = username.substring(username.length - 1)
-    const middle = '*'.repeat(Math.min(username.length - 3, 4)) // Max 4 stars
+    const middle = '*'.repeat(Math.min(username.length - 3, 4))
     
     return `${firstTwo}${middle}${lastOne}`
   }
 
+  const getListingImage = (listing: Listing) => {
+    if (listing.image_urls && listing.image_urls.length > 0) {
+      return listing.image_urls[0]
+    }
+    return listing.image_url
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
+        <div className="fixed inset-0 z-0">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
+          <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+        </div>
+        <div className="relative z-10 text-center">
+          <div className="relative inline-block">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-lg opacity-50 animate-pulse"></div>
+            <div className="relative inline-block animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent"></div>
+          </div>
+          <p className="text-white mt-6 text-lg">Loading profile...</p>
+        </div>
       </div>
     )
   }
 
   if (!seller) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
+        <div className="fixed inset-0 z-0">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
+        </div>
+        <div className="relative z-10 text-center">
+          <div className="text-6xl mb-4">🔍</div>
           <h1 className="text-3xl font-bold text-white mb-4">Seller Not Found</h1>
-          <Link href="/" className="text-purple-400 hover:text-purple-300">
+          <Link href="/" className="text-purple-400 hover:text-purple-300 transition">
             ← Back to Home
           </Link>
         </div>
@@ -191,153 +209,246 @@ export default function SellerProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <Navigation />
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Animated Background */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+        
+        {/* Animated Nebula Clouds */}
+        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[150px] animate-pulse"></div>
+        <div className="absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+        
+        {/* Grid Pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
+        
+        {/* Floating Particles */}
+        <div className="absolute top-20 left-[10%] w-2 h-2 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDuration: '3s' }}></div>
+        <div className="absolute top-40 left-[25%] w-1 h-1 bg-pink-400/60 rounded-full animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}></div>
+        <div className="absolute top-60 right-[15%] w-3 h-3 bg-blue-400/40 rounded-full animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}></div>
+        <div className="absolute top-32 right-[30%] w-2 h-2 bg-purple-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1.5s' }}></div>
+      </div>
 
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-6xl mx-auto">
-          {/* Seller Header */}
-          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 mb-8">
-            <div className="flex items-center gap-6">
-              <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl font-bold text-white">
-                {seller.username.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1">
-                <h1 className="text-4xl font-bold text-white mb-2">{seller.username}</h1>
-                <p className="text-gray-400 mb-3">
-                  Vendor since {new Date(seller.vendor_since).toLocaleDateString()}
-                </p>
-                <div className="flex items-center gap-6">
-                  <div>
-                    {renderStars(Math.round(seller.average_rating))}
-                    <p className="text-sm text-gray-400 mt-1">
-                      {seller.average_rating.toFixed(1)} ({seller.total_reviews} {seller.total_reviews === 1 ? 'review' : 'reviews'})
-                    </p>
+      {/* Content */}
+      <div className="relative z-10">
+        <Navigation />
+
+        <div className="container mx-auto px-4 pt-24 pb-12">
+          <div className="max-w-6xl mx-auto">
+            {/* Seller Header Card */}
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 mb-8 hover:border-purple-500/30 transition-all duration-300">
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                {/* Avatar */}
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur opacity-50 group-hover:opacity-75 transition duration-300"></div>
+                  <div className="relative w-28 h-28 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center overflow-hidden ring-4 ring-purple-500/30">
+                    {seller.avatar_url ? (
+                      <img 
+                        src={seller.avatar_url} 
+                        alt={seller.username}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-5xl font-bold text-white">
+                        {seller.username.charAt(0).toUpperCase()}
+                      </span>
+                    )}
                   </div>
-                  {seller.total_sales > 0 && (
-                    <div className="border-l border-white/20 pl-6">
-                      <p className="text-2xl font-bold text-white">{seller.total_sales}</p>
-                      <p className="text-sm text-gray-400">Total Sales</p>
+                  {seller.verified && (
+                    <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-1.5 ring-4 ring-slate-900">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
                     </div>
                   )}
                 </div>
+
+                {/* Seller Info */}
+                <div className="flex-1 text-center md:text-left">
+                  <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
+                    <h1 className="text-4xl font-bold text-white">{seller.username}</h1>
+                    {seller.verified && (
+                      <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold border border-blue-500/30">
+                        ✓ Verified
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-gray-400 mb-4">
+                    Vendor since {new Date(seller.vendor_since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </p>
+                  
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-white/10 hover:border-yellow-500/30 transition-all duration-300">
+                      <div className="flex items-center justify-center mb-2">
+                        {renderStars(Math.round(seller.average_rating))}
+                      </div>
+                      <p className="text-2xl font-bold text-white text-center">
+                        {seller.average_rating > 0 ? seller.average_rating.toFixed(1) : 'N/A'}
+                      </p>
+                      <p className="text-xs text-gray-400 text-center">Rating</p>
+                    </div>
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-white/10 hover:border-purple-500/30 transition-all duration-300">
+                      <div className="text-2xl mb-2 text-center">📝</div>
+                      <p className="text-2xl font-bold text-white text-center">{seller.total_reviews}</p>
+                      <p className="text-xs text-gray-400 text-center">Reviews</p>
+                    </div>
+                    <div className="bg-slate-800/50 rounded-xl p-4 border border-white/10 hover:border-green-500/30 transition-all duration-300">
+                      <div className="text-2xl mb-2 text-center">💰</div>
+                      <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent text-center">
+                        {seller.total_sales}
+                      </p>
+                      <p className="text-xs text-gray-400 text-center">Sales</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Tabs */}
-          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8">
-            <div className="flex space-x-4 mb-6 border-b border-white/10 pb-4">
-              <button
-                onClick={() => setActiveTab('listings')}
-                className={`px-6 py-2 rounded-lg font-semibold transition ${
-                  activeTab === 'listings'
-                    ? 'bg-purple-500/30 text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Listings ({listings.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('reviews')}
-                className={`px-6 py-2 rounded-lg font-semibold transition ${
-                  activeTab === 'reviews'
-                    ? 'bg-purple-500/30 text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Reviews ({reviews.length})
-              </button>
-            </div>
+            {/* Tabs */}
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
+              <div className="flex space-x-4 mb-6 border-b border-white/10 pb-4">
+                <button
+                  onClick={() => setActiveTab('listings')}
+                  className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                    activeTab === 'listings'
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  🏪 Listings ({listings.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('reviews')}
+                  className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                    activeTab === 'reviews'
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  ⭐ Reviews ({reviews.length})
+                </button>
+              </div>
 
-            {/* Listings Tab */}
-            {activeTab === 'listings' && (
-              <>
-                {listings.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-5xl mb-4">📦</div>
-                    <h3 className="text-xl font-bold text-white mb-2">No active listings</h3>
-                    <p className="text-gray-400">This seller doesn't have any items available right now.</p>
-                  </div>
-                ) : (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {listings.map((listing) => (
-                      <Link
-                        key={listing.id}
-                        href={`/listing/${listing.id}`}
-                        className="bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition group"
-                      >
-                        <div className="relative h-40 bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                          {listing.image_url ? (
-                            <img src={listing.image_url} alt={listing.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-5xl">
-                              {listing.category === 'account' ? '🎮' : listing.category === 'topup' ? '💰' : '🔑'}
+              {/* Listings Tab */}
+              {activeTab === 'listings' && (
+                <>
+                  {listings.length === 0 ? (
+                    <div className="text-center py-16">
+                      <div className="text-6xl mb-4">📦</div>
+                      <h3 className="text-2xl font-bold text-white mb-2">No active listings</h3>
+                      <p className="text-gray-400">This seller doesn't have any items available right now.</p>
+                    </div>
+                  ) : (
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {listings.map((listing) => (
+                        <Link
+                          key={listing.id}
+                          href={`/listing/${listing.id}`}
+                          className="bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-500/10"
+                        >
+                          <div className="relative h-44 bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
+                            {getListingImage(listing) ? (
+                              <img 
+                                src={getListingImage(listing)} 
+                                alt={listing.title} 
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-6xl group-hover:scale-125 transition-transform duration-300">
+                                {listing.category === 'account' ? '🎮' : listing.category === 'items' ? '🎒' : listing.category === 'currency' ? '💰' : '🔑'}
+                              </div>
+                            )}
+                            <div className="absolute top-3 right-3">
+                              <span className="bg-black/60 backdrop-blur-lg px-3 py-1 rounded-full text-xs text-white font-semibold border border-white/10">
+                                {listing.delivery_type === 'automatic' ? '⚡ Auto' : '👤 Manual'}
+                              </span>
                             </div>
-                          )}
-                        </div>
-                        <div className="p-4">
-                          <h3 className="text-white font-semibold mb-1 truncate">{listing.title}</h3>
-                          <p className="text-sm text-gray-400 mb-2">{listing.game}</p>
-                          <div className="flex justify-between items-center">
-                            <span className="text-xl font-bold text-white">${listing.price}</span>
-                            <span className="text-sm text-gray-400">
-                              {listing.delivery_type === 'automatic' ? '⚡ Auto' : '👤 Manual'}
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Reviews Tab */}
-            {activeTab === 'reviews' && (
-              <>
-                {reviews.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-5xl mb-4">⭐</div>
-                    <h3 className="text-xl font-bold text-white mb-2">No reviews yet</h3>
-                    <p className="text-gray-400">This seller hasn't received any reviews.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="bg-white/5 border border-white/10 rounded-xl p-6">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
-                                <span className="text-white font-semibold text-sm">
-                                  {review.buyer.username.charAt(0).toUpperCase()}
+                            {listing.stock <= 3 && listing.stock > 0 && (
+                              <div className="absolute top-3 left-3">
+                                <span className="bg-orange-500/90 backdrop-blur-lg px-3 py-1 rounded-full text-xs text-white font-semibold">
+                                  Only {listing.stock} left!
                                 </span>
                               </div>
-                              <div>
-                                <p className="text-white font-semibold">{censorUsername(review.buyer.username)}</p>
-                                <p className="text-xs text-gray-400">
-                                  {new Date(review.created_at).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                            <p className="text-sm text-purple-400 mb-2">
-                              {review.listing.title} - {review.listing.game}
-                            </p>
+                            )}
                           </div>
-                          {renderStars(review.rating)}
+                          <div className="p-4">
+                            <p className="text-xs text-purple-400 mb-1 font-semibold">{listing.game}</p>
+                            <h3 className="text-white font-semibold mb-2 truncate group-hover:text-purple-300 transition">
+                              {listing.title}
+                            </h3>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                                ${listing.price.toFixed(2)}
+                              </span>
+                              <span className="text-xs text-gray-400 bg-white/5 px-2 py-1 rounded-full">
+                                {listing.stock} in stock
+                              </span>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Reviews Tab */}
+              {activeTab === 'reviews' && (
+                <>
+                  {reviews.length === 0 ? (
+                    <div className="text-center py-16">
+                      <div className="text-6xl mb-4">⭐</div>
+                      <h3 className="text-2xl font-bold text-white mb-2">No reviews yet</h3>
+                      <p className="text-gray-400">This seller hasn't received any reviews.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {reviews.map((review) => (
+                        <div key={review.id} className="bg-slate-800/50 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                                  <span className="text-white font-semibold text-sm">
+                                    {review.buyer.username.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-white font-semibold">{censorUsername(review.buyer.username)}</p>
+                                  <p className="text-xs text-gray-400">
+                                    {new Date(review.created_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <p className="text-sm text-purple-400 mb-2 bg-purple-500/10 px-3 py-1 rounded-full inline-block">
+                                {review.listing.title} - {review.listing.game}
+                              </p>
+                            </div>
+                            {renderStars(review.rating)}
+                          </div>
+                          {review.comment && (
+                            <p className="text-gray-300 text-sm leading-relaxed bg-white/5 p-3 rounded-lg">
+                              "{review.comment}"
+                            </p>
+                          )}
                         </div>
-                        {review.comment && (
-                          <p className="text-gray-300 text-sm leading-relaxed">{review.comment}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Footer */}
+        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
+          <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
+            <p>&copy; 2024 GameVault. All rights reserved.</p>
+          </div>
+        </footer>
       </div>
     </div>
   )

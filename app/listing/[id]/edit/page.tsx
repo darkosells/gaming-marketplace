@@ -1,4 +1,4 @@
-// app/listing/[id]/edit/page.tsx - EDIT LISTING WITH IMAGE UPLOAD AND DELIVERY CODE MANAGEMENT
+// app/listing/[id]/edit/page.tsx - EDIT LISTING WITH FIXED DROPDOWNS & IMPROVED CODES UI
 
 'use client'
 
@@ -8,6 +8,14 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import ImageUploader from '@/components/ImageUploader'
+
+// Category to Games mapping
+const categoryGamesMap: { [key: string]: string[] } = {
+  account: ['GTA 5', 'Fortnite', 'Roblox', 'Valorant', 'League of Legends', 'Clash Royale', 'Clash of Clans', 'Steam'],
+  items: ['Steal a Brainrot', 'Grow a Garden', 'Adopt me', 'Blox Fruits', 'Plants vs Brainrots'],
+  currency: ['Roblox', 'Fortnite'],
+  key: ['Steam', 'Playstation', 'Xbox']
+}
 
 interface DeliveryCode {
   id: string
@@ -49,6 +57,16 @@ export default function EditListingPage() {
       fetchListing()
     }
   }, [user])
+
+  // Reset game if it's not valid for the new category (but only after initial load)
+  useEffect(() => {
+    if (listing && category !== listing.category) {
+      const validGames = categoryGamesMap[category] || []
+      if (!validGames.includes(game)) {
+        setGame('')
+      }
+    }
+  }, [category])
 
   const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -192,11 +210,32 @@ export default function EditListingPage() {
     }
   }
 
+  const getAvailableGames = () => {
+    return categoryGamesMap[category] || []
+  }
+
+  const getCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case 'account': return 'Accounts'
+      case 'items': return 'Items'
+      case 'currency': return 'Currency'
+      case 'key': return 'Game Keys'
+      default: return cat
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!title || !game || !price) {
       alert('Please fill in all required fields')
+      return
+    }
+
+    // Check if selected game is valid for category
+    const validGames = categoryGamesMap[category] || []
+    if (!validGames.includes(game)) {
+      alert(`"${game}" is not a valid game for the ${getCategoryLabel(category)} category. Please select a valid game.`)
       return
     }
 
@@ -372,30 +411,62 @@ export default function EditListingPage() {
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-white mb-2 font-semibold">Game *</label>
-                    <input
-                      type="text"
-                      value={game}
-                      onChange={(e) => setGame(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
-                      placeholder="Fortnite"
-                      required
-                    />
-                  </div>
-
+                  {/* Category Selection - FIXED: Using solid dark background */}
                   <div>
                     <label className="block text-white mb-2 font-semibold">Category *</label>
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
+                      className="w-full bg-[#1e1b4b] border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none appearance-none cursor-pointer"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 1rem center',
+                        backgroundSize: '1.5em 1.5em',
+                        paddingRight: '3rem',
+                        backgroundColor: '#1e1b4b'
+                      }}
                       required
                     >
-                      <option value="account">Account</option>
-                      <option value="topup">Top-up</option>
-                      <option value="key">Game Key</option>
+                      <option value="account" style={{ backgroundColor: '#1e1b4b', color: 'white' }}>🎮 Accounts</option>
+                      <option value="items" style={{ backgroundColor: '#1e1b4b', color: 'white' }}>🎒 Items</option>
+                      <option value="currency" style={{ backgroundColor: '#1e1b4b', color: 'white' }}>💰 Currency</option>
+                      <option value="key" style={{ backgroundColor: '#1e1b4b', color: 'white' }}>🔑 Game Keys</option>
                     </select>
+                  </div>
+
+                  {/* Game Selection - Dynamic based on category */}
+                  <div>
+                    <label className="block text-white mb-2 font-semibold">
+                      Game *
+                      <span className="text-purple-400 text-xs font-normal ml-2">
+                        ({getAvailableGames().length} options)
+                      </span>
+                    </label>
+                    <select
+                      value={game}
+                      onChange={(e) => setGame(e.target.value)}
+                      className="w-full bg-[#1e1b4b] border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none appearance-none cursor-pointer"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 1rem center',
+                        backgroundSize: '1.5em 1.5em',
+                        paddingRight: '3rem',
+                        backgroundColor: '#1e1b4b'
+                      }}
+                      required
+                    >
+                      <option value="" style={{ backgroundColor: '#1e1b4b', color: 'white' }}>Select a game</option>
+                      {getAvailableGames().map((g) => (
+                        <option key={g} value={g} style={{ backgroundColor: '#1e1b4b', color: 'white' }}>{g}</option>
+                      ))}
+                    </select>
+                    {game && !getAvailableGames().includes(game) && (
+                      <p className="text-yellow-400 text-xs mt-1">
+                        ⚠️ Current game "{game}" is not in the {getCategoryLabel(category)} category. Please select a valid game.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -578,26 +649,39 @@ export default function EditListingPage() {
                   </div>
                 )}
 
-                {/* Add New Codes */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Add New Codes</h3>
+                {/* Add New Codes - IMPROVED STYLING */}
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-5">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <span className="text-2xl">➕</span>
+                    Add New Delivery Codes
+                  </h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    Enter each code on a separate line. Each code will be automatically delivered to buyers.
+                  </p>
+                  
                   <div className="space-y-3 mb-4">
                     {newCodes.map((code, index) => (
-                      <div key={index} className="flex items-center gap-2">
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 font-semibold text-sm">
+                          {index + 1}
+                        </div>
                         <input
                           type="text"
                           value={code}
                           onChange={(e) => handleNewCodeChange(index, e.target.value)}
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:outline-none"
-                          placeholder="Enter delivery code or instructions"
+                          className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition"
+                          placeholder={`Enter delivery code #${index + 1} (e.g., ABCD-EFGH-1234)`}
                         />
                         {newCodes.length > 1 && (
                           <button
                             type="button"
                             onClick={() => handleRemoveCodeField(index)}
-                            className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-3 rounded-lg transition"
+                            className="flex-shrink-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 p-3 rounded-lg transition hover:scale-105"
+                            title="Remove this code"
                           >
-                            Remove
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           </button>
                         )}
                       </div>
@@ -607,17 +691,26 @@ export default function EditListingPage() {
                   <button
                     type="button"
                     onClick={handleAddCodeField}
-                    className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 px-4 py-2 rounded-lg font-semibold border border-purple-500/50 transition"
+                    className="w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-300 px-4 py-3 rounded-lg font-semibold border border-purple-500/50 transition flex items-center justify-center gap-2 hover:scale-[1.02]"
                   >
-                    + Add Another Code
+                    <span className="text-xl">+</span>
+                    Add Another Code
                   </button>
 
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mt-4">
-                    <p className="text-yellow-400 text-sm">
-                      💡 <strong>Tip:</strong> Each code will be automatically delivered to buyers when they complete payment. 
-                      Stock is calculated from the number of available (unused) codes.
-                    </p>
-                  </div>
+                  {newCodes.filter(c => c.trim()).length > 0 && (
+                    <div className="mt-4 bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                      <p className="text-green-400 text-sm font-semibold">
+                        ✓ {newCodes.filter(c => c.trim()).length} new code{newCodes.filter(c => c.trim()).length !== 1 ? 's' : ''} ready to be added
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mt-4">
+                  <p className="text-yellow-400 text-sm">
+                    💡 <strong>Tip:</strong> Each code will be automatically delivered to buyers when they complete payment. 
+                    Stock is calculated from the number of available (unused) codes.
+                  </p>
                 </div>
               </div>
             )}

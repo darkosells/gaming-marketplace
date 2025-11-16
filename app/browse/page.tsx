@@ -6,6 +6,14 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 
+// Category to Games mapping
+const categoryGamesMap: { [key: string]: string[] } = {
+  account: ['GTA 5', 'Fortnite', 'Roblox', 'Valorant', 'League of Legends', 'Clash Royale', 'Clash of Clans', 'Steam'],
+  items: ['Steal a Brainrot', 'Grow a Garden', 'Adopt me', 'Blox Fruits', 'Plants vs Brainrots'],
+  currency: ['Roblox', 'Fortnite'],
+  key: ['Steam', 'Playstation', 'Xbox']
+}
+
 function BrowseContent() {
   const [listings, setListings] = useState<any[]>([])
   const [filteredListings, setFilteredListings] = useState<any[]>([])
@@ -34,6 +42,17 @@ function BrowseContent() {
   }, [searchParams])
 
   useEffect(() => { applyFilters() }, [listings, searchQuery, selectedCategory, selectedGame, selectedPlatform, priceRange, sortBy])
+
+  // Reset game selection when category changes
+  useEffect(() => {
+    if (selectedCategory !== 'all') {
+      // Check if current game is valid for new category
+      const validGames = categoryGamesMap[selectedCategory] || []
+      if (!validGames.includes(selectedGame)) {
+        setSelectedGame('all')
+      }
+    }
+  }, [selectedCategory])
 
   const fetchListings = async () => {
     try {
@@ -104,7 +123,24 @@ function BrowseContent() {
     setSortBy('newest')
   }
 
-  const uniqueGames = Array.from(new Set(listings.map(l => l.game)))
+  // Get available games based on selected category
+  const getAvailableGames = () => {
+    if (selectedCategory === 'all') {
+      // Show all unique games from listings when no category is selected
+      return Array.from(new Set(listings.map(l => l.game)))
+    }
+    return categoryGamesMap[selectedCategory] || []
+  }
+
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'account': return '🎮 Accounts'
+      case 'items': return '🎒 Items'
+      case 'currency': return '💰 Currency'
+      case 'key': return '🔑 Game Keys'
+      default: return category
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
@@ -147,7 +183,7 @@ function BrowseContent() {
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
               Browse <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Marketplace</span>
             </h1>
-            <p className="text-gray-400 text-lg">Discover gaming accounts, top-ups, and game keys from verified sellers</p>
+            <p className="text-gray-400 text-lg">Discover gaming accounts, items, currency, and game keys from verified sellers</p>
           </div>
 
           <div className="flex flex-col lg:flex-row gap-8">
@@ -167,21 +203,46 @@ function BrowseContent() {
                 {/* Category Filter */}
                 <div className="mb-6">
                   <label className="block text-white font-semibold mb-3 text-sm">Category</label>
-                  <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}>
+                  <select 
+                    value={selectedCategory} 
+                    onChange={(e) => setSelectedCategory(e.target.value)} 
+                    className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30" 
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}
+                  >
                     <option value="all">All Categories</option>
                     <option value="account">🎮 Accounts</option>
-                    <option value="topup">💰 Top-Ups</option>
+                    <option value="items">🎒 Items</option>
+                    <option value="currency">💰 Currency</option>
                     <option value="key">🔑 Game Keys</option>
                   </select>
                 </div>
 
-                {/* Game Filter */}
+                {/* Game Filter - Dynamic based on category */}
                 <div className="mb-6">
-                  <label className="block text-white font-semibold mb-3 text-sm">Game</label>
-                  <select value={selectedGame} onChange={(e) => setSelectedGame(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}>
+                  <label className="block text-white font-semibold mb-3 text-sm">
+                    Game 
+                    {selectedCategory !== 'all' && (
+                      <span className="text-purple-400 text-xs ml-2">
+                        ({getAvailableGames().length} available)
+                      </span>
+                    )}
+                  </label>
+                  <select 
+                    value={selectedGame} 
+                    onChange={(e) => setSelectedGame(e.target.value)} 
+                    className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30" 
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}
+                  >
                     <option value="all">All Games</option>
-                    {uniqueGames.map(game => (<option key={game} value={game}>{game}</option>))}
+                    {getAvailableGames().map(game => (
+                      <option key={game} value={game}>{game}</option>
+                    ))}
                   </select>
+                  {selectedCategory !== 'all' && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      Showing games for {getCategoryLabel(selectedCategory)}
+                    </p>
+                  )}
                 </div>
 
                 {/* Platform Filter */}
@@ -274,12 +335,14 @@ function BrowseContent() {
                             <img src={listing.image_url} alt={listing.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <span className="text-6xl group-hover:scale-125 transition-transform duration-300">{listing.category === 'account' ? '🎮' : listing.category === 'topup' ? '💰' : '🔑'}</span>
+                              <span className="text-6xl group-hover:scale-125 transition-transform duration-300">
+                                {listing.category === 'account' ? '🎮' : listing.category === 'items' ? '🎒' : listing.category === 'currency' ? '💰' : '🔑'}
+                              </span>
                             </div>
                           )}
                           <div className="absolute top-3 left-3">
                             <span className="bg-black/60 backdrop-blur-lg px-3 py-1.5 rounded-full text-xs text-white font-semibold border border-white/10">
-                              {listing.category === 'account' ? '🎮 Account' : listing.category === 'topup' ? '💰 Top-Up' : '🔑 Key'}
+                              {listing.category === 'account' ? '🎮 Account' : listing.category === 'items' ? '🎒 Items' : listing.category === 'currency' ? '💰 Currency' : '🔑 Key'}
                             </span>
                           </div>
                           {listing.stock <= 3 && listing.stock > 0 && (

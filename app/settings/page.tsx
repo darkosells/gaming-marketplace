@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
@@ -11,11 +11,27 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'account'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security' | 'account'>('profile')
   
   // Profile form state
   const [username, setUsername] = useState('')
   const [usernameError, setUsernameError] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarError, setAvatarError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Preferences state
+  const [preferences, setPreferences] = useState({
+    emailOrderUpdates: true,
+    emailMessages: true,
+    emailMarketing: false,
+    emailSecurityAlerts: true,
+    theme: 'dark',
+    compactMode: false,
+    showOnlineStatus: true
+  })
+  const [preferencesSuccess, setPreferencesSuccess] = useState('')
   
   // Password form state
   const [currentPassword, setCurrentPassword] = useState('')
@@ -33,6 +49,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     checkUser()
+    loadPreferences()
   }, [])
 
   const checkUser = async () => {
@@ -60,11 +77,157 @@ export default function SettingsPage() {
 
       setProfile(profileData)
       setUsername(profileData.username || '')
+      setAvatarUrl(profileData.avatar_url || null)
       setLoading(false)
     } catch (error) {
       console.error('Check user error:', error)
       router.push('/login')
     }
+  }
+
+  const loadPreferences = () => {
+    const saved = localStorage.getItem('userPreferences')
+    if (saved) {
+      try {
+        setPreferences(JSON.parse(saved))
+      } catch (e) {
+        console.error('Error loading preferences:', e)
+      }
+    }
+  }
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setAvatarError('')
+    setUploadingAvatar(true)
+
+    // Validate file
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      setAvatarError('Please upload a JPG, PNG, GIF, or WebP image')
+      setUploadingAvatar(false)
+      return
+    }
+
+    const maxSize = 2 * 1024 * 1024 // 2MB
+    if (file.size > maxSize) {
+      setAvatarError('Image must be smaller than 2MB')
+      setUploadingAvatar(false)
+      return
+    }
+
+    try {
+      // Delete old avatar if exists
+      if (avatarUrl) {
+        const oldPath = avatarUrl.split('/').pop()
+        if (oldPath) {
+          await supabase.storage
+            .from('avatars')
+            .remove([`${user.id}/${oldPath}`])
+        }
+      }
+
+      // Upload new avatar
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}.${fileExt}`
+      const filePath = `${user.id}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      // Update profile in database
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id)
+
+      if (updateError) throw updateError
+
+      setAvatarUrl(publicUrl)
+      setProfile({ ...profile, avatar_url: publicUrl })
+      
+      // Trigger navigation refresh
+      window.dispatchEvent(new Event('avatar-updated'))
+      
+      alert('✅ Avatar updated successfully!')
+    } catch (error: any) {
+      console.error('Avatar upload error:', error)
+      setAvatarError('Failed to upload avatar: ' + error.message)
+    } finally {
+      setUploadingAvatar(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    if (!avatarUrl) return
+    if (!confirm('Are you sure you want to remove your avatar?')) return
+
+    setUploadingAvatar(true)
+    setAvatarError('')
+
+    try {
+      // Extract file path from URL
+      const urlParts = avatarUrl.split('/avatars/')
+      if (urlParts.length > 1) {
+        const filePath = urlParts[1]
+        await supabase.storage
+          .from('avatars')
+          .remove([filePath])
+      }
+
+      // Update profile
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: null })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      setAvatarUrl(null)
+      setProfile({ ...profile, avatar_url: null })
+      
+      // Trigger navigation refresh
+      window.dispatchEvent(new Event('avatar-updated'))
+      
+      alert('Avatar removed successfully!')
+    } catch (error: any) {
+      console.error('Remove avatar error:', error)
+      setAvatarError('Failed to remove avatar: ' + error.message)
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
+  const savePreferences = () => {
+    setSaving(true)
+    setPreferencesSuccess('')
+    
+    localStorage.setItem('userPreferences', JSON.stringify(preferences))
+    
+    if (preferences.theme === 'light') {
+      document.documentElement.classList.add('light-theme')
+    } else {
+      document.documentElement.classList.remove('light-theme')
+    }
+    
+    setTimeout(() => {
+      setSaving(false)
+      setPreferencesSuccess('Preferences saved successfully!')
+      setTimeout(() => setPreferencesSuccess(''), 3000)
+    }, 500)
   }
 
   const handleUpdateProfile = async () => {
@@ -254,110 +417,34 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
       {/* 2D Comic Space Background */}
       <div className="fixed inset-0 z-0">
-        {/* Base gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
-        
-        {/* Gradient Mesh */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-        
-        {/* Animated Nebula Clouds */}
         <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[150px] animate-pulse"></div>
         <div className="absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '1s' }}></div>
         <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
         <div className="absolute bottom-1/4 left-1/3 w-[300px] h-[300px] bg-cyan-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '3s' }}></div>
-        
-        {/* Comic-style Grid Pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
         
-        {/* Twinkling Stars - Small */}
+        {/* Stars */}
         <div className="absolute top-[5%] left-[10%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '2s' }}></div>
         <div className="absolute top-[15%] left-[20%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '3s', animationDelay: '0.5s' }}></div>
         <div className="absolute top-[8%] left-[35%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '2.5s', animationDelay: '1s' }}></div>
         <div className="absolute top-[12%] left-[55%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '4s', animationDelay: '0.3s' }}></div>
         <div className="absolute top-[20%] left-[70%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '3.5s', animationDelay: '1.5s' }}></div>
         <div className="absolute top-[25%] left-[85%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '2.8s', animationDelay: '0.8s' }}></div>
-        <div className="absolute top-[35%] left-[5%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '3.2s', animationDelay: '2s' }}></div>
-        <div className="absolute top-[45%] left-[92%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '2.2s', animationDelay: '1.2s' }}></div>
-        <div className="absolute top-[55%] left-[15%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '3.8s', animationDelay: '0.7s' }}></div>
-        <div className="absolute top-[65%] left-[78%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '2.6s', animationDelay: '1.8s' }}></div>
         
-        {/* Twinkling Stars - Medium */}
-        <div className="absolute top-[10%] left-[45%] w-1.5 h-1.5 bg-blue-200 rounded-full animate-pulse" style={{ animationDuration: '3s' }}></div>
-        <div className="absolute top-[30%] left-[75%] w-1.5 h-1.5 bg-purple-200 rounded-full animate-pulse" style={{ animationDuration: '4s', animationDelay: '1s' }}></div>
-        <div className="absolute top-[50%] left-[8%] w-1.5 h-1.5 bg-pink-200 rounded-full animate-pulse" style={{ animationDuration: '3.5s', animationDelay: '2s' }}></div>
-        <div className="absolute top-[70%] left-[60%] w-1.5 h-1.5 bg-cyan-200 rounded-full animate-pulse" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }}></div>
-        
-        {/* Comic-style Planets */}
-        {/* Planet 1 - Saturn-like with ring */}
+        {/* Planets */}
         <div className="absolute top-[15%] right-[10%] group">
           <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-amber-600 rounded-full shadow-lg relative">
             <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/20 rounded-full"></div>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-6 border-4 border-orange-300/60 rounded-full -rotate-12"></div>
           </div>
         </div>
-        
-        {/* Planet 2 - Purple gas giant */}
         <div className="absolute bottom-[20%] left-[8%]">
           <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-700 rounded-full shadow-lg relative">
             <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/30 rounded-full"></div>
-            <div className="absolute top-[30%] left-0 right-0 h-1 bg-purple-300/40 rounded-full"></div>
-            <div className="absolute top-[50%] left-0 right-0 h-0.5 bg-purple-200/30 rounded-full"></div>
           </div>
         </div>
-        
-        {/* Planet 3 - Small blue planet */}
-        <div className="absolute top-[60%] right-[5%]">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full shadow-md">
-            <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/40 rounded-full"></div>
-          </div>
-        </div>
-        
-        {/* Comic-style Moon */}
-        <div className="absolute top-[40%] left-[3%]">
-          <div className="w-8 h-8 bg-gradient-to-br from-gray-300 to-gray-400 rounded-full shadow-md relative">
-            <div className="absolute top-1 left-1 w-2 h-2 bg-gray-400/50 rounded-full"></div>
-            <div className="absolute top-3 left-4 w-1.5 h-1.5 bg-gray-400/50 rounded-full"></div>
-            <div className="absolute bottom-2 left-2 w-1 h-1 bg-gray-400/50 rounded-full"></div>
-          </div>
-        </div>
-        
-        {/* Shooting Stars / Comets - Slow and subtle */}
-        <div className="absolute top-[20%] left-[30%]">
-          <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-white to-white rounded-full animate-[shooting_12s_ease-in-out_infinite] opacity-30" style={{ transform: 'rotate(-45deg)' }}></div>
-        </div>
-        <div className="absolute top-[50%] right-[25%]">
-          <div className="w-20 h-0.5 bg-gradient-to-r from-transparent via-cyan-200 to-white rounded-full animate-[shooting_15s_ease-in-out_infinite] opacity-25" style={{ transform: 'rotate(-30deg)', animationDelay: '6s' }}></div>
-        </div>
-        
-        {/* Floating Cosmic Particles */}
-        <div className="absolute top-20 left-[10%] w-2 h-2 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDuration: '3s' }}></div>
-        <div className="absolute top-40 left-[25%] w-1 h-1 bg-pink-400/60 rounded-full animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}></div>
-        <div className="absolute top-60 right-[15%] w-3 h-3 bg-blue-400/40 rounded-full animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}></div>
-        <div className="absolute top-32 right-[30%] w-2 h-2 bg-purple-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1.5s' }}></div>
-        <div className="absolute top-80 left-[40%] w-1 h-1 bg-pink-400/70 rounded-full animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '2s' }}></div>
-        <div className="absolute bottom-40 right-[20%] w-2 h-2 bg-indigo-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.8s', animationDelay: '2.5s' }}></div>
-        
-        {/* Comic-style Star Bursts */}
-        <div className="absolute top-[25%] left-[60%]">
-          <div className="relative">
-            <div className="absolute w-3 h-3 bg-yellow-300/80 rotate-45 animate-pulse" style={{ animationDuration: '2s' }}></div>
-            <div className="absolute w-3 h-3 bg-yellow-300/80 animate-pulse" style={{ animationDuration: '2s' }}></div>
-          </div>
-        </div>
-        <div className="absolute top-[70%] left-[40%]">
-          <div className="relative">
-            <div className="absolute w-2 h-2 bg-cyan-300/70 rotate-45 animate-pulse" style={{ animationDuration: '3s', animationDelay: '1s' }}></div>
-            <div className="absolute w-2 h-2 bg-cyan-300/70 animate-pulse" style={{ animationDuration: '3s', animationDelay: '1s' }}></div>
-          </div>
-        </div>
-        
-        {/* Constellation Lines */}
-        <svg className="absolute inset-0 w-full h-full opacity-20 pointer-events-none">
-          <line x1="10%" y1="15%" x2="20%" y2="8%" stroke="white" strokeWidth="1" strokeDasharray="2,4" />
-          <line x1="20%" y1="8%" x2="35%" y2="12%" stroke="white" strokeWidth="1" strokeDasharray="2,4" />
-          <line x1="70%" y1="20%" x2="85%" y2="25%" stroke="white" strokeWidth="1" strokeDasharray="2,4" />
-          <line x1="85%" y1="25%" x2="78%" y2="35%" stroke="white" strokeWidth="1" strokeDasharray="2,4" />
-        </svg>
       </div>
 
       {/* Content */}
@@ -389,7 +476,7 @@ export default function SettingsPage() {
 
             {/* Tabs */}
             <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
-              <div className="flex space-x-2 mb-8 border-b border-white/10 pb-4">
+              <div className="flex flex-wrap gap-2 mb-8 border-b border-white/10 pb-4">
                 <button
                   onClick={() => setActiveTab('profile')}
                   className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
@@ -399,6 +486,16 @@ export default function SettingsPage() {
                   }`}
                 >
                   👤 Profile
+                </button>
+                <button
+                  onClick={() => setActiveTab('preferences')}
+                  className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                    activeTab === 'preferences'
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  🔔 Preferences
                 </button>
                 <button
                   onClick={() => setActiveTab('security')}
@@ -429,6 +526,84 @@ export default function SettingsPage() {
                     <span className="text-purple-400">📝</span>
                     Profile Information
                   </h2>
+
+                  {/* Avatar Upload Section */}
+                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <span>📷</span> Profile Picture
+                    </h3>
+                    
+                    <div className="flex items-center gap-6">
+                      {/* Avatar Preview */}
+                      <div className="relative group">
+                        <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ring-4 ring-purple-500/30">
+                          {avatarUrl ? (
+                            <img 
+                              src={avatarUrl} 
+                              alt="Profile" 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-white font-bold text-3xl">
+                              {profile?.username?.charAt(0).toUpperCase() || 'U'}
+                            </span>
+                          )}
+                        </div>
+                        {uploadingAvatar && (
+                          <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                            <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Upload Controls */}
+                      <div className="flex-1">
+                        <div className="flex flex-wrap gap-3 mb-3">
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploadingAvatar}
+                            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            {avatarUrl ? 'Change Avatar' : 'Upload Avatar'}
+                          </button>
+                          
+                          {avatarUrl && (
+                            <button
+                              onClick={handleRemoveAvatar}
+                              disabled={uploadingAvatar}
+                              className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg font-semibold transition-all duration-300 border border-red-500/30 disabled:opacity-50 flex items-center gap-2"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          onChange={handleAvatarUpload}
+                          className="hidden"
+                        />
+                        
+                        <p className="text-gray-400 text-sm">
+                          JPG, PNG, GIF or WebP. Max size 2MB.
+                        </p>
+                        
+                        {avatarError && (
+                          <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                            <span>❌</span> {avatarError}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Email (Read-only) */}
                   <div>
@@ -537,6 +712,217 @@ export default function SettingsPage() {
                       </span>
                     ) : (
                       'Save Changes'
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Preferences Tab */}
+              {activeTab === 'preferences' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                    <span className="text-purple-400">🔔</span>
+                    Preferences
+                  </h2>
+
+                  {/* Notification Preferences */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <span>📧</span> Email Notifications
+                    </h3>
+                    
+                    <div className="space-y-3">
+                      <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
+                        <div>
+                          <p className="text-white font-medium">Order Updates</p>
+                          <p className="text-gray-400 text-sm">Get notified about your order status changes</p>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={preferences.emailOrderUpdates}
+                            onChange={(e) => setPreferences({ ...preferences, emailOrderUpdates: e.target.checked })}
+                            className="sr-only"
+                          />
+                          <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                            preferences.emailOrderUpdates ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
+                          }`}>
+                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                              preferences.emailOrderUpdates ? 'translate-x-7' : 'translate-x-1'
+                            }`}></div>
+                          </div>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
+                        <div>
+                          <p className="text-white font-medium">New Messages</p>
+                          <p className="text-gray-400 text-sm">Get notified when you receive new messages</p>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={preferences.emailMessages}
+                            onChange={(e) => setPreferences({ ...preferences, emailMessages: e.target.checked })}
+                            className="sr-only"
+                          />
+                          <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                            preferences.emailMessages ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
+                          }`}>
+                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                              preferences.emailMessages ? 'translate-x-7' : 'translate-x-1'
+                            }`}></div>
+                          </div>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
+                        <div>
+                          <p className="text-white font-medium">Marketing & Promotions</p>
+                          <p className="text-gray-400 text-sm">Receive special offers and platform updates</p>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={preferences.emailMarketing}
+                            onChange={(e) => setPreferences({ ...preferences, emailMarketing: e.target.checked })}
+                            className="sr-only"
+                          />
+                          <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                            preferences.emailMarketing ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
+                          }`}>
+                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                              preferences.emailMarketing ? 'translate-x-7' : 'translate-x-1'
+                            }`}></div>
+                          </div>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
+                        <div>
+                          <p className="text-white font-medium">Security Alerts</p>
+                          <p className="text-gray-400 text-sm">Important security notifications about your account</p>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={preferences.emailSecurityAlerts}
+                            onChange={(e) => setPreferences({ ...preferences, emailSecurityAlerts: e.target.checked })}
+                            className="sr-only"
+                          />
+                          <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                            preferences.emailSecurityAlerts ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
+                          }`}>
+                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                              preferences.emailSecurityAlerts ? 'translate-x-7' : 'translate-x-1'
+                            }`}></div>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Theme Preferences */}
+                  <div className="space-y-4 pt-4 border-t border-white/10">
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <span>🎨</span> Display Settings
+                    </h3>
+
+                    <div>
+                      <p className="text-white font-medium mb-3">Theme</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          onClick={() => setPreferences({ ...preferences, theme: 'dark' })}
+                          className={`p-4 rounded-xl border transition-all duration-300 ${
+                            preferences.theme === 'dark'
+                              ? 'bg-purple-500/20 border-purple-500/50 ring-2 ring-purple-500/30'
+                              : 'bg-slate-900/50 border-white/10 hover:border-purple-500/30'
+                          }`}
+                        >
+                          <div className="text-2xl mb-2">🌙</div>
+                          <p className="text-white font-medium">Dark</p>
+                          <p className="text-gray-400 text-xs">Default theme</p>
+                        </button>
+                        <button
+                          onClick={() => setPreferences({ ...preferences, theme: 'light' })}
+                          className={`p-4 rounded-xl border transition-all duration-300 ${
+                            preferences.theme === 'light'
+                              ? 'bg-purple-500/20 border-purple-500/50 ring-2 ring-purple-500/30'
+                              : 'bg-slate-900/50 border-white/10 hover:border-purple-500/30'
+                          }`}
+                        >
+                          <div className="text-2xl mb-2">☀️</div>
+                          <p className="text-white font-medium">Light</p>
+                          <p className="text-gray-400 text-xs">Coming soon</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
+                      <div>
+                        <p className="text-white font-medium">Compact Mode</p>
+                        <p className="text-gray-400 text-sm">Reduce spacing for more content on screen</p>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={preferences.compactMode}
+                          onChange={(e) => setPreferences({ ...preferences, compactMode: e.target.checked })}
+                          className="sr-only"
+                        />
+                        <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                          preferences.compactMode ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
+                        }`}>
+                          <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                            preferences.compactMode ? 'translate-x-7' : 'translate-x-1'
+                          }`}></div>
+                        </div>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
+                      <div>
+                        <p className="text-white font-medium">Show Online Status</p>
+                        <p className="text-gray-400 text-sm">Let others see when you're online</p>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={preferences.showOnlineStatus}
+                          onChange={(e) => setPreferences({ ...preferences, showOnlineStatus: e.target.checked })}
+                          className="sr-only"
+                        />
+                        <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                          preferences.showOnlineStatus ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
+                        }`}>
+                          <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                            preferences.showOnlineStatus ? 'translate-x-7' : 'translate-x-1'
+                          }`}></div>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {preferencesSuccess && (
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3">
+                      <p className="text-green-400 text-sm flex items-center gap-2">
+                        <span>✅</span> {preferencesSuccess}
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={savePreferences}
+                    disabled={saving}
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    {saving ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Saving...
+                      </span>
+                    ) : (
+                      'Save Preferences'
                     )}
                   </button>
                 </div>
@@ -651,7 +1037,6 @@ export default function SettingsPage() {
                     Account Management
                   </h2>
 
-                  {/* Account Info */}
                   <div className="bg-slate-800/50 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300">
                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                       <span>ℹ️</span> Account Information
@@ -676,7 +1061,6 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* Data Export */}
                   <div className="bg-slate-800/50 border border-white/10 rounded-xl p-6 hover:border-blue-500/30 transition-all duration-300">
                     <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                       <span>📦</span> Export Your Data
@@ -692,7 +1076,6 @@ export default function SettingsPage() {
                     </button>
                   </div>
 
-                  {/* Delete Account */}
                   <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
                     <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
                       <span>⚠️</span> Danger Zone

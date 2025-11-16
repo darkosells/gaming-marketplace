@@ -30,6 +30,7 @@ interface Listing {
     average_rating: number
     verified: boolean
     created_at: string
+    avatar_url: string | null  // Added avatar_url
   }
 }
 
@@ -100,7 +101,8 @@ export default function ListingDetailPage() {
             total_reviews,
             average_rating,
             verified,
-            created_at
+            created_at,
+            avatar_url
           )
         `)
         .eq('id', params.id)
@@ -375,7 +377,6 @@ export default function ListingDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
-        {/* Animated Background for Loading */}
         <div className="fixed inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
@@ -395,7 +396,6 @@ export default function ListingDetailPage() {
   if (!listing) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
-        {/* Animated Background for Not Found */}
         <div className="fixed inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
@@ -420,19 +420,12 @@ export default function ListingDetailPage() {
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
       {/* Animated Background */}
       <div className="fixed inset-0 z-0">
-        {/* Gradient Mesh */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-        
-        {/* Animated Orbs */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
         <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
         <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }}></div>
         <div className="absolute bottom-1/4 left-1/3 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '3s' }}></div>
-        
-        {/* Grid Pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-        
-        {/* Floating Particles */}
         <div className="absolute top-20 left-[10%] w-2 h-2 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDuration: '3s' }}></div>
         <div className="absolute top-40 left-[25%] w-1 h-1 bg-pink-400/60 rounded-full animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}></div>
         <div className="absolute top-60 right-[15%] w-3 h-3 bg-blue-400/40 rounded-full animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}></div>
@@ -744,7 +737,7 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
-              {/* Seller Info Card */}
+              {/* Seller Info Card - UPDATED WITH AVATAR */}
               <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   <span className="text-purple-400">👤</span>
@@ -752,10 +745,18 @@ export default function ListingDetailPage() {
                 </h3>
                 
                 <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-xl">
-                      {listing.profiles.username.charAt(0).toUpperCase()}
-                    </span>
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-purple-500/30">
+                    {listing.profiles.avatar_url ? (
+                      <img 
+                        src={listing.profiles.avatar_url} 
+                        alt={listing.profiles.username}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-white font-bold text-xl">
+                        {listing.profiles.username.charAt(0).toUpperCase()}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">

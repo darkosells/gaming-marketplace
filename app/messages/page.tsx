@@ -21,9 +21,11 @@ interface Conversation {
   }
   buyer: {
     username: string
+    avatar_url: string | null
   }
   seller: {
     username: string
+    avatar_url: string | null
   }
   order: {
     status: string
@@ -42,6 +44,7 @@ interface Message {
   sender: {
     username: string
     is_admin: boolean
+    avatar_url: string | null
   }
 }
 
@@ -52,6 +55,7 @@ function MessagesContent() {
   const supabase = createClient()
   
   const [user, setUser] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<any>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -68,6 +72,7 @@ function MessagesContent() {
   useEffect(() => {
     if (user) {
       fetchConversations()
+      fetchUserProfile()
       
       const conversationId = searchParams.get('conversation')
       if (conversationId) {
@@ -156,6 +161,22 @@ function MessagesContent() {
     setLoading(false)
   }
 
+  const fetchUserProfile = async () => {
+    if (!user) return
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) throw error
+      setUserProfile(data)
+    } catch (error) {
+      console.error('Error fetching user profile:', error)
+    }
+  }
+
   const fetchConversations = async () => {
     try {
       const { data, error } = await supabase
@@ -163,8 +184,8 @@ function MessagesContent() {
         .select(`
           *,
           listing:listings(title, image_url, game),
-          buyer:profiles!conversations_buyer_id_fkey(username),
-          seller:profiles!conversations_seller_id_fkey(username),
+          buyer:profiles!conversations_buyer_id_fkey(username, avatar_url),
+          seller:profiles!conversations_seller_id_fkey(username, avatar_url),
           order:orders(status, amount)
         `)
         .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
@@ -226,8 +247,8 @@ function MessagesContent() {
           .select(`
             *,
             listing:listings(title, image_url, game),
-            buyer:profiles!conversations_buyer_id_fkey(username),
-            seller:profiles!conversations_seller_id_fkey(username),
+            buyer:profiles!conversations_buyer_id_fkey(username, avatar_url),
+            seller:profiles!conversations_seller_id_fkey(username, avatar_url),
             order:orders(status, amount)
           `)
           .eq('id', conversationId)
@@ -247,7 +268,7 @@ function MessagesContent() {
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select(`*, sender:profiles!messages_sender_id_fkey(username, is_admin)`)
+        .select(`*, sender:profiles!messages_sender_id_fkey(username, is_admin, avatar_url)`)
         .eq('conversation_id', selectedConversation.id)
         .order('created_at', { ascending: true })
 
@@ -323,6 +344,31 @@ function MessagesContent() {
   }
 
   const isSeller = selectedConversation?.seller_id === user?.id
+
+  // Helper function to render avatar
+  const renderAvatar = (avatarUrl: string | null, username: string, size: 'sm' | 'md' | 'lg' = 'md') => {
+    const sizeClasses = {
+      sm: 'w-8 h-8 text-xs',
+      md: 'w-10 h-10 text-sm',
+      lg: 'w-12 h-12 text-base'
+    }
+    
+    return (
+      <div className={`${sizeClasses[size]} bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0`}>
+        {avatarUrl ? (
+          <img 
+            src={avatarUrl} 
+            alt={username}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <span className="text-white font-semibold">
+            {username.charAt(0).toUpperCase()}
+          </span>
+        )}
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -519,6 +565,7 @@ function MessagesContent() {
                           )}
                           
                           <div className="flex items-center gap-3">
+                            {/* Product Image in conversation list */}
                             <div className="relative w-12 h-12 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20 group-hover:scale-105 transition-transform duration-300">
                               {conv.listing?.image_url ? (
                                 <img src={conv.listing.image_url} alt={conv.listing.title} className="w-full h-full object-cover" />
@@ -582,13 +629,16 @@ function MessagesContent() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                              <span className="text-white font-semibold text-sm">
-                                {(selectedConversation.buyer_id === user.id 
-                                  ? selectedConversation.seller.username 
-                                  : selectedConversation.buyer.username).charAt(0).toUpperCase()}
-                              </span>
-                            </div>
+                            {/* Avatar in chat header */}
+                            {renderAvatar(
+                              selectedConversation.buyer_id === user.id 
+                                ? selectedConversation.seller.avatar_url 
+                                : selectedConversation.buyer.avatar_url,
+                              selectedConversation.buyer_id === user.id 
+                                ? selectedConversation.seller.username 
+                                : selectedConversation.buyer.username,
+                              'sm'
+                            )}
                             {selectedConversation.buyer_id === user.id 
                               ? selectedConversation.seller.username 
                               : selectedConversation.buyer.username}
@@ -628,7 +678,11 @@ function MessagesContent() {
                         const isSystemMessage = message.message_type === 'system'
                         const previousMessage = index > 0 ? messages[index - 1] : null
                         const showDateSeparator = shouldShowDateSeparator(message, previousMessage)
-                        const otherUser = isOwnMessage ? selectedConversation.seller : selectedConversation.buyer
+                        
+                        // Get the other user's info for displaying their avatar
+                        const otherUserInfo = isOwnMessage 
+                          ? (selectedConversation.buyer_id === user.id ? selectedConversation.seller : selectedConversation.buyer)
+                          : (selectedConversation.buyer_id === user.id ? selectedConversation.seller : selectedConversation.buyer)
                         
                         return (
                           <div key={message.id}>
@@ -683,8 +737,8 @@ function MessagesContent() {
                             ) : (
                               <div className={`flex gap-2 mb-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
                                 {!isOwnMessage && (
-                                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500/30 to-pink-500/30 rounded-full flex items-center justify-center flex-shrink-0 mt-1 border border-white/10">
-                                    <span className="text-white font-semibold text-xs">{otherUser.username.charAt(0).toUpperCase()}</span>
+                                  <div className="mt-1">
+                                    {renderAvatar(message.sender.avatar_url, message.sender.username, 'sm')}
                                   </div>
                                 )}
                                 <div className={`max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
@@ -700,8 +754,8 @@ function MessagesContent() {
                                   </p>
                                 </div>
                                 {isOwnMessage && (
-                                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                                    <span className="text-white font-semibold text-xs">{user.email?.charAt(0).toUpperCase() || 'U'}</span>
+                                  <div className="mt-1">
+                                    {renderAvatar(userProfile?.avatar_url || null, userProfile?.username || user.email?.charAt(0) || 'U', 'sm')}
                                   </div>
                                 )}
                               </div>
