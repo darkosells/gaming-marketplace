@@ -14,7 +14,7 @@ const corsHeaders = {
 }
 
 interface EmailRequest {
-  type: 'order_confirmation' | 'delivery_notification' | 'new_sale' | 'dispute_opened' | 'withdrawal_processed' | 'password_changed' | 'username_changed'
+  type: 'order_confirmation' | 'delivery_notification' | 'new_sale' | 'dispute_opened' | 'withdrawal_processed' | 'password_changed' | 'username_changed' | 'welcome'
   [key: string]: any
 }
 
@@ -72,6 +72,12 @@ serve(async (req) => {
         toEmail = emailRequest.userEmail
         subject = `✨ Username Changed - Nashflare Account Update`
         htmlContent = generateUsernameChangedEmail(emailRequest)
+        break
+
+      case 'welcome':
+        toEmail = emailRequest.userEmail
+        subject = `🎮 Welcome to Nashflare!`
+        htmlContent = generateWelcomeEmail(emailRequest)
         break
 
       default:
@@ -600,6 +606,87 @@ function generateUsernameChangedEmail(data: any): string {
                   <p style="color: #64748b; margin: 0; font-size: 12px;">
                     © 2024 Nashflare. All rights reserved.<br>
                     If you didn't make this change, please contact support immediately.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+}
+
+function generateWelcomeEmail(data: any): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); padding: 30px; text-align: center;">
+                  <h1 style="margin: 0; color: white; font-size: 32px; font-weight: bold;">🎮 Welcome to Nashflare!</h1>
+                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">Your Gaming Marketplace Adventure Begins</p>
+                </td>
+              </tr>
+              
+              <!-- Content -->
+              <tr>
+                <td style="padding: 40px;">
+                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Hey ${data.username}! 🎉</h2>
+                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">
+                    Welcome to Nashflare - the ultimate marketplace for gaming accounts, in-game currency, items, and game keys!
+                  </p>
+                  
+                  <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                    <p style="color: #a78bfa; font-weight: 600; margin: 0 0 16px; font-size: 14px; text-transform: uppercase;">What You Can Do</p>
+                    
+                    <div style="margin-bottom: 12px;">
+                      <p style="color: white; margin: 0 0 4px; font-size: 16px; font-weight: 600;">🛒 Browse & Buy</p>
+                      <p style="color: #94a3b8; margin: 0; font-size: 14px;">Find amazing deals on gaming accounts, items, and more</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 12px;">
+                      <p style="color: white; margin: 0 0 4px; font-size: 16px; font-weight: 600;">💰 Sell Your Items</p>
+                      <p style="color: #94a3b8; margin: 0; font-size: 14px;">Upgrade to vendor status and start earning</p>
+                    </div>
+                    
+                    <div>
+                      <p style="color: white; margin: 0 0 4px; font-size: 16px; font-weight: 600;">🔒 Safe & Secure</p>
+                      <p style="color: #94a3b8; margin: 0; font-size: 14px;">Buyer protection and secure transactions</p>
+                    </div>
+                  </div>
+
+                  <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                    <p style="color: #34d399; margin: 0; font-size: 14px;">
+                      ✅ <strong>Your account is ready!</strong><br>
+                      Start exploring the marketplace and find your next gaming treasure.
+                    </p>
+                  </div>
+
+                  <div style="text-align: center;">
+                    <a href="https://nashflare.com/browse" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: bold; font-size: 16px;">
+                      Start Browsing →
+                    </a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
+                  <p style="color: #64748b; margin: 0; font-size: 12px;">
+                    © 2024 Nashflare. All rights reserved.<br>
+                    Thanks for joining our gaming community!
                   </p>
                 </td>
               </tr>

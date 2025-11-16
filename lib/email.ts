@@ -239,6 +239,37 @@ export function getSiteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL || 'https://nashflare.com'
 }
 
+// Send welcome email to new users
+export async function sendWelcomeEmail(data: {
+  email: string
+  username: string
+  site_url?: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'welcome',
+        userEmail: data.email,
+        username: data.username
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send welcome email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 // Combined function to send order emails (to both buyer and seller)
 export async function sendOrderEmails(data: {
   id: string
