@@ -144,7 +144,7 @@ export default function ListingDetailPage() {
 
       if (error) throw error
 
-      const sorted = (data || []).sort((a, b) => {
+      const sorted = (data || []).sort((a: any, b: any) => {
         const aScore = (a.game === listing.game ? 2 : 0) + (a.category === listing.category ? 1 : 0)
         const bScore = (b.game === listing.game ? 2 : 0) + (b.category === listing.category ? 1 : 0)
         return bScore - aScore
