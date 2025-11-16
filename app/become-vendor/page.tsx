@@ -122,7 +122,7 @@ export default function BecomeVendorPage() {
     setSubmitting(true)
     try {
       const idFrontUrl = await uploadDocument(idFrontFile!, 'front')
-      let idBackUrl = null
+      let idBackUrl: string | null = null
       if (idBackFile) { idBackUrl = await uploadDocument(idBackFile, 'back') }
       const submissionData = {
         user_id: user.id, full_name: formData.fullName.trim(), date_of_birth: formData.dateOfBirth, phone_number: formData.phoneNumber,
