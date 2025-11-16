@@ -92,7 +92,7 @@ export default function AdminDashboard() {
   
   const fetchReviews = async () => {
     const { data } = await supabase.from('reviews').select('*, buyer:profiles!buyer_id(username)').order('created_at', { ascending: false })
-    const reviewsWithSellers = await Promise.all((data || []).map(async (review) => {
+    const reviewsWithSellers = await Promise.all((data || []).map(async (review: any) => {
       if (review.seller_id) { const { data: sellerData } = await supabase.from('profiles').select('username').eq('id', review.seller_id).single(); return { ...review, seller: sellerData } }
       return { ...review, seller: null }
     }))
