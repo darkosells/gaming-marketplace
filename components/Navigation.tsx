@@ -1,8 +1,6 @@
-// components/Navigation.tsx - NAVIGATION WITH MEGA MENU
-
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -41,24 +39,123 @@ export default function Navigation() {
   const [scrolled, setScrolled] = useState(false)
   const [megaMenuOpen, setMegaMenuOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authError, setAuthError] = useState(false)
+  
+  const mountedRef = useRef(true)
+  const authInitializedRef = useRef(false)
   
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
 
-  // Check if we're on the homepage
   const isHomepage = pathname === '/'
 
   useEffect(() => {
-    checkUser()
+    mountedRef.current = true
+    
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
+      if (!mountedRef.current) return
+      
+      // Mark that we've received auth state
+      authInitializedRef.current = true
+      
+      // Handle SIGNED_OUT event explicitly
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setProfile(null)
+        setAuthError(false) // Don't treat logout as an error
+        setAuthLoading(false)
+        return // Exit early, don't try to fetch anything
+      }
+      
+      if (session?.user) {
+        setUser(session.user)
+        setAuthError(false)
+        // Fetch profile when auth state changes
+        fetchProfile(session.user.id)
+      } else {
+        setUser(null)
+        setProfile(null)
+      }
+      setAuthLoading(false)
+    })
+
+    // Then check initial auth state with timeout
+    const initAuth = async () => {
+      try {
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth timeout')), 5000)
+        )
+        
+        const authPromise = supabase.auth.getUser()
+        
+        // Race the auth check against timeout
+        const { data: { user: authUser }, error } = await Promise.race([
+          authPromise,
+          timeoutPromise
+        ]) as any
+        
+        if (!mountedRef.current) return
+        
+        if (error) {
+          // Check if this is an AuthSessionMissingError (happens after logout)
+          if (error.name === 'AuthSessionMissingError' || error.message?.includes('session')) {
+            // This is expected after logout, not a real error
+            console.log('No active session (user logged out)')
+            setUser(null)
+            setProfile(null)
+            setAuthError(false) // Don't treat as error
+            setAuthLoading(false)
+            return
+          }
+          console.error('Auth error:', error)
+          setAuthError(true)
+          setAuthLoading(false)
+          return
+        }
+        
+        if (authUser) {
+          setUser(authUser)
+          setAuthError(false)
+          // Fetch profile with its own timeout
+          await fetchProfile(authUser.id)
+        }
+        
+        setAuthLoading(false)
+      } catch (error: any) {
+        console.error('Error initializing auth:', error)
+        if (!mountedRef.current) return
+        
+        // Check if this is a session missing error (expected after logout)
+        if (error.name === 'AuthSessionMissingError' || error.message?.includes('session')) {
+          console.log('No active session (user logged out)')
+          setUser(null)
+          setProfile(null)
+          setAuthError(false) // Don't treat as error
+          setAuthLoading(false)
+          return
+        }
+        
+        if (error.message === 'Auth timeout') {
+          console.warn('Auth check timed out, will retry on state change')
+          setAuthError(true)
+        }
+        setAuthLoading(false)
+      }
+    }
+
+    initAuth()
     checkCart()
     
     const handleStorageChange = () => checkCart()
-    const handleMessagesRead = () => {
-      if (user) fetchUnreadCount()
-    }
+    const handleMessagesRead = () => fetchUnreadCount()
     const handleScroll = () => setScrolled(window.scrollY > 10)
-    const handleAvatarUpdate = () => checkUser() // Re-fetch profile to get new avatar
+    const handleAvatarUpdate = () => {
+      if (user) fetchProfile(user.id)
+    }
     
     window.addEventListener('storage', handleStorageChange)
     window.addEventListener('cart-updated', handleStorageChange)
@@ -67,14 +164,17 @@ export default function Navigation() {
     window.addEventListener('avatar-updated', handleAvatarUpdate)
     
     return () => {
+      mountedRef.current = false
+      subscription.unsubscribe()
       window.removeEventListener('storage', handleStorageChange)
       window.removeEventListener('cart-updated', handleStorageChange)
       window.removeEventListener('messages-read', handleMessagesRead)
       window.removeEventListener('scroll', handleScroll)
       window.removeEventListener('avatar-updated', handleAvatarUpdate)
     }
-  }, [user])
+  }, [])
 
+  // Separate effect for fetching unread count when user changes
   useEffect(() => {
     if (user) {
       fetchUnreadCount()
@@ -87,14 +187,39 @@ export default function Navigation() {
 
       return () => { supabase.removeChannel(channel) }
     }
-  }, [user])
+  }, [user?.id]) // Only re-run when user ID changes
 
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    setUser(user)
-    if (user) {
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      setProfile(profileData)
+  const fetchProfile = async (userId: string) => {
+    if (!mountedRef.current) return
+    
+    try {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile timeout')), 5000)
+      )
+      
+      const profilePromise = supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+      
+      const { data: profileData, error } = await Promise.race([
+        profilePromise,
+        timeoutPromise
+      ]) as any
+      
+      if (!mountedRef.current) return
+      
+      if (error) {
+        console.error('Error fetching profile:', error)
+        return
+      }
+      
+      if (profileData) {
+        setProfile(profileData)
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error)
     }
   }
 
@@ -104,16 +229,37 @@ export default function Navigation() {
   }
 
   const fetchUnreadCount = async () => {
-    if (!user) return
-    const { count } = await supabase.from('messages').select('*', { count: 'exact', head: true }).eq('receiver_id', user.id).eq('read', false)
-    setUnreadMessageCount(count || 0)
+    if (!user || !mountedRef.current) return
+    try {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', user.id)
+        .eq('read', false)
+      
+      if (!mountedRef.current) return
+      if (!error) {
+        setUnreadMessageCount(count || 0)
+      }
+    } catch (error) {
+      console.error('Error fetching unread count:', error)
+    }
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    // Clear local state FIRST to prevent any fetches after signout
     setUser(null)
     setProfile(null)
     setUserMenuOpen(false)
+    setAuthError(false) // Clear any auth errors
+    
+    try {
+      await supabase.auth.signOut()
+    } catch (error) {
+      // Ignore errors during signout - session is already gone
+      console.log('Signout complete')
+    }
+    
     router.push('/')
   }
 
@@ -137,6 +283,23 @@ export default function Navigation() {
     setActiveCategory(null)
   }
 
+  const retryAuth = async () => {
+    setAuthLoading(true)
+    setAuthError(false)
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (authUser) {
+        setUser(authUser)
+        await fetchProfile(authUser.id)
+      }
+      setAuthLoading(false)
+    } catch (error) {
+      console.error('Retry auth failed:', error)
+      setAuthError(true)
+      setAuthLoading(false)
+    }
+  }
+
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       scrolled 
@@ -155,7 +318,7 @@ export default function Navigation() {
             </div>
             <div className="flex flex-col">
               <span className="text-xl lg:text-2xl font-black text-white tracking-tight">
-                Game<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Vault</span>
+                Nash<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">flare</span>
               </span>
               <span className="hidden sm:block text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-1">Marketplace</span>
             </div>
@@ -191,11 +354,9 @@ export default function Navigation() {
                 {/* Mega Menu Dropdown */}
                 {megaMenuOpen && (
                   <>
-                    {/* Invisible bridge */}
                     <div className="absolute left-0 top-full h-3 w-full" />
                     <div className="absolute left-1/2 -translate-x-1/2 mt-3 w-[700px] bg-slate-800/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
                       <div className="flex">
-                        {/* Categories Column */}
                         <div className="w-1/3 bg-slate-900/50 p-4 border-r border-white/10">
                           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">Categories</h3>
                           <div className="space-y-1">
@@ -221,7 +382,6 @@ export default function Navigation() {
                             ))}
                           </div>
                           
-                          {/* View All Link */}
                           <div className="mt-4 pt-4 border-t border-white/10">
                             <Link 
                               href="/browse" 
@@ -236,7 +396,6 @@ export default function Navigation() {
                           </div>
                         </div>
 
-                        {/* Games Column */}
                         <div className="w-2/3 p-4">
                           {activeCategory ? (
                             <>
@@ -290,7 +449,8 @@ export default function Navigation() {
 
           {/* Right Side Actions */}
           <div className="flex items-center space-x-2 lg:space-x-3">
-            {user && (
+            {/* Show user controls immediately if we have user data, even if still loading profile */}
+            {!authLoading && user && (
               <>
                 {/* Messages */}
                 <Link href="/messages" className="relative p-2.5 lg:p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-300 hover:text-white transition-all duration-200 group">
@@ -335,11 +495,13 @@ export default function Navigation() {
                         />
                       ) : (
                         <span className="text-white font-bold text-xs lg:text-sm">
-                          {profile?.username?.charAt(0).toUpperCase() || 'U'}
+                          {profile?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
                         </span>
                       )}
                     </div>
-                    <span className="text-white font-medium hidden md:block text-sm lg:text-base">{profile?.username}</span>
+                    <span className="text-white font-medium hidden md:block text-sm lg:text-base">
+                      {profile?.username || user?.email?.split('@')[0] || 'User'}
+                    </span>
                     <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
@@ -347,10 +509,8 @@ export default function Navigation() {
 
                   {userMenuOpen && (
                     <>
-                      {/* Invisible bridge to prevent menu from closing when moving mouse to dropdown */}
                       <div className="absolute right-0 top-full h-3 w-64" />
                       <div className="absolute right-0 mt-3 w-64 bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden z-50">
-                        {/* User Info Header */}
                         <div className="p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-b border-white/10">
                           <div className="flex items-center space-x-3">
                             <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center overflow-hidden">
@@ -361,11 +521,13 @@ export default function Navigation() {
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <span className="text-white font-bold text-lg">{profile?.username?.charAt(0).toUpperCase() || 'U'}</span>
+                                <span className="text-white font-bold text-lg">
+                                  {profile?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
+                                </span>
                               )}
                             </div>
                             <div>
-                              <p className="text-white font-semibold">{profile?.username}</p>
+                              <p className="text-white font-semibold">{profile?.username || user?.email?.split('@')[0] || 'User'}</p>
                               <p className="text-xs text-gray-400 truncate max-w-[150px]">{user?.email}</p>
                               <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ${
                                 profile?.is_admin ? 'bg-red-500/20 text-red-400' : profile?.role === 'vendor' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
@@ -376,7 +538,6 @@ export default function Navigation() {
                           </div>
                         </div>
 
-                        {/* Menu Items */}
                         <div className="p-2">
                           {!profile?.is_admin && (
                             <Link href={getDashboardUrl()} onClick={() => setUserMenuOpen(false)} className="flex items-center space-x-3 px-3 py-2.5 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
@@ -424,7 +585,6 @@ export default function Navigation() {
                           )}
                         </div>
 
-                        {/* Logout */}
                         <div className="p-2 border-t border-white/10">
                           <button onClick={handleLogout} className="flex items-center space-x-3 w-full px-3 py-2.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -440,7 +600,7 @@ export default function Navigation() {
               </>
             )}
 
-            {!user && (
+            {!authLoading && !user && (
               <div className="flex items-center space-x-2">
                 <Link href="/login" className="px-4 py-2 text-gray-300 hover:text-white font-medium transition-colors">
                   Sign In
@@ -449,6 +609,24 @@ export default function Navigation() {
                   Get Started
                 </Link>
               </div>
+            )}
+
+            {/* Loading state for auth - with retry option */}
+            {authLoading && (
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-white/10 rounded-full animate-pulse"></div>
+                <div className="hidden md:block w-20 h-4 bg-white/10 rounded animate-pulse"></div>
+              </div>
+            )}
+
+            {/* Error state - show retry button */}
+            {!authLoading && authError && !user && (
+              <button
+                onClick={retryAuth}
+                className="px-4 py-2 bg-orange-500/20 text-orange-400 rounded-lg text-sm font-medium hover:bg-orange-500/30 transition-colors border border-orange-500/30"
+              >
+                Retry Login
+              </button>
             )}
 
             {/* Mobile Menu Button */}

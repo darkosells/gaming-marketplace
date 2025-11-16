@@ -13,6 +13,7 @@ export default function CustomerDashboardPage() {
   const [myOrders, setMyOrders] = useState<any[]>([])
   const [verificationStatus, setVerificationStatus] = useState<any>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [error, setError] = useState<string | null>(null)
   const ordersPerPage = 5
   const router = useRouter()
   const supabase = createClient()
@@ -22,25 +23,107 @@ export default function CustomerDashboardPage() {
   }, [])
 
   const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-    setUser(user)
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    setProfile(profileData)
-    if (profileData?.role === 'vendor') { router.push('/dashboard'); return }
-    await fetchMyOrders(user.id)
-    await fetchVerificationStatus(user.id)
-    setLoading(false)
+    try {
+      // Add timeout for auth check to prevent infinite loading
+      const authPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth timeout')), 10000)
+      )
+      
+      const { data: { user }, error: userError } = await Promise.race([authPromise, timeoutPromise]) as any
+      
+      if (userError || !user) { 
+        router.push('/login')
+        return 
+      }
+      
+      setUser(user)
+      
+      // Fetch profile with timeout
+      const profilePromise = supabase.from('profiles').select('*').eq('id', user.id).single()
+      const { data: profileData, error: profileError } = await Promise.race([
+        profilePromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Profile timeout')), 10000))
+      ]) as any
+      
+      if (profileError) {
+        console.error('Profile fetch error:', profileError)
+        setError('Failed to load profile. Please try again.')
+        setLoading(false)
+        return
+      }
+      
+      setProfile(profileData)
+      
+      if (profileData?.role === 'vendor') { 
+        router.push('/dashboard')
+        return 
+      }
+      
+      // Fetch all data in parallel instead of sequentially - much faster!
+      const results = await Promise.allSettled([
+        fetchMyOrders(user.id),
+        fetchVerificationStatus(user.id)
+      ])
+      
+      // Check for any failures but don't block loading
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`Failed to fetch data ${index}:`, result.reason)
+        }
+      })
+      
+      setLoading(false)
+    } catch (error: any) {
+      console.error('Check user error:', error)
+      setLoading(false) // Always stop loading on error
+      
+      if (error.message?.includes('timeout')) {
+        setError('Connection timed out. Please refresh the page.')
+      } else {
+        router.push('/login')
+      }
+    }
   }
 
   const fetchMyOrders = async (userId: string) => {
-    const { data } = await supabase.from('orders').select('*, listing:listings(title, game, image_url, category)').eq('buyer_id', userId).order('created_at', { ascending: false })
-    setMyOrders(data || [])
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, listing:listings(title, game, image_url, category)')
+        .eq('buyer_id', userId)
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('Fetch orders error:', error)
+        return
+      }
+      
+      setMyOrders(data || [])
+    } catch (error) {
+      console.error('Error fetching orders:', error)
+    }
   }
 
   const fetchVerificationStatus = async (userId: string) => {
-    const { data } = await supabase.from('vendor_verifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single()
-    setVerificationStatus(data)
+    try {
+      const { data, error } = await supabase
+        .from('vendor_verifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      
+      // It's OK if there's no verification status - user just hasn't applied
+      if (error && error.code !== 'PGRST116') {
+        console.error('Fetch verification error:', error)
+      }
+      
+      setVerificationStatus(data)
+    } catch (error) {
+      console.error('Error fetching verification:', error)
+    }
   }
 
   // Pagination logic
@@ -52,6 +135,28 @@ export default function CustomerDashboardPage() {
   const goToPage = (page: number) => {
     setCurrentPage(page)
     window.scrollTo({ top: document.getElementById('orders-section')?.offsetTop || 0, behavior: 'smooth' })
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
+        <div className="fixed inset-0 z-0">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+        </div>
+        <div className="relative z-10 text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h1 className="text-3xl font-bold text-white mb-4">Something went wrong</h1>
+          <p className="text-gray-400 mb-6">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -67,6 +172,7 @@ export default function CustomerDashboardPage() {
             <div className="relative inline-block animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent"></div>
           </div>
           <p className="text-white mt-6 text-lg">Loading dashboard...</p>
+          <p className="text-gray-500 mt-2 text-sm">This should only take a moment</p>
         </div>
       </div>
     )

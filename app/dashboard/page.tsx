@@ -19,6 +19,7 @@ export default function VendorDashboardPage() {
   const [withdrawalAmount, setWithdrawalAmount] = useState('')
   const [withdrawalAddress, setWithdrawalAddress] = useState('')
   const [withdrawalProcessing, setWithdrawalProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -28,7 +29,13 @@ export default function VendorDashboardPage() {
 
   const checkUser = async () => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      // Add timeout for auth check to prevent infinite loading
+      const authPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth timeout')), 10000)
+      )
+      
+      const { data: { user }, error: userError } = await Promise.race([authPromise, timeoutPromise]) as any
       
       if (userError || !user) {
         router.push('/login')
@@ -37,15 +44,22 @@ export default function VendorDashboardPage() {
 
       setUser(user)
 
-      const { data: profileData, error: profileError } = await supabase
+      // Fetch profile with timeout
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single()
+      
+      const { data: profileData, error: profileError } = await Promise.race([
+        profilePromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Profile timeout')), 10000))
+      ]) as any
 
       if (profileError) {
         console.error('Profile fetch error:', profileError)
-        router.push('/login')
+        setError('Failed to load profile. Please try again.')
+        setLoading(false)
         return
       }
 
@@ -56,13 +70,30 @@ export default function VendorDashboardPage() {
         return
       }
 
-      await fetchMyListings(user.id)
-      await fetchMyOrders(user.id)
-      await fetchWithdrawals(user.id)
+      // Fetch all data in parallel instead of sequentially - much faster!
+      const results = await Promise.allSettled([
+        fetchMyListings(user.id),
+        fetchMyOrders(user.id),
+        fetchWithdrawals(user.id)
+      ])
+
+      // Check for any failures but don't block loading
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`Failed to fetch data ${index}:`, result.reason)
+        }
+      })
+      
       setLoading(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Check user error:', error)
-      router.push('/login')
+      setLoading(false) // Always stop loading on error
+      
+      if (error.message?.includes('timeout')) {
+        setError('Connection timed out. Please refresh the page.')
+      } else {
+        router.push('/login')
+      }
     }
   }
 
@@ -246,6 +277,28 @@ Proceed with withdrawal?`
     }
   }
 
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
+        <div className="fixed inset-0 z-0">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+        </div>
+        <div className="relative z-10 text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h1 className="text-3xl font-bold text-white mb-4">Something went wrong</h1>
+          <p className="text-gray-400 mb-6">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
@@ -259,6 +312,7 @@ Proceed with withdrawal?`
             <div className="relative inline-block animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent"></div>
           </div>
           <p className="text-white mt-6 text-lg">Loading dashboard...</p>
+          <p className="text-gray-500 mt-2 text-sm">This should only take a moment</p>
         </div>
       </div>
     )
