@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { sendWelcomeEmail, getSiteUrl } from '@/lib/email'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -42,7 +43,22 @@ export default function SignupPage() {
 
       if (profileError) throw profileError
 
-      alert('Account created! Redirecting to login...')
+      // Send welcome email (fire and forget - don't block on this)
+      sendWelcomeEmail({
+        username: username,
+        email: email,
+        site_url: getSiteUrl()
+      }).then(result => {
+        if (result.success) {
+          console.log('Welcome email sent successfully!')
+        } else {
+          console.error('Failed to send welcome email:', result.error)
+        }
+      }).catch(err => {
+        console.error('Error sending welcome email:', err)
+      })
+
+      alert('Account created! Check your email for a welcome message. Redirecting to login...')
       router.push('/login')
 
     } catch (error: any) {
@@ -84,7 +100,7 @@ export default function SignupPage() {
           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
             <span className="text-3xl">🎮</span>
           </div>
-          <span className="text-2xl font-bold text-white group-hover:text-purple-400 transition">GameVault</span>
+          <span className="text-2xl font-bold text-white group-hover:text-purple-400 transition">Nashflare</span>
         </Link>
 
         <div className="text-center mb-8">

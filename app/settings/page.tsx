@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import { sendPasswordChangedEmail, sendUsernameChangedEmail } from '@/lib/email'
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
@@ -256,7 +257,11 @@ export default function SettingsPage() {
     setSaving(true)
 
     try {
-      if (username !== profile.username) {
+      const oldUsername = profile.username
+      const usernameChanged = username !== oldUsername
+
+      if (usernameChanged) {
+        // Check if username is taken
         const { data: existingUser } = await supabase
           .from('profiles')
           .select('id')
@@ -279,6 +284,22 @@ export default function SettingsPage() {
       if (error) throw error
 
       setProfile({ ...profile, username })
+      
+      // Send username change notification email if username was changed
+      if (usernameChanged) {
+        try {
+          await sendUsernameChangedEmail({
+            userEmail: user.email,
+            oldUsername: oldUsername,
+            newUsername: username
+          })
+          console.log('Username change notification email sent')
+        } catch (emailError) {
+          console.error('Failed to send username change email:', emailError)
+          // Don't block the success - email is a nice-to-have
+        }
+      }
+      
       alert('✅ Profile updated successfully!')
     } catch (error: any) {
       console.error('Update profile error:', error)
@@ -320,6 +341,7 @@ export default function SettingsPage() {
     setSaving(true)
 
     try {
+      // Verify current password
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: currentPassword
@@ -331,13 +353,26 @@ export default function SettingsPage() {
         return
       }
 
+      // Update password
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       })
 
       if (error) throw error
 
-      setPasswordSuccess('Password changed successfully!')
+      // Send password change notification email
+      try {
+        await sendPasswordChangedEmail({
+          userEmail: user.email,
+          username: profile.username
+        })
+        console.log('Password change notification email sent')
+      } catch (emailError) {
+        console.error('Failed to send password change email:', emailError)
+        // Don't block the success - email is a nice-to-have
+      }
+
+      setPasswordSuccess('Password changed successfully! A confirmation email has been sent.')
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
@@ -635,7 +670,7 @@ export default function SettingsPage() {
                         <span>❌</span> {usernameError}
                       </p>
                     )}
-                    <p className="text-xs text-gray-500 mt-1">3-20 characters, letters, numbers, and underscores only</p>
+                    <p className="text-xs text-gray-500 mt-1">3-20 characters, letters, numbers, and underscores only. You'll receive an email confirmation when changed.</p>
                   </div>
 
                   {/* Account Type */}
@@ -1135,7 +1170,7 @@ export default function SettingsPage() {
         {/* Footer */}
         <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
           <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2024 GameVault. All rights reserved.</p>
+            <p>&copy; 2024 Nashflare. All rights reserved.</p>
           </div>
         </footer>
       </div>

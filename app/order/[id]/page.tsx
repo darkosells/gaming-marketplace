@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import { sendOrderEmails, sendDeliveredEmail, sendDisputeEmails, getSiteUrl } from '@/lib/email'
 
 interface Order {
   id: string
@@ -292,6 +293,33 @@ export default function OrderDetailPage() {
 
       if (error) throw error
 
+      // Send delivery notification email to buyer
+      if (order) {
+        const { data: buyerData } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', order.buyer_id)
+          .single()
+
+        if (buyerData?.email) {
+          sendDeliveredEmail({
+            id: order.id,
+            listing_title: order.listing.title,
+            buyer_email: buyerData.email,
+            seller_username: order.seller.username,
+            site_url: getSiteUrl()
+          }).then(result => {
+            if (result.success) {
+              console.log('Delivery notification email sent!')
+            } else {
+              console.error('Failed to send delivery email:', result.error)
+            }
+          }).catch(err => {
+            console.error('Error sending delivery email:', err)
+          })
+        }
+      }
+
       alert('Order marked as delivered! The buyer has 48 hours to confirm or dispute.')
       fetchOrder()
     } catch (error: any) {
@@ -354,6 +382,51 @@ export default function OrderDetailPage() {
 
       if (error) throw error
 
+      // Update order status to disputed
+      await supabase
+        .from('orders')
+        .update({ 
+          status: 'dispute_raised',
+          dispute_reason: disputeReason,
+          dispute_opened_at: new Date().toISOString()
+        })
+        .eq('id', params.id)
+
+      // Send dispute notification emails to both parties
+      if (order) {
+        const { data: buyerData } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', order.buyer_id)
+          .single()
+
+        const { data: sellerData } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', order.seller_id)
+          .single()
+
+        if (buyerData?.email && sellerData?.email) {
+          sendDisputeEmails({
+            id: order.id,
+            listing_title: order.listing.title,
+            buyer_email: buyerData.email,
+            seller_email: sellerData.email,
+            dispute_reason: disputeReason,
+            is_buyer_raising: isBuyer,
+            site_url: getSiteUrl()
+          }).then(result => {
+            if (result.success) {
+              console.log('Dispute notification emails sent!')
+            } else {
+              console.error('Failed to send dispute emails:', result.error)
+            }
+          }).catch(err => {
+            console.error('Error sending dispute emails:', err)
+          })
+        }
+      }
+
       alert('Dispute raised successfully! Our support team will review it shortly.')
       setShowDisputeForm(false)
       fetchOrder()
@@ -414,7 +487,44 @@ export default function OrderDetailPage() {
 
       if (error) throw error
 
-      alert('✅ Payment simulated!')
+      // Send email notifications
+      if (order) {
+        // Fetch buyer and seller emails from profiles
+        const { data: buyerData } = await supabase
+          .from('profiles')
+          .select('email, username')
+          .eq('id', order.buyer_id)
+          .single()
+
+        const { data: sellerData } = await supabase
+          .from('profiles')
+          .select('email, username')
+          .eq('id', order.seller_id)
+          .single()
+
+        if (buyerData?.email && sellerData?.email) {
+          const emailResult = await sendOrderEmails({
+            id: order.id,
+            listing_title: order.listing.title,
+            quantity: order.quantity,
+            total_amount: order.amount + (order.amount * 0.05), // Include service fee
+            seller_amount: order.amount * 0.95, // After 5% platform fee
+            buyer_email: buyerData.email,
+            seller_email: sellerData.email,
+            buyer_username: buyerData.username,
+            seller_username: sellerData.username,
+            site_url: getSiteUrl()
+          })
+
+          if (emailResult.success) {
+            console.log('Order notification emails sent!')
+          } else {
+            console.error('Failed to send emails:', emailResult.error)
+          }
+        }
+      }
+
+      alert('✅ Payment simulated! Email notifications sent.')
       setTimeout(() => {
         fetchOrder()
       }, 1000)
@@ -1155,7 +1265,7 @@ export default function OrderDetailPage() {
         {/* Footer */}
         <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
           <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2024 GameVault. All rights reserved.</p>
+            <p>&copy; 2024 Nashflare. All rights reserved.</p>
           </div>
         </footer>
       </div>
