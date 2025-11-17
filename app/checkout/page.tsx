@@ -30,7 +30,8 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [user, setUser] = useState<any>(null)
-  const [selectedPayment, setSelectedPayment] = useState('card')
+  const [selectedPayment, setSelectedPayment] = useState('test')
+  const [showComingSoon, setShowComingSoon] = useState(false)
   
   // Billing form state
   const [billingInfo, setBillingInfo] = useState({
@@ -97,10 +98,16 @@ export default function CheckoutPage() {
     }
   }
 
-  const handleCreateOrder = async () => {
+  const handlePlaceOrder = async () => {
     if (!cartItem || !user) return
 
-    // Basic validation
+    // For real payment methods, show coming soon message
+    if (selectedPayment === 'card' || selectedPayment === 'crypto') {
+      setShowComingSoon(true)
+      return
+    }
+
+    // Basic validation for test mode
     if (!billingInfo.firstName || !billingInfo.lastName || !billingInfo.email) {
       alert('Please fill in all required billing information')
       return
@@ -111,7 +118,7 @@ export default function CheckoutPage() {
     try {
       const totalPrice = cartItem.listing.price * cartItem.quantity
 
-      // Create the order
+      // Create the order (for test/simulation)
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -123,7 +130,6 @@ export default function CheckoutPage() {
           status: 'pending',
           payment_status: 'pending',
           payment_method: selectedPayment,
-          // Snapshot listing data
           listing_title: cartItem.listing.title,
           listing_game: cartItem.listing.game,
           listing_category: cartItem.listing.category,
@@ -209,17 +215,6 @@ export default function CheckoutPage() {
             </h1>
           </div>
 
-          {/* Test Mode Notice */}
-          <div className="mb-8 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
-            <p className="text-yellow-300 text-sm flex items-start gap-2">
-              <span className="text-lg">⚠️</span>
-              <span>
-                <span className="font-semibold">Test Mode:</span> This is a demo checkout. No real payment will be processed. 
-                After creating your order, you'll be redirected to the order page where you can simulate the payment.
-              </span>
-            </p>
-          </div>
-
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Left Column - Forms */}
             <div className="lg:col-span-2 space-y-6">
@@ -299,6 +294,7 @@ export default function CheckoutPage() {
                       <option value="DE">Germany</option>
                       <option value="FR">France</option>
                       <option value="AU">Australia</option>
+                      <option value="NL">Netherlands</option>
                       <option value="other">Other</option>
                     </select>
                   </div>
@@ -323,7 +319,40 @@ export default function CheckoutPage() {
                 </h2>
 
                 <div className="space-y-3">
-                  {/* Credit Card */}
+                  {/* Test/Simulation Mode */}
+                  <label className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
+                    selectedPayment === 'test' 
+                      ? 'bg-green-500/20 border-green-500/50' 
+                      : 'bg-slate-800/50 border-white/10 hover:border-green-500/30'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="test"
+                      checked={selectedPayment === 'test'}
+                      onChange={(e) => setSelectedPayment(e.target.value)}
+                      className="sr-only"
+                    />
+                    <div className={`w-5 h-5 rounded-full border-2 mr-4 flex items-center justify-center ${
+                      selectedPayment === 'test' ? 'border-green-500' : 'border-gray-500'
+                    }`}>
+                      {selectedPayment === 'test' && (
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white font-semibold flex items-center gap-2">
+                        Test Mode
+                        <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-bold rounded">DEV</span>
+                      </p>
+                      <p className="text-gray-400 text-sm">Simulate payment for testing purposes</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-2xl">🧪</span>
+                    </div>
+                  </label>
+
+                  {/* Credit/Debit Card (Coming Soon) */}
                   <label className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
                     selectedPayment === 'card' 
                       ? 'bg-purple-500/20 border-purple-500/50' 
@@ -345,7 +374,10 @@ export default function CheckoutPage() {
                       )}
                     </div>
                     <div className="flex-1">
-                      <p className="text-white font-semibold">Credit / Debit Card</p>
+                      <p className="text-white font-semibold flex items-center gap-2">
+                        Credit / Debit Card
+                        <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">COMING SOON</span>
+                      </p>
                       <p className="text-gray-400 text-sm">Visa, Mastercard, American Express</p>
                     </div>
                     <div className="flex gap-2">
@@ -353,37 +385,7 @@ export default function CheckoutPage() {
                     </div>
                   </label>
 
-                  {/* PayPal */}
-                  <label className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
-                    selectedPayment === 'paypal' 
-                      ? 'bg-purple-500/20 border-purple-500/50' 
-                      : 'bg-slate-800/50 border-white/10 hover:border-purple-500/30'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="paypal"
-                      checked={selectedPayment === 'paypal'}
-                      onChange={(e) => setSelectedPayment(e.target.value)}
-                      className="sr-only"
-                    />
-                    <div className={`w-5 h-5 rounded-full border-2 mr-4 flex items-center justify-center ${
-                      selectedPayment === 'paypal' ? 'border-purple-500' : 'border-gray-500'
-                    }`}>
-                      {selectedPayment === 'paypal' && (
-                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-white font-semibold">PayPal</p>
-                      <p className="text-gray-400 text-sm">Pay with your PayPal account</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <span className="text-2xl">🅿️</span>
-                    </div>
-                  </label>
-
-                  {/* Crypto */}
+                  {/* Cryptocurrency (Coming Soon) */}
                   <label className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
                     selectedPayment === 'crypto' 
                       ? 'bg-purple-500/20 border-purple-500/50' 
@@ -405,8 +407,11 @@ export default function CheckoutPage() {
                       )}
                     </div>
                     <div className="flex-1">
-                      <p className="text-white font-semibold">Cryptocurrency</p>
-                      <p className="text-gray-400 text-sm">Bitcoin, Ethereum, USDT</p>
+                      <p className="text-white font-semibold flex items-center gap-2">
+                        Cryptocurrency
+                        <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">COMING SOON</span>
+                      </p>
+                      <p className="text-gray-400 text-sm">Bitcoin, Ethereum, USDT via Coinbase Commerce</p>
                     </div>
                     <div className="flex gap-2">
                       <span className="text-2xl">₿</span>
@@ -414,41 +419,46 @@ export default function CheckoutPage() {
                   </label>
                 </div>
 
-                {/* Card Details (shown when card is selected) */}
+                {/* Info box based on selection */}
+                {selectedPayment === 'test' && (
+                  <div className="mt-6 p-4 bg-green-500/10 rounded-xl border border-green-500/30">
+                    <p className="text-green-300 text-sm flex items-start gap-2">
+                      <span className="text-lg">ℹ️</span>
+                      <span>
+                        <span className="font-semibold">Test Mode Active:</span> Your order will be created and you can simulate the payment on the order details page. 
+                        No real payment will be processed.
+                      </span>
+                    </p>
+                  </div>
+                )}
+
                 {selectedPayment === 'card' && (
-                  <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-white/10">
-                    <p className="text-gray-400 text-sm mb-4">Card details will be entered on the payment page</p>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-gray-400 text-sm mb-2">Card Number</label>
-                        <input
-                          type="text"
-                          placeholder="•••• •••• •••• ••••"
-                          disabled
-                          className="w-full px-4 py-3 rounded-lg bg-slate-900/50 border border-white/10 text-gray-500 cursor-not-allowed"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-gray-400 text-sm mb-2">Expiry</label>
-                          <input
-                            type="text"
-                            placeholder="MM/YY"
-                            disabled
-                            className="w-full px-4 py-3 rounded-lg bg-slate-900/50 border border-white/10 text-gray-500 cursor-not-allowed"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-gray-400 text-sm mb-2">CVC</label>
-                          <input
-                            type="text"
-                            placeholder="•••"
-                            disabled
-                            className="w-full px-4 py-3 rounded-lg bg-slate-900/50 border border-white/10 text-gray-500 cursor-not-allowed"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                  <div className="mt-6 p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
+                    <p className="text-yellow-300 text-sm flex items-start gap-2">
+                      <span className="text-lg">🚧</span>
+                      <span>
+                        <span className="font-semibold">Coming Soon:</span> Bank card payments are being integrated. 
+                        Want to be notified when this goes live? Email us at{' '}
+                        <a href="mailto:contact@nashflare.com" className="text-yellow-200 underline hover:text-white transition">
+                          contact@nashflare.com
+                        </a>
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                {selectedPayment === 'crypto' && (
+                  <div className="mt-6 p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
+                    <p className="text-yellow-300 text-sm flex items-start gap-2">
+                      <span className="text-lg">🚧</span>
+                      <span>
+                        <span className="font-semibold">Coming Soon:</span> Cryptocurrency payments via Coinbase Commerce are being integrated. 
+                        Want to be notified when this goes live? Email us at{' '}
+                        <a href="mailto:contact@nashflare.com" className="text-yellow-200 underline hover:text-white transition">
+                          contact@nashflare.com
+                        </a>
+                      </span>
+                    </p>
                   </div>
                 )}
               </div>
@@ -509,23 +519,37 @@ export default function CheckoutPage() {
 
                 {/* Place Order Button */}
                 <button
-                  onClick={handleCreateOrder}
-                  disabled={processing}
-                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 mb-4"
+                  onClick={handlePlaceOrder}
+                  disabled={processing || (selectedPayment !== 'test')}
+                  className={`w-full py-4 rounded-xl font-semibold transition-all duration-300 mb-4 ${
+                    selectedPayment === 'test'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg hover:shadow-green-500/50 hover:scale-105'
+                      : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/50 hover:scale-105'
+                  } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
                 >
                   {processing ? (
                     <span className="flex items-center justify-center gap-2">
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                       Creating Order...
                     </span>
+                  ) : selectedPayment === 'test' ? (
+                    'Create Test Order'
                   ) : (
-                    'Create Order'
+                    'Payment Coming Soon'
                   )}
                 </button>
 
-                <p className="text-center text-gray-500 text-xs mb-6">
-                  You'll complete payment on the next page
-                </p>
+                {selectedPayment === 'test' && (
+                  <p className="text-center text-gray-500 text-xs mb-6">
+                    You'll simulate payment on the order page
+                  </p>
+                )}
+
+                {selectedPayment !== 'test' && (
+                  <p className="text-center text-yellow-400 text-xs mb-6">
+                    Select "Test Mode" to create a test order
+                  </p>
+                )}
 
                 {/* Trust Badges */}
                 <div className="space-y-3 pt-4 border-t border-white/10">
@@ -554,10 +578,50 @@ export default function CheckoutPage() {
         {/* Footer */}
         <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
           <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2024 GameVault. All rights reserved.</p>
+            <p>&copy; 2024 Nashflare. All rights reserved.</p>
           </div>
         </footer>
       </div>
+
+      {/* Coming Soon Modal */}
+      {showComingSoon && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl max-w-md w-full border border-white/20 shadow-2xl p-8 text-center">
+            <div className="text-6xl mb-6">🚧</div>
+            <h3 className="text-2xl font-bold text-white mb-4">Payment Coming Soon!</h3>
+            <p className="text-gray-300 mb-6">
+              {selectedPayment === 'card' 
+                ? 'Bank card payments are currently being integrated with our payment provider.'
+                : 'Cryptocurrency payments via Coinbase Commerce are currently being integrated.'
+              }
+            </p>
+            <p className="text-gray-400 text-sm mb-6">
+              Want to be notified when this payment method goes live?<br />
+              Email us at{' '}
+              <a href="mailto:contact@nashflare.com" className="text-purple-400 hover:text-purple-300 underline">
+                contact@nashflare.com
+              </a>
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setShowComingSoon(false)
+                  setSelectedPayment('test')
+                }}
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-green-500/50 transition-all"
+              >
+                Use Test Mode Instead
+              </button>
+              <button
+                onClick={() => setShowComingSoon(false)}
+                className="w-full bg-white/10 text-white py-3 rounded-xl font-semibold hover:bg-white/20 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
