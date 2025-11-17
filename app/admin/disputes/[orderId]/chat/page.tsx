@@ -1,5 +1,3 @@
-// app/admin/disputes/[orderId]/chat/page.tsx - ADMIN DISPUTE CHAT (3-WAY)
-
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
@@ -50,7 +48,6 @@ export default function AdminDisputeChat() {
     if (conversation) {
       fetchMessages()
       
-      // Set up real-time subscription
       const channel = supabase
         .channel(`admin-dispute-chat-${conversation.id}`)
         .on(
@@ -111,7 +108,6 @@ export default function AdminDisputeChat() {
 
   const fetchOrder = async () => {
     try {
-      // First fetch the order with snapshot data (no joins needed for listing)
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
@@ -123,14 +119,12 @@ export default function AdminDisputeChat() {
         .single()
 
       if (orderError) {
-        console.error('Order fetch error:', orderError.message, orderError.details, orderError.hint)
+        console.error('Order fetch error:', orderError.message)
         throw orderError
       }
       
-      console.log('Order fetched:', orderData)
       setOrder(orderData)
 
-      // Get conversation for this order (use limit 1 to handle any duplicates)
       const { data: convData, error: convError } = await supabase
         .from('conversations')
         .select('*')
@@ -140,14 +134,12 @@ export default function AdminDisputeChat() {
         .single()
 
       if (convError) {
-        console.error('Conversation fetch error:', convError.message, convError.details, convError.hint)
-        // No conversation exists - this shouldn't happen for a dispute
-        alert('No conversation found for this order. The order may not have an associated chat yet.')
+        console.error('Conversation fetch error:', convError.message)
+        alert('No conversation found for this order.')
         router.push('/admin')
         return
       }
       
-      console.log('Conversation fetched:', convData)
       setConversation(convData)
     } catch (error: any) {
       console.error('Error fetching order:', error.message || error)
@@ -181,8 +173,6 @@ export default function AdminDisputeChat() {
     setSending(true)
 
     try {
-      // Determine receiver - admin messages go to both buyer and seller
-      // We'll send to buyer by default, but the conversation shows all messages
       const receiverId = order.buyer_id
 
       const { error } = await supabase
@@ -199,7 +189,6 @@ export default function AdminDisputeChat() {
 
       if (error) throw error
 
-      // Update conversation last message
       await supabase
         .from('conversations')
         .update({
@@ -226,10 +215,8 @@ export default function AdminDisputeChat() {
 
   const shouldShowDateSeparator = (currentMsg: Message, previousMsg: Message | null) => {
     if (!previousMsg) return true
-    
     const currentDate = new Date(currentMsg.created_at)
     const previousDate = new Date(previousMsg.created_at)
-    
     return currentDate.toDateString() !== previousDate.toDateString()
   }
 
@@ -254,7 +241,7 @@ export default function AdminDisputeChat() {
 
   if (loading || !order || !conversation) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-4"></div>
           <p className="text-white text-xl">Loading dispute chat...</p>
@@ -264,13 +251,35 @@ export default function AdminDisputeChat() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Simplified Cosmic Background */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+        <div className="absolute top-1/4 left-1/4 w-[700px] h-[700px] bg-purple-600/15 rounded-full blur-[150px]"></div>
+        <div className="absolute bottom-1/3 right-1/4 w-[600px] h-[600px] bg-pink-600/10 rounded-full blur-[140px]"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600/8 rounded-full blur-[160px]"></div>
+        
+        {/* Static Stars */}
+        <div className="absolute top-[5%] left-[10%] w-1 h-1 bg-white/60 rounded-full"></div>
+        <div className="absolute top-[15%] left-[25%] w-1 h-1 bg-white/50 rounded-full"></div>
+        <div className="absolute top-[8%] left-[60%] w-1 h-1 bg-white/70 rounded-full"></div>
+        <div className="absolute top-[25%] left-[85%] w-1 h-1 bg-white/40 rounded-full"></div>
+        <div className="absolute top-[40%] left-[5%] w-1 h-1 bg-white/55 rounded-full"></div>
+        <div className="absolute top-[55%] left-[92%] w-1 h-1 bg-white/65 rounded-full"></div>
+        <div className="absolute top-[70%] left-[15%] w-1 h-1 bg-white/45 rounded-full"></div>
+        <div className="absolute top-[85%] left-[78%] w-1 h-1 bg-white/50 rounded-full"></div>
+        
+        {/* Vignette */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
+      </div>
+
       {/* Navigation */}
-      <nav className="bg-black/30 backdrop-blur-lg border-b border-white/10">
+      <nav className="bg-black/30 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50 relative">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <Link href="/admin" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center shadow-lg shadow-red-500/20">
                 <span className="text-2xl">👑</span>
               </div>
               <span className="text-xl font-bold text-white">Admin - Dispute Chat</span>
@@ -286,7 +295,7 @@ export default function AdminDisputeChat() {
         </div>
       </nav>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 relative z-10">
         <div className="max-w-5xl mx-auto">
           {/* Admin Participation Notice */}
           <div className="bg-orange-500/20 border border-orange-500/50 rounded-xl p-4 mb-6">
@@ -303,7 +312,7 @@ export default function AdminDisputeChat() {
           <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <h2 className="text-2xl font-bold text-white">Dispute Details</h2>
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30">
                 ACTIVE DISPUTE
               </span>
             </div>
@@ -342,7 +351,7 @@ export default function AdminDisputeChat() {
           </div>
 
           {/* Chat */}
-          <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl overflow-hidden">
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
             <div className="p-4 border-b border-white/10 bg-white/5">
               <h3 className="text-white font-bold">3-Way Dispute Chat</h3>
               <p className="text-sm text-gray-400">Admin, Buyer, and Seller</p>
@@ -410,8 +419,8 @@ export default function AdminDisputeChat() {
                         {!isSender && (
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${
                             isAdmin ? 'bg-gradient-to-br from-red-500 to-orange-500' :
-                            isBuyer ? 'bg-gradient-to-br from-blue-500/30 to-cyan-500/30' :
-                            'bg-gradient-to-br from-green-500/30 to-emerald-500/30'
+                            isBuyer ? 'bg-gradient-to-br from-blue-500/30 to-cyan-500/30 border border-blue-500/30' :
+                            'bg-gradient-to-br from-green-500/30 to-emerald-500/30 border border-green-500/30'
                           }`}>
                             <span className="text-white font-semibold text-xs">
                               {message.sender.username.charAt(0).toUpperCase()}
@@ -455,7 +464,7 @@ export default function AdminDisputeChat() {
                         
                         {/* Avatar for self */}
                         {isSender && (
-                          <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                          <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-lg shadow-red-500/20">
                             <span className="text-white font-semibold text-xs">
                               👑
                             </span>
@@ -480,7 +489,7 @@ export default function AdminDisputeChat() {
                     <button
                       type="button"
                       onClick={() => setShowEmojiPicker(false)}
-                      className="text-gray-400 hover:text-white"
+                      className="text-gray-400 hover:text-white transition"
                     >
                       ✕
                     </button>
@@ -514,12 +523,12 @@ export default function AdminDisputeChat() {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type your message as admin..."
-                  className="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                 />
                 <button
                   type="submit"
                   disabled={!newMessage.trim() || sending}
-                  className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-orange-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Send as Admin
                 </button>

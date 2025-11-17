@@ -53,16 +53,96 @@ export default function AdminDashboard() {
   
   useEffect(() => {
     if (profile?.is_admin) {
-      if (activeTab === 'users') fetchUsers()
-      if (activeTab === 'listings') fetchListings()
-      if (activeTab === 'orders') fetchOrders()
-      if (activeTab === 'messages') fetchConversations()
-      if (activeTab === 'disputes') fetchDisputes()
-      if (activeTab === 'reviews') fetchReviews()
-      if (activeTab === 'withdrawals') fetchWithdrawals()
-      if (activeTab === 'verifications') fetchVerifications()
+      // Fetch ALL data immediately on load for accurate stats
+      fetchUsers()
+      fetchListings()
+      fetchOrders()
+      fetchConversations()
+      fetchDisputes()
+      fetchReviews()
+      fetchWithdrawals()
+      fetchVerifications()
+      
+      // Set up real-time subscriptions for live updates
+      const ordersChannel = supabase
+        .channel('admin-orders-realtime')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+          fetchOrders()
+          fetchDisputes()
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
+          fetchOrders()
+          fetchDisputes()
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, () => {
+          fetchOrders()
+          fetchDisputes()
+        })
+        .subscribe()
+      
+      const disputesChannel = supabase
+        .channel('admin-disputes-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'disputes' }, () => {
+          fetchDisputes()
+          fetchOrders()
+        })
+        .subscribe()
+      
+      const usersChannel = supabase
+        .channel('admin-users-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+          fetchUsers()
+          fetchVerifications()
+        })
+        .subscribe()
+      
+      const listingsChannel = supabase
+        .channel('admin-listings-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => {
+          fetchListings()
+        })
+        .subscribe()
+      
+      const withdrawalsChannel = supabase
+        .channel('admin-withdrawals-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, () => {
+          fetchWithdrawals()
+        })
+        .subscribe()
+      
+      const verificationsChannel = supabase
+        .channel('admin-verifications-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'verifications' }, () => {
+          fetchVerifications()
+        })
+        .subscribe()
+      
+      const reviewsChannel = supabase
+        .channel('admin-reviews-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => {
+          fetchReviews()
+        })
+        .subscribe()
+      
+      const conversationsChannel = supabase
+        .channel('admin-conversations-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
+          fetchConversations()
+        })
+        .subscribe()
+      
+      return () => {
+        supabase.removeChannel(ordersChannel)
+        supabase.removeChannel(disputesChannel)
+        supabase.removeChannel(usersChannel)
+        supabase.removeChannel(listingsChannel)
+        supabase.removeChannel(withdrawalsChannel)
+        supabase.removeChannel(verificationsChannel)
+        supabase.removeChannel(reviewsChannel)
+        supabase.removeChannel(conversationsChannel)
+      }
     }
-  }, [activeTab, profile])
+  }, [profile])
   
   useEffect(() => { setCurrentPage(1) }, [activeTab, disputeSubTab, verificationSubTab])
 
@@ -209,15 +289,7 @@ export default function AdminDashboard() {
         updateData.resubmission_instructions = null
       }
 
-      console.log('Updating verification with:', updateData)
-      
-      const { error } = await supabase
-        .from('vendor_verifications')
-        .update(updateData)
-        .eq('id', selectedVerification.id)
-      
-      console.log('Update error:', error)
-      
+      const { error } = await supabase.from('vendor_verifications').update(updateData).eq('id', selectedVerification.id)
       if (error) throw error
 
       alert(rejectionType === 'permanent' ? '❌ Permanently rejected.' : '🔄 Resubmission requested.')
@@ -245,52 +317,848 @@ export default function AdminDashboard() {
   const confirmRejectWithdrawal = async () => { if (rejectionReason.trim().length < 5) { alert('Provide reason (min 5 chars)'); return }; await supabase.from('withdrawals').update({ status: 'rejected', processed_by: user.id, processed_at: new Date().toISOString(), admin_notes: rejectionReason.trim() }).eq('id', rejectingWithdrawalId); alert('❌ Rejected.'); setShowRejectModal(false); setRejectingWithdrawalId(null); fetchWithdrawals() }
   const handleBanUser = async (id: string, banned: boolean) => { const reason = banned ? null : prompt('Ban reason:'); if (!banned && !reason) return; await supabase.from('profiles').update({ is_banned: !banned, banned_at: !banned ? new Date().toISOString() : null, ban_reason: reason }).eq('id', id); alert(`User ${banned ? 'unbanned' : 'banned'}`); fetchUsers() }
   const handleDeleteListing = async (id: string) => { if (!confirm('Delete listing?')) return; await supabase.from('listings').delete().eq('id', id); alert('Listing deleted'); fetchListings() }
-  const handleResolveDispute = async (id: string, res: 'buyer' | 'seller') => { const isBuyer = res === 'buyer'; if (!confirm(isBuyer ? 'Refund buyer?' : 'Complete for seller?')) return; const notes = prompt('Resolution notes (optional):'); const newStatus = isBuyer ? 'refunded' : 'completed'; await supabase.from('orders').update({ status: newStatus, completed_at: new Date().toISOString(), resolved_by: user.id, resolution_notes: notes || null }).eq('id', id); alert(`✅ Resolved for ${res}`); fetchDisputes(); fetchOrders() }
+  const handleResolveDispute = async (id: string, res: 'buyer' | 'seller') => { 
+    const isBuyer = res === 'buyer'
+    if (!confirm(isBuyer ? 'Refund buyer?' : 'Complete for seller?')) return
+    const notes = prompt('Resolution notes (optional):')
+    const newStatus = isBuyer ? 'refunded' : 'completed'
+    
+    try {
+      // Get the order details first
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('*, buyer:profiles!orders_buyer_id_fkey(username), seller:profiles!orders_seller_id_fkey(username)')
+        .eq('id', id)
+        .single()
+      
+      if (orderError) throw orderError
+      
+      // Update the order status
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ 
+          status: newStatus, 
+          completed_at: new Date().toISOString(), 
+          resolved_by: user.id, 
+          resolution_notes: notes || null 
+        })
+        .eq('id', id)
+      
+      if (updateError) throw updateError
+      
+      // Get the conversation for this order
+      const { data: convData } = await supabase
+        .from('conversations')
+        .select('id, listing_id')
+        .eq('order_id', id)
+        .single()
+      
+      // If conversation exists, create system notification
+      if (convData) {
+        const resolutionMessage = isBuyer
+          ? `✅ DISPUTE RESOLVED - REFUNDED ✅
+
+This dispute has been resolved in favor of the BUYER.
+
+The order has been refunded and the buyer will receive their funds back.
+
+Resolved by: ${profile.username}${notes ? `
+
+Admin Notes: ${notes}` : ''}
+
+This conversation is now closed.`
+          : `✅ DISPUTE RESOLVED - COMPLETED ✅
+
+This dispute has been resolved in favor of the SELLER.
+
+The order has been marked as completed and the seller will receive their payment.
+
+Resolved by: ${profile.username}${notes ? `
+
+Admin Notes: ${notes}` : ''}
+
+This conversation is now closed.`
+
+        await supabase.from('messages').insert({
+          conversation_id: convData.id,
+          sender_id: user.id,
+          receiver_id: orderData.buyer_id,
+          listing_id: convData.listing_id,
+          order_id: id,
+          content: resolutionMessage,
+          message_type: 'system'
+        })
+
+        // Update conversation last message
+        await supabase.from('conversations').update({
+          last_message: isBuyer ? '✅ Dispute resolved - Buyer refunded' : '✅ Dispute resolved - Order completed',
+          last_message_at: new Date().toISOString()
+        }).eq('id', convData.id)
+      }
+      
+      alert(`✅ Resolved for ${res}`)
+      fetchDisputes()
+      fetchOrders()
+    } catch (error) {
+      console.error('Error resolving dispute:', error)
+      alert('Failed to resolve dispute')
+    }
+  }
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/') }
   const getCurrentPageData = (d: any[]) => d.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
   const getTotalPages = (d: any[]) => Math.ceil(d.length / ITEMS_PER_PAGE)
-  const renderPagination = (d: any[]) => { const t = getTotalPages(d); if (t <= 1) return null; return (<div className="flex items-center justify-center gap-2 mt-6"><button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 bg-white/10 text-white rounded-lg disabled:opacity-50">← Prev</button>{Array.from({ length: Math.min(5, t) }, (_, i) => i + 1).map(p => (<button key={p} onClick={() => setCurrentPage(p)} className={`w-10 h-10 rounded-lg font-semibold ${currentPage === p ? 'bg-purple-500 text-white' : 'bg-white/10 text-white'}`}>{p}</button>))}<button onClick={() => setCurrentPage(p => Math.min(t, p + 1))} disabled={currentPage === t} className="px-4 py-2 bg-white/10 text-white rounded-lg disabled:opacity-50">Next →</button></div>) }
+  
+  const renderPagination = (d: any[]) => { 
+    const t = getTotalPages(d)
+    if (t <= 1) return null
+    return (
+      <div className="flex items-center justify-center gap-2 mt-6">
+        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg disabled:opacity-50 transition">← Prev</button>
+        {Array.from({ length: Math.min(5, t) }, (_, i) => i + 1).map(p => (
+          <button key={p} onClick={() => setCurrentPage(p)} className={`w-10 h-10 rounded-lg font-semibold transition ${currentPage === p ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}>{p}</button>
+        ))}
+        <button onClick={() => setCurrentPage(p => Math.min(t, p + 1))} disabled={currentPage === t} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg disabled:opacity-50 transition">Next →</button>
+      </div>
+    )
+  }
 
-  if (loading) return <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center"><div className="text-white text-xl">Loading...</div></div>
+  if (loading) return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <div className="text-white text-xl">Loading Admin Panel...</div>
+      </div>
+    </div>
+  )
 
   const stats = { totalUsers: users.length, totalListings: listings.length, totalOrders: orders.length, activeDisputes: activeDisputes.length, solvedDisputes: solvedDisputes.length, pendingVerifications: pendingVerifications.length }
   const currentUsers = getCurrentPageData(users), currentListings = getCurrentPageData(listings), currentOrders = getCurrentPageData(orders), currentConversations = getCurrentPageData(conversations), currentActiveDisputes = getCurrentPageData(activeDisputes), currentSolvedDisputes = getCurrentPageData(solvedDisputes), currentPendingVerifications = getCurrentPageData(pendingVerifications), currentPastVerifications = getCurrentPageData(pastVerifications)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <nav className="bg-black/30 backdrop-blur-lg border-b border-white/10"><div className="container mx-auto px-4"><div className="flex items-center justify-between h-16"><Link href="/" className="flex items-center space-x-2"><div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center"><span className="text-2xl">👑</span></div><span className="text-xl font-bold text-white">Admin Panel</span></Link><div className="flex items-center space-x-4"><Link href="/" className="text-gray-300 hover:text-white">Main Site</Link><button onClick={handleLogout} className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-white">{profile?.username} (Logout)</button></div></div></div></nav>
-      <div className="container mx-auto px-4 py-12"><div className="max-w-7xl mx-auto">
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 mb-8"><h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1><p className="text-gray-300">Manage users, listings, orders, disputes, and verifications</p></div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-          <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">👥</div><div className="text-gray-400 text-xs">Users</div><div className="text-2xl font-bold text-white">{stats.totalUsers}</div></div>
-          <div className="bg-gradient-to-br from-green-500/20 to-blue-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">📦</div><div className="text-gray-400 text-xs">Listings</div><div className="text-2xl font-bold text-white">{stats.totalListings}</div></div>
-          <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">💰</div><div className="text-gray-400 text-xs">Orders</div><div className="text-2xl font-bold text-white">{stats.totalOrders}</div></div>
-          <div className="bg-gradient-to-br from-red-500/20 to-orange-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">⚠️</div><div className="text-gray-400 text-xs">Active Disputes</div><div className="text-2xl font-bold text-white">{stats.activeDisputes}</div></div>
-          <div className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">✅</div><div className="text-gray-400 text-xs">Solved Disputes</div><div className="text-2xl font-bold text-white">{stats.solvedDisputes}</div></div>
-          <div className="bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-white/10 rounded-xl p-4"><div className="text-2xl mb-1">🔍</div><div className="text-gray-400 text-xs">Pending Verifications</div><div className="text-2xl font-bold text-white">{stats.pendingVerifications}</div></div>
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Simplified Cosmic Background - Lighter on animations */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+        
+        {/* Static Nebula Clouds - No animation */}
+        <div className="absolute top-1/4 left-1/4 w-[700px] h-[700px] bg-purple-600/15 rounded-full blur-[150px]"></div>
+        <div className="absolute bottom-1/3 right-1/4 w-[600px] h-[600px] bg-pink-600/10 rounded-full blur-[140px]"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600/8 rounded-full blur-[160px]"></div>
+        
+        {/* Static Stars - No animations */}
+        <div className="absolute top-[5%] left-[10%] w-1 h-1 bg-white/60 rounded-full"></div>
+        <div className="absolute top-[15%] left-[25%] w-1 h-1 bg-white/50 rounded-full"></div>
+        <div className="absolute top-[8%] left-[60%] w-1 h-1 bg-white/70 rounded-full"></div>
+        <div className="absolute top-[25%] left-[85%] w-1 h-1 bg-white/40 rounded-full"></div>
+        <div className="absolute top-[40%] left-[5%] w-1 h-1 bg-white/55 rounded-full"></div>
+        <div className="absolute top-[55%] left-[92%] w-1 h-1 bg-white/65 rounded-full"></div>
+        <div className="absolute top-[70%] left-[15%] w-1 h-1 bg-white/45 rounded-full"></div>
+        <div className="absolute top-[85%] left-[78%] w-1 h-1 bg-white/50 rounded-full"></div>
+        <div className="absolute top-[12%] left-[45%] w-1 h-1 bg-white/60 rounded-full"></div>
+        <div className="absolute top-[62%] left-[35%] w-1 h-1 bg-white/55 rounded-full"></div>
+        <div className="absolute top-[30%] left-[75%] w-1.5 h-1.5 bg-purple-200/40 rounded-full"></div>
+        <div className="absolute top-[50%] left-[8%] w-1.5 h-1.5 bg-pink-200/40 rounded-full"></div>
+        <div className="absolute top-[75%] left-[60%] w-1.5 h-1.5 bg-cyan-200/40 rounded-full"></div>
+        
+        {/* Vignette */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
+      </div>
+      
+      {/* Navigation */}
+      <nav className="bg-black/30 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50 relative">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            <Link href="/" className="flex items-center space-x-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center shadow-lg shadow-red-500/20">
+                <span className="text-2xl">👑</span>
+              </div>
+              <span className="text-xl font-bold text-white">Admin Panel</span>
+            </Link>
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="text-gray-300 hover:text-white transition">Main Site</Link>
+              <button onClick={handleLogout} className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-white transition border border-white/10">
+                {profile?.username} (Logout)
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2 mb-6">{['users', 'listings', 'orders', 'messages', 'disputes', 'verifications', 'reviews', 'withdrawals'].map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-3 rounded-lg font-semibold transition relative ${activeTab === tab ? tab === 'verifications' ? 'bg-cyan-500 text-white' : tab === 'reviews' ? 'bg-yellow-500 text-white' : tab === 'withdrawals' ? 'bg-green-500 text-white' : 'bg-purple-500 text-white' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}>{tab.charAt(0).toUpperCase() + tab.slice(1)} {tab === 'verifications' && '🔍'}{tab === 'reviews' && '⭐'}{tab === 'withdrawals' && '💸'}{tab === 'verifications' && stats.pendingVerifications > 0 && (<span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{stats.pendingVerifications}</span>)}</button>))}</div>
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6">
-          {activeTab === 'users' && (<div><h2 className="text-2xl font-bold text-white mb-4">All Users ({users.length})</h2><div className="space-y-4">{currentUsers.map((u) => (<div key={u.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between"><div><div className="flex items-center gap-2"><span className="text-white font-semibold">{u.username}</span><span className={`px-2 py-1 rounded text-xs ${u.is_admin ? 'bg-red-500/20 text-red-400' : u.role === 'vendor' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'}`}>{u.is_admin ? 'ADMIN' : u.role}</span>{u.is_banned && <span className="px-2 py-1 rounded text-xs bg-red-500/20 text-red-400">BANNED</span>}</div><p className="text-sm text-gray-400">Rating: {u.rating} | Sales: {u.total_sales} | Joined: {new Date(u.created_at).toLocaleDateString()}</p></div>{!u.is_admin && <button onClick={() => handleBanUser(u.id, u.is_banned)} className={`px-4 py-2 rounded-lg text-sm font-semibold ${u.is_banned ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{u.is_banned ? 'Unban' : 'Ban'}</button>}</div>))}</div>{renderPagination(users)}</div>)}
-          {activeTab === 'listings' && (<div><h2 className="text-2xl font-bold text-white mb-4">All Listings ({listings.length})</h2><div className="space-y-4">{currentListings.map((l) => (<div key={l.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between"><div><div className="flex items-center gap-2"><span className="text-white font-semibold">{l.title}</span><span className={`px-2 py-1 rounded text-xs ${l.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>{l.status}</span></div><p className="text-sm text-gray-400">{l.game} | ${l.price} | Stock: {l.stock} | Seller: {l.profiles?.username}</p></div><div className="flex gap-2"><Link href={`/listing/${l.id}`} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm">View</Link><button onClick={() => handleDeleteListing(l.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm">Delete</button></div></div>))}</div>{renderPagination(listings)}</div>)}
-          {activeTab === 'orders' && (<div><h2 className="text-2xl font-bold text-white mb-4">All Orders ({orders.length})</h2><div className="space-y-4">{currentOrders.map((o) => (<div key={o.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between"><div><div className="flex items-center gap-2"><span className="text-white font-semibold">{o.listing_title || 'Unknown'}</span><span className={`px-2 py-1 rounded text-xs ${o.status === 'completed' ? 'bg-green-500/20 text-green-400' : o.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{o.status}</span></div><p className="text-sm text-gray-400">${o.amount} | Buyer: {o.buyer?.username} | Seller: {o.seller?.username}</p></div><Link href={`/order/${o.id}`} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm">View</Link></div>))}</div>{renderPagination(orders)}</div>)}
-          {activeTab === 'messages' && (<div><h2 className="text-2xl font-bold text-white mb-4">Conversations ({conversations.length})</h2><div className="space-y-4">{currentConversations.map((c) => (<div key={c.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4"><div className="w-16 h-16 rounded-lg bg-purple-500/20 flex items-center justify-center text-2xl">🎮</div><div className="flex-1"><h3 className="text-white font-semibold">{c.listing?.title || 'Unknown'}</h3><p className="text-sm text-gray-400">{c.buyer?.username} ↔ {c.seller?.username}</p><p className="text-xs text-gray-500 truncate">{c.last_message}</p></div><Link href={`/admin/messages/${c.id}`} className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm">View Chat</Link></div>))}</div>{renderPagination(conversations)}</div>)}
-          {activeTab === 'disputes' && (<div><div className="flex gap-3 mb-6"><button onClick={() => setDisputeSubTab('active')} className={`px-4 py-2 rounded-lg font-semibold ${disputeSubTab === 'active' ? 'bg-red-500 text-white' : 'bg-white/5 text-gray-300'}`}>Active ({activeDisputes.length})</button><button onClick={() => setDisputeSubTab('solved')} className={`px-4 py-2 rounded-lg font-semibold ${disputeSubTab === 'solved' ? 'bg-green-500 text-white' : 'bg-white/5 text-gray-300'}`}>Solved ({solvedDisputes.length})</button></div>{disputeSubTab === 'active' && (<div className="space-y-4">{currentActiveDisputes.map((o) => (<div key={o.id} className="bg-red-500/10 border border-red-500/30 rounded-xl p-4"><div className="flex items-start justify-between"><div><h3 className="text-white font-bold">{o.listing_title || 'Unknown'}</h3><p className="text-gray-300 text-sm">Buyer: {o.buyer?.username} | Seller: {o.seller?.username}</p><p className="text-gray-400 text-sm">${o.amount}</p></div><div className="flex flex-col gap-2"><button onClick={() => handleResolveDispute(o.id, 'buyer')} className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm">💰 Refund Buyer</button><button onClick={() => handleResolveDispute(o.id, 'seller')} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm">✓ Complete</button></div></div></div>))}{renderPagination(activeDisputes)}</div>)}{disputeSubTab === 'solved' && (<div className="space-y-4">{currentSolvedDisputes.map((o) => (<div key={o.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex justify-between"><div><h3 className="text-white font-bold">{o.listing_title}</h3><p className="text-gray-400 text-sm">{o.buyer?.username} ↔ {o.seller?.username} | ${o.amount}</p><span className={`inline-block mt-2 px-2 py-1 rounded text-xs ${o.status === 'refunded' ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400'}`}>{o.status}</span></div></div>))}{renderPagination(solvedDisputes)}</div>)}</div>)}
-          {activeTab === 'verifications' && (<div><div className="flex gap-3 mb-6"><button onClick={() => setVerificationSubTab('pending')} className={`px-4 py-2 rounded-lg font-semibold ${verificationSubTab === 'pending' ? 'bg-cyan-500 text-white' : 'bg-white/5 text-gray-300'}`}>Pending ({pendingVerifications.length})</button><button onClick={() => setVerificationSubTab('past')} className={`px-4 py-2 rounded-lg font-semibold ${verificationSubTab === 'past' ? 'bg-gray-500 text-white' : 'bg-white/5 text-gray-300'}`}>Past ({pastVerifications.length})</button></div>{verificationSubTab === 'pending' && (<div className="space-y-4">{pendingVerifications.length === 0 ? <div className="text-center py-12"><div className="text-5xl mb-4">✅</div><p className="text-gray-400">No pending verifications</p></div> : currentPendingVerifications.map((v) => (<div key={v.id} className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 flex items-start gap-4"><div className="w-16 h-16 rounded-lg bg-cyan-500/20 flex items-center justify-center text-3xl">🔍</div><div className="flex-1"><div className="flex items-center gap-2 mb-2"><h3 className="text-white font-bold">{v.full_name}</h3><span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-400">PENDING</span>{v.resubmission_count > 0 && <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-400">🔄 RESUBMISSION #{v.resubmission_count}</span>}</div><p className="text-gray-300 text-sm">Username: {v.user?.username}</p><p className="text-gray-400 text-sm">{v.city}, {v.country} | ID: {v.id_type?.replace('_', ' ')}</p>{v.resubmission_count > 0 && <p className="text-orange-400 text-xs mt-1">⚠️ This is a resubmission - check previous rejection</p>}<p className="text-gray-500 text-xs mt-2">Submitted: {new Date(v.created_at).toLocaleString()}</p></div><button onClick={() => handleViewVerificationDetails(v)} className="px-6 py-3 bg-cyan-500/20 text-cyan-400 rounded-lg font-semibold">🔎 Review</button></div>))}{renderPagination(pendingVerifications)}</div>)}{verificationSubTab === 'past' && (<div className="space-y-4">{pastVerifications.length === 0 ? <div className="text-center py-12"><div className="text-5xl mb-4">📋</div><p className="text-gray-400">No past verifications</p></div> : currentPastVerifications.map((v) => (<div key={v.id} className={`border rounded-xl p-4 ${v.status === 'approved' ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}><div className="flex items-center gap-2 mb-2"><span className="text-3xl">{v.status === 'approved' ? '✅' : '❌'}</span><h3 className="text-white font-bold">{v.full_name}</h3><span className={`px-2 py-1 rounded text-xs ${v.status === 'approved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{v.status?.toUpperCase()}</span>{v.rejection_type === 'resubmission_required' && <span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-400">CAN RESUBMIT</span>}</div><p className="text-gray-300 text-sm">Username: {v.user?.username} | Reviewed by: {v.reviewer?.username}</p><p className="text-gray-400 text-sm">{v.city}, {v.country}</p>{v.rejection_reason && <div className="bg-red-500/10 border border-red-500/20 rounded p-2 mt-2"><p className="text-red-400 text-xs">Reason: {v.rejection_reason}</p></div>}<p className="text-gray-500 text-xs mt-2">Reviewed: {v.reviewed_at ? new Date(v.reviewed_at).toLocaleString() : 'N/A'}</p></div>))}{renderPagination(pastVerifications)}</div>)}</div>)}
-          {activeTab === 'reviews' && (<div><h2 className="text-2xl font-bold text-white mb-4">Reviews ({reviews.length})</h2><div className="space-y-4">{getCurrentPageData(reviews).map((r) => (<div key={r.id} className="bg-white/5 border border-white/10 rounded-xl p-4"><div className="flex items-center gap-2 mb-2"><div className="flex">{[1,2,3,4,5].map(s => <span key={s} className={s <= r.rating ? 'text-yellow-400' : 'text-gray-600'}>★</span>)}</div><span className="text-white">{r.rating}/5</span>{r.edited_by_admin && <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-400">Edited</span>}</div><p className="text-gray-300 text-sm">Buyer: {r.buyer?.username} → Seller: {r.seller?.username}</p>{editingReview?.id === r.id ? (<div className="mt-2"><textarea value={editedComment} onChange={(e) => setEditedComment(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded p-2 text-white text-sm" rows={3} /><div className="flex gap-2 mt-2"><button onClick={handleSaveReview} className="px-4 py-2 bg-green-500/20 text-green-400 rounded text-sm">Save</button><button onClick={() => setEditingReview(null)} className="px-4 py-2 bg-gray-500/20 text-gray-400 rounded text-sm">Cancel</button></div></div>) : (<div className="mt-2"><p className="text-white text-sm bg-white/5 p-2 rounded">{r.comment || 'No comment'}</p><div className="flex gap-2 mt-2"><button onClick={() => handleEditReview(r)} className="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded text-sm">✏️ Edit</button><button onClick={() => handleDeleteReview(r.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded text-sm">🗑️ Delete</button></div></div>)}</div>))}</div>{renderPagination(reviews)}</div>)}
-          {activeTab === 'withdrawals' && (<div><div className="flex gap-3 mb-6"><button onClick={() => setDisputeSubTab('active')} className={`px-4 py-2 rounded-lg font-semibold ${disputeSubTab === 'active' ? 'bg-yellow-500/30 text-yellow-400' : 'bg-white/5 text-gray-400'}`}>Pending ({pendingWithdrawals.length})</button><button onClick={() => setDisputeSubTab('solved')} className={`px-4 py-2 rounded-lg font-semibold ${disputeSubTab === 'solved' ? 'bg-green-500/30 text-green-400' : 'bg-white/5 text-gray-400'}`}>Processed ({processedWithdrawals.length})</button></div>{disputeSubTab === 'active' && (<div className="space-y-4">{pendingWithdrawals.map((w) => (<div key={w.id} className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex justify-between"><div><h3 className="text-white font-bold">{w.method === 'bitcoin' ? '₿ Bitcoin' : '💳 Skrill'}</h3><p className="text-gray-300">User: {w.user?.username}</p><p className="text-white font-bold text-xl">${parseFloat(w.amount).toFixed(2)} → ${parseFloat(w.net_amount).toFixed(2)}</p><p className="text-gray-400 text-xs break-all">{w.address}</p></div><div className="flex flex-col gap-2"><button onClick={() => handleApproveWithdrawal(w.id)} className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm">✅ Approve</button><button onClick={() => handleRejectWithdrawal(w.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm">❌ Reject</button></div></div>))}</div>)}{disputeSubTab === 'solved' && (<div className="space-y-4">{processedWithdrawals.map((w) => (<div key={w.id} className={`border rounded-xl p-4 ${w.status === 'completed' ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}><h3 className="text-white font-bold">{w.method === 'bitcoin' ? '₿' : '💳'} {w.user?.username}</h3><p className="text-white">${parseFloat(w.net_amount).toFixed(2)}</p><span className={`inline-block px-2 py-1 rounded text-xs ${w.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{w.status?.toUpperCase()}</span></div>))}</div>)}</div>)}
+      </nav>
+
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-12 relative z-10">
+        <div className="max-w-7xl mx-auto">
+          
+          {/* Header Card */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 mb-8 shadow-2xl">
+            <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
+            <p className="text-gray-300">Manage users, listings, orders, disputes, and verifications</p>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            <div className="bg-white/10 backdrop-blur-lg border border-white/10 rounded-xl p-4 hover:bg-white/15 transition">
+              <div className="text-2xl mb-1">👥</div>
+              <div className="text-gray-400 text-xs">Total Users</div>
+              <div className="text-2xl font-bold text-white">{stats.totalUsers}</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-lg border border-white/10 rounded-xl p-4 hover:bg-white/15 transition">
+              <div className="text-2xl mb-1">📦</div>
+              <div className="text-gray-400 text-xs">Total Listings</div>
+              <div className="text-2xl font-bold text-white">{stats.totalListings}</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-lg border border-white/10 rounded-xl p-4 hover:bg-white/15 transition">
+              <div className="text-2xl mb-1">💰</div>
+              <div className="text-gray-400 text-xs">Total Orders</div>
+              <div className="text-2xl font-bold text-white">{stats.totalOrders}</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-lg border border-white/10 rounded-xl p-4 hover:bg-white/15 transition">
+              <div className="text-2xl mb-1">⚠️</div>
+              <div className="text-gray-400 text-xs">Active Disputes</div>
+              <div className="text-2xl font-bold text-white">{stats.activeDisputes}</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-lg border border-white/10 rounded-xl p-4 hover:bg-white/15 transition">
+              <div className="text-2xl mb-1">✅</div>
+              <div className="text-gray-400 text-xs">Solved Disputes</div>
+              <div className="text-2xl font-bold text-white">{stats.solvedDisputes}</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-lg border border-white/10 rounded-xl p-4 hover:bg-white/15 transition">
+              <div className="text-2xl mb-1">🔍</div>
+              <div className="text-gray-400 text-xs">Pending Verifications</div>
+              <div className="text-2xl font-bold text-white">{stats.pendingVerifications}</div>
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {[
+              { id: 'users', label: 'Users', icon: '👥' },
+              { id: 'listings', label: 'Listings', icon: '📦' },
+              { id: 'orders', label: 'Orders', icon: '💰' },
+              { id: 'messages', label: 'Messages', icon: '💬' },
+              { id: 'disputes', label: 'Disputes', icon: '⚠️' },
+              { id: 'verifications', label: 'Verifications', icon: '🔍', badge: stats.pendingVerifications > 0 ? stats.pendingVerifications : undefined },
+              { id: 'reviews', label: 'Reviews', icon: '⭐' },
+              { id: 'withdrawals', label: 'Withdrawals', icon: '💸' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-6 py-3 rounded-lg font-semibold transition relative ${
+                  activeTab === tab.id
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+                    : 'bg-white/10 text-gray-300 hover:bg-white/20 border border-white/10'
+                }`}
+              >
+                <span className="mr-2">{tab.icon}</span>
+                {tab.label}
+                {tab.badge && tab.badge > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Content Area */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-2xl">
+            
+            {/* Users Tab */}
+            {activeTab === 'users' && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-6">All Users ({users.length})</h2>
+                <div className="space-y-4">
+                  {currentUsers.map((u) => (
+                    <div key={u.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between hover:bg-white/10 transition">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-white font-semibold">{u.username}</span>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${u.is_admin ? 'bg-red-500/20 text-red-400 border border-red-500/30' : u.role === 'vendor' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
+                            {u.is_admin ? 'ADMIN' : u.role}
+                          </span>
+                          {u.is_banned && <span className="px-2 py-1 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/30">BANNED</span>}
+                        </div>
+                        <p className="text-sm text-gray-400">Rating: {u.rating} ⭐ | Sales: {u.total_sales} | Joined: {new Date(u.created_at).toLocaleDateString()}</p>
+                      </div>
+                      {!u.is_admin && (
+                        <button onClick={() => handleBanUser(u.id, u.is_banned)} className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${u.is_banned ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'}`}>
+                          {u.is_banned ? '✓ Unban' : '🚫 Ban'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {renderPagination(users)}
+              </div>
+            )}
+
+            {/* Listings Tab */}
+            {activeTab === 'listings' && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-6">All Listings ({listings.length})</h2>
+                <div className="space-y-4">
+                  {currentListings.map((l) => (
+                    <div key={l.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between hover:bg-white/10 transition">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-white font-semibold">{l.title}</span>
+                          <span className={`px-2 py-1 rounded text-xs ${l.status === 'active' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
+                            {l.status}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400">{l.game} | ${l.price} | Stock: {l.stock} | Seller: {l.profiles?.username}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Link href={`/listing/${l.id}`} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30 transition border border-blue-500/30">View</Link>
+                        <button onClick={() => handleDeleteListing(l.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition border border-red-500/30">Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {renderPagination(listings)}
+              </div>
+            )}
+
+            {/* Orders Tab */}
+            {activeTab === 'orders' && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-6">All Orders ({orders.length})</h2>
+                <div className="space-y-4">
+                  {currentOrders.map((o) => (
+                    <div key={o.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between hover:bg-white/10 transition">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-white font-semibold">{o.listing_title || 'Unknown'}</span>
+                          <span className={`px-2 py-1 rounded text-xs ${o.status === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : o.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'}`}>
+                            {o.status}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-400">${o.amount} | Buyer: {o.buyer?.username} | Seller: {o.seller?.username}</p>
+                      </div>
+                      <Link href={`/order/${o.id}`} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30 transition border border-blue-500/30">View</Link>
+                    </div>
+                  ))}
+                </div>
+                {renderPagination(orders)}
+              </div>
+            )}
+
+            {/* Messages Tab */}
+            {activeTab === 'messages' && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-6">Conversations ({conversations.length})</h2>
+                <div className="space-y-4">
+                  {currentConversations.map((c) => (
+                    <div key={c.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4 hover:bg-white/10 transition">
+                      <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-purple-500/30 to-pink-500/30 flex items-center justify-center text-2xl border border-white/10">🎮</div>
+                      <div className="flex-1">
+                        <h3 className="text-white font-semibold">{c.listing?.title || 'Unknown'}</h3>
+                        <p className="text-sm text-gray-400">{c.buyer?.username} ↔ {c.seller?.username}</p>
+                        <p className="text-xs text-gray-500 truncate mt-1">{c.last_message}</p>
+                      </div>
+                      <Link href={`/admin/messages/${c.id}`} className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg text-sm hover:bg-purple-500/30 transition border border-purple-500/30">View Chat</Link>
+                    </div>
+                  ))}
+                </div>
+                {renderPagination(conversations)}
+              </div>
+            )}
+
+            {/* Disputes Tab - ENHANCED */}
+            {activeTab === 'disputes' && (
+              <div>
+                <div className="flex gap-3 mb-6">
+                  <button onClick={() => setDisputeSubTab('active')} className={`px-4 py-2 rounded-lg font-semibold transition ${disputeSubTab === 'active' ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'}`}>
+                    Active ({activeDisputes.length})
+                  </button>
+                  <button onClick={() => setDisputeSubTab('solved')} className={`px-4 py-2 rounded-lg font-semibold transition ${disputeSubTab === 'solved' ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'}`}>
+                    Solved ({solvedDisputes.length})
+                  </button>
+                </div>
+                
+                {disputeSubTab === 'active' && (
+                  <div className="space-y-4">
+                    {currentActiveDisputes.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="text-5xl mb-4">✅</div>
+                        <p className="text-gray-400">No active disputes</p>
+                      </div>
+                    ) : currentActiveDisputes.map((o) => (
+                      <div key={o.id} className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className="text-white font-bold text-lg">{o.listing_title || 'Unknown Listing'}</h3>
+                              <span className="px-2 py-1 rounded text-xs bg-red-500/30 text-red-300 border border-red-500/40">DISPUTE</span>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                              <div>
+                                <p className="text-xs text-gray-400">Order ID</p>
+                                <p className="text-white font-mono text-sm">{o.id.slice(0, 8)}...</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-400">Buyer</p>
+                                <p className="text-blue-400 font-semibold">{o.buyer?.username}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-400">Seller</p>
+                                <p className="text-green-400 font-semibold">{o.seller?.username}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-400">Amount</p>
+                                <p className="text-white font-bold">${o.amount}</p>
+                              </div>
+                            </div>
+                            {o.dispute_reason && (
+                              <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-3">
+                                <p className="text-xs text-red-400 font-semibold mb-1">Dispute Reason:</p>
+                                <p className="text-white text-sm">{o.dispute_reason}</p>
+                              </div>
+                            )}
+                            <p className="text-xs text-gray-500">
+                              Opened: {o.dispute_opened_at ? new Date(o.dispute_opened_at).toLocaleString() : 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Admin Actions */}
+                        <div className="border-t border-white/10 pt-4">
+                          <p className="text-xs text-gray-400 mb-3 font-semibold">ADMIN ACTIONS</p>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <Link 
+                              href={`/admin/disputes/${o.id}/chat`}
+                              className="flex items-center justify-center gap-2 px-4 py-3 bg-orange-500/20 text-orange-400 rounded-lg text-sm hover:bg-orange-500/30 transition border border-orange-500/30 font-semibold"
+                            >
+                              💬 Open Dispute Chat
+                            </Link>
+                            <button 
+                              onClick={() => handleResolveDispute(o.id, 'buyer')} 
+                              className="flex items-center justify-center gap-2 px-4 py-3 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30 transition border border-green-500/30 font-semibold"
+                            >
+                              💰 Refund Buyer
+                            </button>
+                            <button 
+                              onClick={() => handleResolveDispute(o.id, 'seller')} 
+                              className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30 transition border border-blue-500/30 font-semibold"
+                            >
+                              ✓ Complete for Seller
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {renderPagination(activeDisputes)}
+                  </div>
+                )}
+                
+                {disputeSubTab === 'solved' && (
+                  <div className="space-y-4">
+                    {currentSolvedDisputes.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="text-5xl mb-4">📋</div>
+                        <p className="text-gray-400">No solved disputes yet</p>
+                      </div>
+                    ) : currentSolvedDisputes.map((o) => (
+                      <div key={o.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex justify-between hover:bg-white/10 transition">
+                        <div>
+                          <h3 className="text-white font-bold">{o.listing_title}</h3>
+                          <p className="text-gray-400 text-sm">{o.buyer?.username} ↔ {o.seller?.username} | ${o.amount}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className={`px-2 py-1 rounded text-xs ${o.status === 'refunded' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-green-500/20 text-green-400 border border-green-500/30'}`}>{o.status}</span>
+                            {o.resolution_notes && (
+                              <span className="text-xs text-gray-500">Notes: {o.resolution_notes.slice(0, 50)}...</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Resolved: {o.completed_at ? new Date(o.completed_at).toLocaleString() : 'N/A'}
+                          </p>
+                        </div>
+                        <Link 
+                          href={`/admin/disputes/${o.id}/chat`}
+                          className="px-4 py-2 bg-gray-500/20 text-gray-400 rounded-lg text-sm hover:bg-gray-500/30 transition border border-gray-500/30 h-fit"
+                        >
+                          View Chat
+                        </Link>
+                      </div>
+                    ))}
+                    {renderPagination(solvedDisputes)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Verifications Tab */}
+            {activeTab === 'verifications' && (
+              <div>
+                <div className="flex gap-3 mb-6">
+                  <button onClick={() => setVerificationSubTab('pending')} className={`px-4 py-2 rounded-lg font-semibold transition ${verificationSubTab === 'pending' ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'}`}>
+                    Pending ({pendingVerifications.length})
+                  </button>
+                  <button onClick={() => setVerificationSubTab('past')} className={`px-4 py-2 rounded-lg font-semibold transition ${verificationSubTab === 'past' ? 'bg-gradient-to-r from-gray-500 to-slate-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'}`}>
+                    Past ({pastVerifications.length})
+                  </button>
+                </div>
+                
+                {verificationSubTab === 'pending' && (
+                  <div className="space-y-4">
+                    {pendingVerifications.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="text-5xl mb-4">✅</div>
+                        <p className="text-gray-400">No pending verifications</p>
+                      </div>
+                    ) : currentPendingVerifications.map((v) => (
+                      <div key={v.id} className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 flex items-start gap-4">
+                        <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-cyan-500/30 to-blue-500/30 flex items-center justify-center text-3xl border border-white/10">🔍</div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-white font-bold">{v.full_name}</h3>
+                            <span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">PENDING</span>
+                            {v.resubmission_count > 0 && <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">🔄 RESUBMISSION #{v.resubmission_count}</span>}
+                          </div>
+                          <p className="text-gray-300 text-sm">Username: {v.user?.username}</p>
+                          <p className="text-gray-400 text-sm">{v.city}, {v.country} | ID: {v.id_type?.replace('_', ' ')}</p>
+                          {v.resubmission_count > 0 && <p className="text-orange-400 text-xs mt-1">⚠️ This is a resubmission - check previous rejection</p>}
+                          <p className="text-gray-500 text-xs mt-2">Submitted: {new Date(v.created_at).toLocaleString()}</p>
+                        </div>
+                        <button onClick={() => handleViewVerificationDetails(v)} className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg font-semibold hover:shadow-lg hover:shadow-cyan-500/30 transition">🔎 Review</button>
+                      </div>
+                    ))}
+                    {renderPagination(pendingVerifications)}
+                  </div>
+                )}
+                
+                {verificationSubTab === 'past' && (
+                  <div className="space-y-4">
+                    {pastVerifications.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="text-5xl mb-4">📋</div>
+                        <p className="text-gray-400">No past verifications</p>
+                      </div>
+                    ) : currentPastVerifications.map((v) => (
+                      <div key={v.id} className={`border rounded-xl p-4 ${v.status === 'approved' ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-3xl">{v.status === 'approved' ? '✅' : '❌'}</span>
+                          <h3 className="text-white font-bold">{v.full_name}</h3>
+                          <span className={`px-2 py-1 rounded text-xs ${v.status === 'approved' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>{v.status?.toUpperCase()}</span>
+                          {v.rejection_type === 'resubmission_required' && <span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">CAN RESUBMIT</span>}
+                        </div>
+                        <p className="text-gray-300 text-sm">Username: {v.user?.username} | Reviewed by: {v.reviewer?.username}</p>
+                        <p className="text-gray-400 text-sm">{v.city}, {v.country}</p>
+                        {v.rejection_reason && <div className="bg-red-500/10 border border-red-500/20 rounded p-2 mt-2"><p className="text-red-400 text-xs">Reason: {v.rejection_reason}</p></div>}
+                        <p className="text-gray-500 text-xs mt-2">Reviewed: {v.reviewed_at ? new Date(v.reviewed_at).toLocaleString() : 'N/A'}</p>
+                      </div>
+                    ))}
+                    {renderPagination(pastVerifications)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Reviews Tab */}
+            {activeTab === 'reviews' && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-6">Reviews ({reviews.length})</h2>
+                <div className="space-y-4">
+                  {getCurrentPageData(reviews).map((r) => (
+                    <div key={r.id} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex">{[1,2,3,4,5].map(s => <span key={s} className={s <= r.rating ? 'text-yellow-400' : 'text-gray-600'}>★</span>)}</div>
+                        <span className="text-white">{r.rating}/5</span>
+                        {r.edited_by_admin && <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30">Edited by Admin</span>}
+                      </div>
+                      <p className="text-gray-300 text-sm">Buyer: {r.buyer?.username} → Seller: {r.seller?.username}</p>
+                      {editingReview?.id === r.id ? (
+                        <div className="mt-2">
+                          <textarea value={editedComment} onChange={(e) => setEditedComment(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white text-sm placeholder-gray-500 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" rows={3} />
+                          <div className="flex gap-2 mt-2">
+                            <button onClick={handleSaveReview} className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30 transition border border-green-500/30">Save</button>
+                            <button onClick={() => setEditingReview(null)} className="px-4 py-2 bg-gray-500/20 text-gray-400 rounded-lg text-sm hover:bg-gray-500/30 transition border border-gray-500/30">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2">
+                          <p className="text-white text-sm bg-white/5 p-3 rounded-lg border border-white/10">{r.comment || 'No comment'}</p>
+                          <div className="flex gap-2 mt-2">
+                            <button onClick={() => handleEditReview(r)} className="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-lg text-sm hover:bg-yellow-500/30 transition border border-yellow-500/30">✏️ Edit</button>
+                            <button onClick={() => handleDeleteReview(r.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition border border-red-500/30">🗑️ Delete</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {renderPagination(reviews)}
+              </div>
+            )}
+
+            {/* Withdrawals Tab */}
+            {activeTab === 'withdrawals' && (
+              <div>
+                <div className="flex gap-3 mb-6">
+                  <button onClick={() => setDisputeSubTab('active')} className={`px-4 py-2 rounded-lg font-semibold transition ${disputeSubTab === 'active' ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-white/10'}`}>
+                    Pending ({pendingWithdrawals.length})
+                  </button>
+                  <button onClick={() => setDisputeSubTab('solved')} className={`px-4 py-2 rounded-lg font-semibold transition ${disputeSubTab === 'solved' ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-white/10'}`}>
+                    Processed ({processedWithdrawals.length})
+                  </button>
+                </div>
+                
+                {disputeSubTab === 'active' && (
+                  <div className="space-y-4">
+                    {pendingWithdrawals.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="text-5xl mb-4">✅</div>
+                        <p className="text-gray-400">No pending withdrawals</p>
+                      </div>
+                    ) : pendingWithdrawals.map((w) => (
+                      <div key={w.id} className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex justify-between">
+                        <div>
+                          <h3 className="text-white font-bold">{w.method === 'bitcoin' ? '₿ Bitcoin' : '💳 Skrill'}</h3>
+                          <p className="text-gray-300">User: {w.user?.username}</p>
+                          <p className="text-white font-bold text-xl">${parseFloat(w.amount).toFixed(2)} → ${parseFloat(w.net_amount).toFixed(2)}</p>
+                          <p className="text-gray-400 text-xs break-all mt-1">{w.address}</p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <button onClick={() => handleApproveWithdrawal(w.id)} className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30 transition border border-green-500/30">✅ Approve</button>
+                          <button onClick={() => handleRejectWithdrawal(w.id)} className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition border border-red-500/30">❌ Reject</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {disputeSubTab === 'solved' && (
+                  <div className="space-y-4">
+                    {processedWithdrawals.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="text-5xl mb-4">📋</div>
+                        <p className="text-gray-400">No processed withdrawals</p>
+                      </div>
+                    ) : processedWithdrawals.map((w) => (
+                      <div key={w.id} className={`border rounded-xl p-4 ${w.status === 'completed' ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                        <h3 className="text-white font-bold">{w.method === 'bitcoin' ? '₿' : '💳'} {w.user?.username}</h3>
+                        <p className="text-white">${parseFloat(w.net_amount).toFixed(2)}</p>
+                        <span className={`inline-block mt-2 px-2 py-1 rounded text-xs ${w.status === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>{w.status?.toUpperCase()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div></div>
+      </div>
 
-      {showAgreementModal && selectedVerification && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"><div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-lg w-full"><div className="text-center mb-6"><div className="text-5xl mb-4">⚠️</div><h2 className="text-2xl font-bold text-white mb-2">Sensitive Document Access</h2><p className="text-gray-300">Viewing documents for <strong className="text-white">{selectedVerification.user?.username}</strong></p></div><div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6 text-sm text-gray-300"><p>• Access will be logged</p><p>• One-time view only</p><p>• Documents deleted after decision</p><p>• Do not screenshot or share</p></div><div className="flex items-start gap-3 mb-6"><input type="checkbox" checked={agreementAccepted} onChange={(e) => setAgreementAccepted(e.target.checked)} className="w-5 h-5 mt-0.5" /><label className="text-white text-sm">I agree to handle this information responsibly.</label></div><div className="flex gap-3"><button onClick={handleAcceptAgreement} disabled={!agreementAccepted} className="flex-1 bg-red-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50">View Documents</button><button onClick={() => { setShowAgreementModal(false); setSelectedVerification(null); setAgreementAccepted(false) }} className="flex-1 bg-white/10 text-white py-3 rounded-lg">Cancel</button></div></div></div>)}
+      {/* Modals - Same as before but optimized */}
+      {showAgreementModal && selectedVerification && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-lg w-full">
+            <div className="text-center mb-6">
+              <div className="text-5xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold text-white mb-2">Sensitive Document Access</h2>
+              <p className="text-gray-300">Viewing documents for <strong className="text-white">{selectedVerification.user?.username}</strong></p>
+            </div>
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6 text-sm text-gray-300">
+              <p>• Access will be logged</p>
+              <p>• One-time view only</p>
+              <p>• Documents deleted after decision</p>
+              <p>• Do not screenshot or share</p>
+            </div>
+            <div className="flex items-start gap-3 mb-6">
+              <input type="checkbox" checked={agreementAccepted} onChange={(e) => setAgreementAccepted(e.target.checked)} className="w-5 h-5 mt-0.5 rounded" />
+              <label className="text-white text-sm">I agree to handle this information responsibly.</label>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={handleAcceptAgreement} disabled={!agreementAccepted} className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 transition">View Documents</button>
+              <button onClick={() => { setShowAgreementModal(false); setSelectedVerification(null); setAgreementAccepted(false) }} className="flex-1 bg-white/10 text-white py-3 rounded-lg hover:bg-white/20 transition border border-white/10">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {showVerificationDetailsModal && selectedVerification && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto"><div className="bg-gradient-to-br from-slate-900 to-purple-900 border border-white/20 rounded-2xl p-8 max-w-4xl w-full my-8"><div className="flex justify-between mb-6"><h2 className="text-2xl font-bold text-white">Verification Review</h2><button onClick={() => { setShowVerificationDetailsModal(false); setSelectedVerification(null) }} className="text-gray-400 hover:text-white text-2xl">✕</button></div><div className="grid md:grid-cols-2 gap-6"><div className="bg-white/5 border border-white/10 rounded-xl p-4"><h3 className="text-lg font-semibold text-white mb-4">Personal Info</h3><p className="text-gray-400 text-xs">Name</p><p className="text-white mb-2">{selectedVerification.full_name}</p><p className="text-gray-400 text-xs">DOB</p><p className="text-white mb-2">{new Date(selectedVerification.date_of_birth).toLocaleDateString()}</p><p className="text-gray-400 text-xs">Phone</p><p className="text-white mb-2">{selectedVerification.phone_number}</p><p className="text-gray-400 text-xs">Username</p><p className="text-purple-400 font-semibold">{selectedVerification.user?.username}</p></div><div className="bg-white/5 border border-white/10 rounded-xl p-4"><h3 className="text-lg font-semibold text-white mb-4">Address</h3><p className="text-white mb-2">{selectedVerification.street_address}</p><p className="text-white mb-2">{selectedVerification.city}, {selectedVerification.state_province}</p><p className="text-white">{selectedVerification.postal_code}, {selectedVerification.country}</p></div>{!selectedVerification.documents_cleared && selectedVerification.id_front_url && (<div className="bg-white/5 border border-white/10 rounded-xl p-4 md:col-span-2"><h3 className="text-lg font-semibold text-white mb-4">ID Documents <span className="text-xs text-red-400">(One-time view)</span></h3><p className="text-gray-400 text-xs mb-2">Type: {selectedVerification.id_type?.replace('_', ' ')}</p><div className="grid md:grid-cols-2 gap-4"><div><p className="text-xs text-gray-400 mb-2">Front</p><img src={selectedVerification.id_front_url} alt="ID Front" className="w-full rounded-lg" /></div>{selectedVerification.id_back_url && <div><p className="text-xs text-gray-400 mb-2">Back</p><img src={selectedVerification.id_back_url} alt="ID Back" className="w-full rounded-lg" /></div>}</div></div>)}{selectedVerification.documents_cleared && <div className="bg-gray-500/10 border border-gray-500/30 rounded-xl p-4 md:col-span-2 text-center"><span className="text-3xl">🔒</span><p className="text-gray-400 mt-2">Documents permanently deleted</p></div>}{selectedVerification.has_previous_experience && (<div className="bg-white/5 border border-white/10 rounded-xl p-4 md:col-span-2"><h3 className="text-lg font-semibold text-white mb-4">Vendor Experience</h3>{selectedVerification.platform_names && <p className="text-white mb-2">Platforms: {selectedVerification.platform_names}</p>}{selectedVerification.platform_usernames && <p className="text-white mb-2">Usernames: {selectedVerification.platform_usernames}</p>}{selectedVerification.experience_description && <p className="text-white">{selectedVerification.experience_description}</p>}</div>)}</div>{selectedVerification.status === 'pending' && (<div className="flex gap-4 mt-8"><button onClick={() => setVerificationDecisionModal('approve')} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-lg font-semibold text-lg">✅ Approve</button><button onClick={() => setVerificationDecisionModal('reject')} className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 rounded-lg font-semibold text-lg">❌ Reject</button></div>)}</div></div>)}
+      {showVerificationDetailsModal && selectedVerification && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-gradient-to-br from-slate-900 to-purple-900 border border-white/20 rounded-2xl p-8 max-w-4xl w-full my-8">
+            <div className="flex justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Verification Review</h2>
+              <button onClick={() => { setShowVerificationDetailsModal(false); setSelectedVerification(null) }} className="text-gray-400 hover:text-white text-2xl transition">✕</button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-white mb-4">Personal Info</h3>
+                <p className="text-gray-400 text-xs">Name</p>
+                <p className="text-white mb-2">{selectedVerification.full_name}</p>
+                <p className="text-gray-400 text-xs">DOB</p>
+                <p className="text-white mb-2">{new Date(selectedVerification.date_of_birth).toLocaleDateString()}</p>
+                <p className="text-gray-400 text-xs">Phone</p>
+                <p className="text-white mb-2">{selectedVerification.phone_number}</p>
+                <p className="text-gray-400 text-xs">Username</p>
+                <p className="text-purple-400 font-semibold">{selectedVerification.user?.username}</p>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-white mb-4">Address</h3>
+                <p className="text-white mb-2">{selectedVerification.street_address}</p>
+                <p className="text-white mb-2">{selectedVerification.city}, {selectedVerification.state_province}</p>
+                <p className="text-white">{selectedVerification.postal_code}, {selectedVerification.country}</p>
+              </div>
+              {!selectedVerification.documents_cleared && selectedVerification.id_front_url && (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 md:col-span-2">
+                  <h3 className="text-lg font-semibold text-white mb-4">ID Documents <span className="text-xs text-red-400">(One-time view)</span></h3>
+                  <p className="text-gray-400 text-xs mb-2">Type: {selectedVerification.id_type?.replace('_', ' ')}</p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-400 mb-2">Front</p>
+                      <img src={selectedVerification.id_front_url} alt="ID Front" className="w-full rounded-lg" />
+                    </div>
+                    {selectedVerification.id_back_url && (
+                      <div>
+                        <p className="text-xs text-gray-400 mb-2">Back</p>
+                        <img src={selectedVerification.id_back_url} alt="ID Back" className="w-full rounded-lg" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selectedVerification.documents_cleared && (
+                <div className="bg-gray-500/10 border border-gray-500/30 rounded-xl p-4 md:col-span-2 text-center">
+                  <span className="text-3xl">🔒</span>
+                  <p className="text-gray-400 mt-2">Documents permanently deleted</p>
+                </div>
+              )}
+              {selectedVerification.has_previous_experience && (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4 md:col-span-2">
+                  <h3 className="text-lg font-semibold text-white mb-4">Vendor Experience</h3>
+                  {selectedVerification.platform_names && <p className="text-white mb-2">Platforms: {selectedVerification.platform_names}</p>}
+                  {selectedVerification.platform_usernames && <p className="text-white mb-2">Usernames: {selectedVerification.platform_usernames}</p>}
+                  {selectedVerification.experience_description && <p className="text-white">{selectedVerification.experience_description}</p>}
+                </div>
+              )}
+            </div>
+            {selectedVerification.status === 'pending' && (
+              <div className="flex gap-4 mt-8">
+                <button onClick={() => setVerificationDecisionModal('approve')} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-lg font-semibold text-lg hover:shadow-lg hover:shadow-green-500/30 transition">✅ Approve</button>
+                <button onClick={() => setVerificationDecisionModal('reject')} className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 rounded-lg font-semibold text-lg hover:shadow-lg hover:shadow-red-500/30 transition">❌ Reject</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-      {verificationDecisionModal && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto"><div className={`border-2 rounded-2xl p-8 max-w-2xl w-full my-8 ${verificationDecisionModal === 'approve' ? 'bg-gradient-to-br from-slate-900 to-green-900 border-green-500/50' : 'bg-gradient-to-br from-slate-900 to-red-900 border-red-500/50'}`}><h2 className="text-2xl font-bold text-white mb-2">{verificationDecisionModal === 'approve' ? '✅ Approve Vendor' : '❌ Reject Application'}</h2><p className="text-gray-300 mb-6">{verificationDecisionModal === 'approve' ? 'User will become a vendor and can start selling.' : 'Choose rejection type below.'}</p>{verificationDecisionModal === 'reject' && (<><div className="mb-6"><label className="block text-white font-semibold mb-3">Rejection Type</label><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><button onClick={() => setRejectionType('resubmission_required')} className={`p-4 rounded-lg border-2 text-left transition ${rejectionType === 'resubmission_required' ? 'border-yellow-500 bg-yellow-500/20' : 'border-white/20 bg-white/5 hover:bg-white/10'}`}><div className="text-2xl mb-2">🔄</div><div className="text-white font-semibold">Request Resubmission</div><div className="text-gray-400 text-sm mt-1">User can fix issues and reapply.</div></button><button onClick={() => setRejectionType('permanent')} className={`p-4 rounded-lg border-2 text-left transition ${rejectionType === 'permanent' ? 'border-red-500 bg-red-500/20' : 'border-white/20 bg-white/5 hover:bg-white/10'}`}><div className="text-2xl mb-2">🚫</div><div className="text-white font-semibold">Permanent Rejection</div><div className="text-gray-400 text-sm mt-1">User cannot reapply.</div></button></div></div>{rejectionType === 'resubmission_required' && (<><div className="mb-4"><label className="block text-white font-semibold mb-3">Fields That Need Resubmission <span className="text-red-400">*</span></label><div className="grid grid-cols-2 gap-2">{[{ id: 'id_front', label: 'ID Front Photo' },{ id: 'id_back', label: 'ID Back Photo' },{ id: 'full_name', label: 'Full Name' },{ id: 'date_of_birth', label: 'Date of Birth' },{ id: 'phone_number', label: 'Phone Number' },{ id: 'address', label: 'Address Information' },{ id: 'id_type', label: 'ID Type Selection' },{ id: 'experience', label: 'Vendor Experience Info' }].map((field) => (<label key={field.id} className="flex items-center gap-2 text-white text-sm bg-white/5 p-2 rounded cursor-pointer hover:bg-white/10"><input type="checkbox" checked={resubmissionFields.includes(field.id)} onChange={(e) => { if (e.target.checked) { setResubmissionFields([...resubmissionFields, field.id]) } else { setResubmissionFields(resubmissionFields.filter(f => f !== field.id)) } }} className="w-4 h-4 rounded" />{field.label}</label>))}</div></div><div className="mb-4"><label className="block text-white font-semibold mb-2">Resubmission Instructions <span className="text-red-400">*</span></label><textarea value={resubmissionInstructions} onChange={(e) => setResubmissionInstructions(e.target.value)} placeholder="Explain clearly what the user needs to fix..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none" /><p className="text-xs text-gray-400 mt-1">{resubmissionInstructions.length}/1000 (minimum 20)</p></div></>)}{rejectionType === 'permanent' && (<div className="mb-4"><label className="block text-white font-semibold mb-2">Permanent Rejection Reason <span className="text-red-400">*</span></label><textarea value={verificationRejectionReason} onChange={(e) => setVerificationRejectionReason(e.target.value)} placeholder="Explain why this application is permanently rejected..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none" /><p className="text-xs text-gray-400 mt-1">{verificationRejectionReason.length}/500 (minimum 10)</p></div>)}</>)}<div className="mb-6"><label className="block text-white font-semibold mb-2">Admin Notes (Internal Only)</label><textarea value={verificationAdminNotes} onChange={(e) => setVerificationAdminNotes(e.target.value)} placeholder="Notes for other admins..." rows={3} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none" /></div><div className="flex gap-3"><button onClick={verificationDecisionModal === 'approve' ? handleApproveVerification : handleRejectVerification} disabled={verificationDecisionModal === 'reject' && ((rejectionType === 'resubmission_required' && (resubmissionFields.length === 0 || resubmissionInstructions.trim().length < 20)) || (rejectionType === 'permanent' && verificationRejectionReason.trim().length < 10))} className={`flex-1 text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${verificationDecisionModal === 'approve' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : rejectionType === 'permanent' ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-yellow-500 to-orange-500'}`}>{verificationDecisionModal === 'approve' ? 'Confirm Approval' : rejectionType === 'permanent' ? 'Permanently Reject' : 'Request Resubmission'}</button><button onClick={() => { setVerificationDecisionModal(null); setVerificationRejectionReason(''); setVerificationAdminNotes(''); setRejectionType('resubmission_required'); setResubmissionFields([]); setResubmissionInstructions('') }} className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-semibold border border-white/10">Cancel</button></div></div></div>)}
+      {verificationDecisionModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto">
+          <div className={`border-2 rounded-2xl p-8 max-w-2xl w-full my-8 ${verificationDecisionModal === 'approve' ? 'bg-gradient-to-br from-slate-900 to-green-900 border-green-500/50' : 'bg-gradient-to-br from-slate-900 to-red-900 border-red-500/50'}`}>
+            <h2 className="text-2xl font-bold text-white mb-2">{verificationDecisionModal === 'approve' ? '✅ Approve Vendor' : '❌ Reject Application'}</h2>
+            <p className="text-gray-300 mb-6">{verificationDecisionModal === 'approve' ? 'User will become a vendor and can start selling.' : 'Choose rejection type below.'}</p>
+            
+            {verificationDecisionModal === 'reject' && (
+              <>
+                <div className="mb-6">
+                  <label className="block text-white font-semibold mb-3">Rejection Type</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button onClick={() => setRejectionType('resubmission_required')} className={`p-4 rounded-lg border-2 text-left transition ${rejectionType === 'resubmission_required' ? 'border-yellow-500 bg-yellow-500/20' : 'border-white/20 bg-white/5 hover:bg-white/10'}`}>
+                      <div className="text-2xl mb-2">🔄</div>
+                      <div className="text-white font-semibold">Request Resubmission</div>
+                      <div className="text-gray-400 text-sm mt-1">User can fix issues and reapply.</div>
+                    </button>
+                    <button onClick={() => setRejectionType('permanent')} className={`p-4 rounded-lg border-2 text-left transition ${rejectionType === 'permanent' ? 'border-red-500 bg-red-500/20' : 'border-white/20 bg-white/5 hover:bg-white/10'}`}>
+                      <div className="text-2xl mb-2">🚫</div>
+                      <div className="text-white font-semibold">Permanent Rejection</div>
+                      <div className="text-gray-400 text-sm mt-1">User cannot reapply.</div>
+                    </button>
+                  </div>
+                </div>
+                
+                {rejectionType === 'resubmission_required' && (
+                  <>
+                    <div className="mb-4">
+                      <label className="block text-white font-semibold mb-3">Fields That Need Resubmission <span className="text-red-400">*</span></label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: 'id_front', label: 'ID Front Photo' },
+                          { id: 'id_back', label: 'ID Back Photo' },
+                          { id: 'full_name', label: 'Full Name' },
+                          { id: 'date_of_birth', label: 'Date of Birth' },
+                          { id: 'phone_number', label: 'Phone Number' },
+                          { id: 'address', label: 'Address Information' },
+                          { id: 'id_type', label: 'ID Type Selection' },
+                          { id: 'experience', label: 'Vendor Experience Info' }
+                        ].map((field) => (
+                          <label key={field.id} className="flex items-center gap-2 text-white text-sm bg-white/5 p-2 rounded cursor-pointer hover:bg-white/10 transition border border-white/10">
+                            <input type="checkbox" checked={resubmissionFields.includes(field.id)} onChange={(e) => { if (e.target.checked) { setResubmissionFields([...resubmissionFields, field.id]) } else { setResubmissionFields(resubmissionFields.filter(f => f !== field.id)) } }} className="w-4 h-4 rounded" />
+                            {field.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-white font-semibold mb-2">Resubmission Instructions <span className="text-red-400">*</span></label>
+                      <textarea value={resubmissionInstructions} onChange={(e) => setResubmissionInstructions(e.target.value)} placeholder="Explain clearly what the user needs to fix..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                      <p className="text-xs text-gray-400 mt-1">{resubmissionInstructions.length}/1000 (minimum 20)</p>
+                    </div>
+                  </>
+                )}
+                
+                {rejectionType === 'permanent' && (
+                  <div className="mb-4">
+                    <label className="block text-white font-semibold mb-2">Permanent Rejection Reason <span className="text-red-400">*</span></label>
+                    <textarea value={verificationRejectionReason} onChange={(e) => setVerificationRejectionReason(e.target.value)} placeholder="Explain why this application is permanently rejected..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+                    <p className="text-xs text-gray-400 mt-1">{verificationRejectionReason.length}/500 (minimum 10)</p>
+                  </div>
+                )}
+              </>
+            )}
+            
+            <div className="mb-6">
+              <label className="block text-white font-semibold mb-2">Admin Notes (Internal Only)</label>
+              <textarea value={verificationAdminNotes} onChange={(e) => setVerificationAdminNotes(e.target.value)} placeholder="Notes for other admins..." rows={3} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+            </div>
+            
+            <div className="flex gap-3">
+              <button onClick={verificationDecisionModal === 'approve' ? handleApproveVerification : handleRejectVerification} disabled={verificationDecisionModal === 'reject' && ((rejectionType === 'resubmission_required' && (resubmissionFields.length === 0 || resubmissionInstructions.trim().length < 20)) || (rejectionType === 'permanent' && verificationRejectionReason.trim().length < 10))} className={`flex-1 text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${verificationDecisionModal === 'approve' ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:shadow-lg hover:shadow-green-500/30' : rejectionType === 'permanent' ? 'bg-gradient-to-r from-red-500 to-red-600 hover:shadow-lg hover:shadow-red-500/30' : 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:shadow-lg hover:shadow-yellow-500/30'}`}>
+                {verificationDecisionModal === 'approve' ? 'Confirm Approval' : rejectionType === 'permanent' ? 'Permanently Reject' : 'Request Resubmission'}
+              </button>
+              <button onClick={() => { setVerificationDecisionModal(null); setVerificationRejectionReason(''); setVerificationAdminNotes(''); setRejectionType('resubmission_required'); setResubmissionFields([]); setResubmissionInstructions('') }} className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-lg font-semibold border border-white/10 transition">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {showApproveModal && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"><div className="bg-gradient-to-br from-slate-900 to-green-900 border-2 border-green-500/50 rounded-2xl p-8 max-w-md w-full"><h2 className="text-2xl font-bold text-white mb-6">✅ Approve Withdrawal</h2><div className="mb-4"><label className="block text-white text-sm mb-2">Transaction ID *</label><input value={transactionId} onChange={(e) => setTransactionId(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white" placeholder="BTC hash or Skrill ref..." /></div><div className="mb-6"><label className="block text-white text-sm mb-2">Notes (Optional)</label><textarea value={approveNotes} onChange={(e) => setApproveNotes(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white" rows={3} /></div><div className="flex gap-3"><button onClick={confirmApproveWithdrawal} disabled={!transactionId.trim()} className="flex-1 bg-green-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50">Confirm</button><button onClick={() => { setShowApproveModal(false); setApprovingWithdrawalId(null) }} className="flex-1 bg-white/10 text-white py-3 rounded-lg">Cancel</button></div></div></div>)}
+      {showApproveModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-slate-900 to-green-900 border-2 border-green-500/50 rounded-2xl p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-white mb-6">✅ Approve Withdrawal</h2>
+            <div className="mb-4">
+              <label className="block text-white text-sm mb-2">Transaction ID *</label>
+              <input value={transactionId} onChange={(e) => setTransactionId(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent" placeholder="BTC hash or Skrill ref..." />
+            </div>
+            <div className="mb-6">
+              <label className="block text-white text-sm mb-2">Notes (Optional)</label>
+              <textarea value={approveNotes} onChange={(e) => setApproveNotes(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent" rows={3} />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={confirmApproveWithdrawal} disabled={!transactionId.trim()} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 transition">Confirm</button>
+              <button onClick={() => { setShowApproveModal(false); setApprovingWithdrawalId(null) }} className="flex-1 bg-white/10 text-white py-3 rounded-lg hover:bg-white/20 transition border border-white/10">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {showRejectModal && (<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"><div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-md w-full"><h2 className="text-2xl font-bold text-white mb-6">❌ Reject Withdrawal</h2><div className="mb-6"><label className="block text-white text-sm mb-2">Rejection Reason *</label><textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white" rows={4} placeholder="Min 5 characters..." /></div><div className="flex gap-3"><button onClick={confirmRejectWithdrawal} disabled={rejectionReason.trim().length < 5} className="flex-1 bg-red-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50">Confirm</button><button onClick={() => { setShowRejectModal(false); setRejectingWithdrawalId(null) }} className="flex-1 bg-white/10 text-white py-3 rounded-lg">Cancel</button></div></div></div>)}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-white mb-6">❌ Reject Withdrawal</h2>
+            <div className="mb-6">
+              <label className="block text-white text-sm mb-2">Rejection Reason *</label>
+              <textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 resize-none focus:ring-2 focus:ring-red-500 focus:border-transparent" rows={4} placeholder="Min 5 characters..." />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={confirmRejectWithdrawal} disabled={rejectionReason.trim().length < 5} className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 transition">Confirm</button>
+              <button onClick={() => { setShowRejectModal(false); setRejectingWithdrawalId(null) }} className="flex-1 bg-white/10 text-white py-3 rounded-lg hover:bg-white/20 transition border border-white/10">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

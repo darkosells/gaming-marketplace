@@ -113,18 +113,18 @@ export default function OrderDetailPage() {
   }, 'info')
 
   const submitDispute = async () => {
-    if (!disputeReason) return toast('error', 'Error', 'Select a reason')
-    if (disputeDesc.length < 20) return toast('error', 'Error', 'Min 20 characters')
-    setActionLoading(true)
-    try {
-      await supabase.from('disputes').insert({ order_id: id, raised_by: user.id, reason: disputeReason, description: disputeDesc, evidence_urls: [], status: 'open' })
-      await supabase.from('orders').update({ status: 'dispute_raised', dispute_reason: disputeReason, dispute_opened_at: new Date().toISOString() }).eq('id', id)
-      const [b, s] = await Promise.all([supabase.from('profiles').select('email').eq('id', order.buyer_id).single(), supabase.from('profiles').select('email').eq('id', order.seller_id).single()])
-      b.data?.email && s.data?.email && sendDisputeEmails({ id: order.id, listing_title: order.listing.title, buyer_email: b.data.email, seller_email: s.data.email, dispute_reason: disputeReason, is_buyer_raising: isBuyer, site_url: getSiteUrl() }).catch(() => {})
-      toast('success', 'Dispute Raised', 'Support will review'); setShowDispute(false); fetchOrder()
-    } catch (e: any) { toast('error', 'Failed', e.message) }
-    finally { setActionLoading(false) }
-  }
+  if (!disputeReason) return toast('error', 'Error', 'Select a reason')
+  if (disputeDesc.length < 20) return toast('error', 'Error', 'Min 20 characters')
+  setActionLoading(true)
+  try {
+    await supabase.from('disputes').insert({ order_id: id, raised_by: user.id, reason: disputeReason, description: disputeDesc, evidence_urls: [], status: 'open' })
+    await supabase.from('orders').update({ status: 'dispute_raised', dispute_reason: disputeReason, dispute_opened_at: new Date().toISOString() }).eq('id', id)
+    const [b, s] = await Promise.all([supabase.from('profiles').select('email').eq('id', order.buyer_id).single(), supabase.from('profiles').select('email').eq('id', order.seller_id).single()])
+    b.data?.email && s.data?.email && sendDisputeEmails({ id: order.id, listing_title: order.listing.title, buyer_email: b.data.email, seller_email: s.data.email, dispute_reason: disputeReason, is_buyer_raising: isBuyer, site_url: getSiteUrl() }).catch(() => {})
+    toast('success', 'Dispute Raised', 'Support will review'); setShowDispute(false); fetchOrder()
+  } catch (e: any) { toast('error', 'Failed', e.message) }
+  finally { setActionLoading(false) }
+}
 
   const submitReview = async () => {
     if (!rating) return toast('error', 'Error', 'Select rating')
