@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -77,11 +78,24 @@ export default function LoginPage() {
       {/* Content */}
       <div className="relative z-10 max-w-md w-full">
         {/* Logo */}
-        <Link href="/" className="flex items-center justify-center space-x-2 mb-8 group">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-            <span className="text-3xl">🎮</span>
+        <Link href="/" className="flex items-center justify-center space-x-3 mb-8 group">
+          <div className="relative">
+            <Image
+              src="/logo6.svg"
+              alt="Nashflare"
+              width={48}
+              height={48}
+              className="transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300"
+              priority
+            />
+            <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
           </div>
-          <span className="text-2xl font-bold text-white group-hover:text-purple-400 transition">GameVault</span>
+          <div className="flex flex-col">
+            <span className="text-2xl font-black text-white tracking-tight">
+              Nash<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">flare</span>
+            </span>
+            <span className="text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-1">Marketplace</span>
+          </div>
         </Link>
 
         {/* Login Card */}
