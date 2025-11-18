@@ -26,7 +26,9 @@ interface Listing {
     id: string
     username: string
     rating: number
+    average_rating: number
     total_sales: number
+    total_reviews: number
     verified: boolean
     created_at: string
   } | null
@@ -67,7 +69,7 @@ interface Props {
 
 export default function ListingDetailClient({ initialListing, listingId }: Props) {
   const router = useRouter()
-  const [listing] = useState<Listing>(initialListing) // Use initial data from server
+  const [listing] = useState<Listing>(initialListing)
   const [reviews, setReviews] = useState<Review[]>([])
   const [similarListings, setSimilarListings] = useState<SimilarListing[]>([])
   const [quantity, setQuantity] = useState(1)
@@ -117,7 +119,6 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
 
       if (error) throw error
 
-      // Sort by relevance: same game gets priority
       const sorted = (data || []).sort((a, b) => {
         const aScore = (a.game === listing.game ? 2 : 0) + (a.category === listing.category ? 1 : 0)
         const bScore = (b.game === listing.game ? 2 : 0) + (b.category === listing.category ? 1 : 0)
@@ -308,15 +309,31 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
     )
   }
 
-  // Safe access with fallbacks
-  const sellerUsername = listing.profiles?.username || 'Unknown Seller'
-  const sellerId = listing.profiles?.id || listing.seller_id
-  const sellerRating = listing.profiles?.rating || 0
-  const sellerTotalSales = listing.profiles?.total_sales || 0
-  const sellerVerified = listing.profiles?.verified || false
-  const sellerJoinDate = listing.profiles?.created_at 
-    ? new Date(listing.profiles.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    : 'Unknown'
+  // Debug: Log the listing data to see what we're getting
+console.log('Listing data:', listing)
+console.log('Profiles data:', listing.profiles)
+
+// Safe access with fallbacks
+const profileData = listing.profiles
+const sellerUsername = profileData?.username || 'Unknown Seller'
+const sellerId = profileData?.id || listing.seller_id
+const sellerRating = profileData?.average_rating || profileData?.rating || 0
+const sellerTotalSales = profileData?.total_sales || 0
+const sellerTotalReviews = profileData?.total_reviews || 0
+const sellerVerified = profileData?.verified || false
+const sellerJoinDate = profileData?.created_at 
+  ? new Date(profileData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  : 'Unknown'
+
+// Debug: Log what we extracted
+console.log('Seller info:', {
+  sellerUsername,
+  sellerId,
+  sellerRating,
+  sellerTotalSales,
+  sellerVerified,
+  sellerJoinDate
+})
 
   const images = listing.image_urls && listing.image_urls.length > 0 
     ? listing.image_urls 
@@ -335,11 +352,7 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
-              <div className={`text-4xl ${
-                modalMessage.type === 'error' ? '❌' :
-                modalMessage.type === 'warning' ? '⚠️' :
-                modalMessage.type === 'success' ? '✅' : 'ℹ️'
-              }`}>
+              <div className="text-4xl">
                 {modalMessage.type === 'error' ? '❌' :
                  modalMessage.type === 'warning' ? '⚠️' :
                  modalMessage.type === 'success' ? '✅' : 'ℹ️'}
@@ -365,19 +378,35 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
         <div className="absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '1s' }}></div>
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
         
-        {/* Stars */}
-        {[...Array(15)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
-            style={{
-              top: `${Math.random() * 50}%`,
-              left: `${Math.random() * 100}%`,
-              animationDuration: `${2 + Math.random() * 3}s`,
-              animationDelay: `${Math.random() * 2}s`
-            }}
-          />
-        ))}
+        {/* Stars - Static positions to avoid hydration mismatch */}
+{[
+  { top: 10, left: 20, duration: 3, delay: 0 },
+  { top: 25, left: 60, duration: 4, delay: 0.5 },
+  { top: 35, left: 80, duration: 2.5, delay: 1 },
+  { top: 15, left: 45, duration: 3.5, delay: 1.5 },
+  { top: 45, left: 15, duration: 4.5, delay: 0.8 },
+  { top: 5, left: 70, duration: 3.2, delay: 1.2 },
+  { top: 40, left: 35, duration: 2.8, delay: 0.3 },
+  { top: 20, left: 90, duration: 4.2, delay: 1.8 },
+  { top: 48, left: 25, duration: 3.8, delay: 0.6 },
+  { top: 8, left: 55, duration: 2.6, delay: 1.4 },
+  { top: 30, left: 75, duration: 3.3, delay: 0.9 },
+  { top: 42, left: 50, duration: 4.8, delay: 1.6 },
+  { top: 18, left: 85, duration: 2.9, delay: 0.4 },
+  { top: 38, left: 10, duration: 3.6, delay: 1.1 },
+  { top: 12, left: 95, duration: 4.4, delay: 1.9 },
+].map((star, i) => (
+  <div
+    key={i}
+    className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
+    style={{
+      top: `${star.top}%`,
+      left: `${star.left}%`,
+      animationDuration: `${star.duration}s`,
+      animationDelay: `${star.delay}s`
+    }}
+  />
+))}
       </div>
 
       {/* Content */}
@@ -607,7 +636,6 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                                 {item.category === 'account' ? '🎮' : item.category === 'currency' ? '💰' : '🔑'}
                               </div>
                             )}
-                            {/* Same Game Badge */}
                             {item.game === listing.game && (
                               <div className="absolute top-2 left-2">
                                 <span className="bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
@@ -638,7 +666,7 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                 </div>
               )}
 
-              {/* Seller Reviews Section */}
+              {/* Seller Reviews Section - WITH CENSORED USERNAMES */}
               <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
                 <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                   <span className="text-purple-400">⭐</span>
@@ -653,33 +681,41 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                              <span className="text-white font-bold text-lg">
-                                {review.profiles?.username?.charAt(0).toUpperCase() || 'U'}
-                              </span>
-                            </div>
-                            <div>
-                              <p className="text-white font-semibold">{review.profiles?.username || 'Anonymous'}</p>
-                              <div className="flex items-center">
-                                {[...Array(5)].map((_, i) => (
-                                  <span key={i} className={`text-lg ${i < review.rating ? 'text-yellow-400' : 'text-gray-600'}`}>
-                                    ★
-                                  </span>
-                                ))}
+                    {reviews.map((review) => {
+                      // Censor username: show first 3 chars + ***
+                      const rawUsername = review.profiles?.username || 'Anonymous'
+                      const censoredUsername = rawUsername.length > 3 
+                        ? rawUsername.substring(0, 3) + '***' 
+                        : rawUsername
+                      
+                      return (
+                        <div key={review.id} className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                                <span className="text-white font-bold text-lg">
+                                  {rawUsername.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-white font-semibold">{censoredUsername}</p>
+                                <div className="flex items-center">
+                                  {[...Array(5)].map((_, i) => (
+                                    <span key={i} className={`text-lg ${i < review.rating ? 'text-yellow-400' : 'text-gray-600'}`}>
+                                      ★
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
                             </div>
+                            <span className="text-sm text-gray-400">
+                              {new Date(review.created_at).toLocaleDateString()}
+                            </span>
                           </div>
-                          <span className="text-sm text-gray-400">
-                            {new Date(review.created_at).toLocaleDateString()}
-                          </span>
+                          {review.comment && <p className="text-gray-300">{review.comment}</p>}
                         </div>
-                        {review.comment && <p className="text-gray-300">{review.comment}</p>}
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -847,7 +883,7 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
         {/* Footer */}
         <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
           <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2024 GameVault. All rights reserved.</p>
+            <p>&copy; 2024 Nashflare. All rights reserved.</p>
           </div>
         </footer>
       </div>
