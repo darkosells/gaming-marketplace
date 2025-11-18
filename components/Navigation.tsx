@@ -313,8 +313,12 @@ const handleGameClick = (category: string, game: string) => {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-3 group">
             <div className="relative">
-              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 rounded-xl flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-purple-500/30">
-                <span className="text-xl lg:text-2xl">🎮</span>
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-slate-900/50 backdrop-blur-sm rounded-xl flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-purple-500/30 p-0.5">
+                <img 
+                  src="/logo6.svg" 
+                  alt="Nashflare Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
             </div>
