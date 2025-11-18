@@ -20,6 +20,14 @@ export default function VendorDashboardPage() {
   const [withdrawalAddress, setWithdrawalAddress] = useState('')
   const [withdrawalProcessing, setWithdrawalProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Pagination states
+  const [listingsPage, setListingsPage] = useState(1)
+  const [ordersPage, setOrdersPage] = useState(1)
+  const [withdrawalsPage, setWithdrawalsPage] = useState(1)
+  const itemsPerPage = 6 // 6 items per page for grid layouts (listings)
+  const ordersPerPage = 5 // 5 items per page for list layouts (orders, withdrawals)
+  
   const router = useRouter()
   const supabase = createClient()
 
@@ -277,6 +285,22 @@ Proceed with withdrawal?`
     }
   }
 
+  // Pagination helper functions
+  const goToListingsPage = (page: number) => {
+    setListingsPage(page)
+    document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const goToOrdersPage = (page: number) => {
+    setOrdersPage(page)
+    document.getElementById('orders-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const goToWithdrawalsPage = (page: number) => {
+    setWithdrawalsPage(page)
+    document.getElementById('withdrawals-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   // Show error state
   if (error) {
     return (
@@ -351,6 +375,24 @@ Proceed with withdrawal?`
     o.status === 'dispute_raised'
   )
   const pendingEarnings = pendingOrders.reduce((sum, o) => sum + (parseFloat(o.amount) * 0.95), 0)
+
+  // Pagination calculations for Listings
+  const totalListingsPages = Math.ceil(myListings.length / itemsPerPage)
+  const startListingsIndex = (listingsPage - 1) * itemsPerPage
+  const endListingsIndex = startListingsIndex + itemsPerPage
+  const paginatedListings = myListings.slice(startListingsIndex, endListingsIndex)
+
+  // Pagination calculations for Orders
+  const totalOrdersPages = Math.ceil(myOrders.length / ordersPerPage)
+  const startOrdersIndex = (ordersPage - 1) * ordersPerPage
+  const endOrdersIndex = startOrdersIndex + ordersPerPage
+  const paginatedOrders = myOrders.slice(startOrdersIndex, endOrdersIndex)
+
+  // Pagination calculations for Withdrawals
+  const totalWithdrawalsPages = Math.ceil(withdrawals.length / ordersPerPage)
+  const startWithdrawalsIndex = (withdrawalsPage - 1) * ordersPerPage
+  const endWithdrawalsIndex = startWithdrawalsIndex + ordersPerPage
+  const paginatedWithdrawals = withdrawals.slice(startWithdrawalsIndex, endWithdrawalsIndex)
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
@@ -554,12 +596,19 @@ Proceed with withdrawal?`
 
               {/* Listings Tab */}
               {activeTab === 'listings' && (
-                <>
+                <div id="listings-section">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                      <span className="text-purple-400">📦</span>
-                      My Listings
-                    </h2>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <span className="text-purple-400">📦</span>
+                        My Listings
+                      </h2>
+                      {myListings.length > 0 && (
+                        <p className="text-sm text-gray-400 mt-1">
+                          Showing {startListingsIndex + 1}-{Math.min(endListingsIndex, myListings.length)} of {myListings.length} listings
+                        </p>
+                      )}
+                    </div>
                     <Link
                       href="/sell"
                       className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105"
@@ -581,69 +630,133 @@ Proceed with withdrawal?`
                       </Link>
                     </div>
                   ) : (
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {myListings.map((listing) => (
-                        <div key={listing.id} className="bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 group hover:-translate-y-1">
-                          <div className="relative h-44 bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
-                            {listing.image_url ? (
-                              <img src={listing.image_url} alt={listing.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-5xl group-hover:scale-125 transition-transform duration-300">
-                                {listing.category === 'account' ? '🎮' : listing.category === 'items' ? '🎒' : listing.category === 'currency' ? '💰' : '🔑'}
+                    <>
+                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {paginatedListings.map((listing) => (
+                          <div key={listing.id} className="bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 group hover:-translate-y-1">
+                            <div className="relative h-44 bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
+                              {listing.image_url ? (
+                                <img src={listing.image_url} alt={listing.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-5xl group-hover:scale-125 transition-transform duration-300">
+                                  {listing.category === 'account' ? '🎮' : listing.category === 'items' ? '🎒' : listing.category === 'currency' ? '💰' : '🔑'}
+                                </div>
+                              )}
+                              <div className="absolute top-3 right-3">
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                                  listing.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                                  listing.status === 'sold' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' :
+                                  listing.status === 'out_of_stock' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                                  'bg-red-500/20 text-red-400 border-red-500/30'
+                                }`}>
+                                  {listing.status === 'out_of_stock' ? 'Out of Stock' : listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
+                                </span>
                               </div>
-                            )}
-                            <div className="absolute top-3 right-3">
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                                listing.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                                listing.status === 'sold' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' :
-                                listing.status === 'out_of_stock' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                                'bg-red-500/20 text-red-400 border-red-500/30'
-                              }`}>
-                                {listing.status === 'out_of_stock' ? 'Out of Stock' : listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
-                              </span>
+                            </div>
+                            <div className="p-4">
+                              <h3 className="text-white font-semibold mb-1 truncate group-hover:text-purple-300 transition">{listing.title}</h3>
+                              <p className="text-sm text-purple-400 mb-3">{listing.game}</p>
+                              <div className="flex justify-between items-center mb-4">
+                                <div>
+                                  <span className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${listing.price}</span>
+                                  <p className="text-xs text-gray-500">You earn: ${(listing.price * 0.95).toFixed(2)}</p>
+                                </div>
+                                <span className="text-sm text-gray-400 bg-white/5 px-2 py-1 rounded-full">
+                                  Stock: {listing.stock}
+                                </span>
+                              </div>
+                              <div className="flex gap-2">
+                                <Link
+                                  href={`/listing/${listing.id}`}
+                                  className="flex-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 py-2.5 rounded-lg text-sm font-semibold text-center transition-all duration-300 border border-purple-500/30"
+                                >
+                                  View
+                                </Link>
+                                <Link
+                                  href={`/listing/${listing.id}/edit`}
+                                  className="flex-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 py-2.5 rounded-lg text-sm font-semibold text-center transition-all duration-300 border border-blue-500/30"
+                                >
+                                  Edit
+                                </Link>
+                              </div>
                             </div>
                           </div>
-                          <div className="p-4">
-                            <h3 className="text-white font-semibold mb-1 truncate group-hover:text-purple-300 transition">{listing.title}</h3>
-                            <p className="text-sm text-purple-400 mb-3">{listing.game}</p>
-                            <div className="flex justify-between items-center mb-4">
-                              <div>
-                                <span className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${listing.price}</span>
-                                <p className="text-xs text-gray-500">You earn: ${(listing.price * 0.95).toFixed(2)}</p>
-                              </div>
-                              <span className="text-sm text-gray-400 bg-white/5 px-2 py-1 rounded-full">
-                                Stock: {listing.stock}
-                              </span>
-                            </div>
-                            <div className="flex gap-2">
-                              <Link
-                                href={`/listing/${listing.id}`}
-                                className="flex-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 py-2.5 rounded-lg text-sm font-semibold text-center transition-all duration-300 border border-purple-500/30"
-                              >
-                                View
-                              </Link>
-                              <Link
-                                href={`/listing/${listing.id}/edit`}
-                                className="flex-1 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 py-2.5 rounded-lg text-sm font-semibold text-center transition-all duration-300 border border-blue-500/30"
-                              >
-                                Edit
-                              </Link>
-                            </div>
+                        ))}
+                      </div>
+
+                      {/* Pagination Controls for Listings */}
+                      {totalListingsPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 mt-8">
+                          <button
+                            onClick={() => goToListingsPage(listingsPage - 1)}
+                            disabled={listingsPage === 1}
+                            className="px-4 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ← Previous
+                          </button>
+                          
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: totalListingsPages }, (_, i) => i + 1).map((page) => {
+                              const showPage = 
+                                page === 1 || 
+                                page === totalListingsPages || 
+                                (page >= listingsPage - 1 && page <= listingsPage + 1)
+
+                              if (!showPage) {
+                                if (page === listingsPage - 2 || page === listingsPage + 2) {
+                                  return (
+                                    <span key={page} className="px-2 text-gray-500">
+                                      ...
+                                    </span>
+                                  )
+                                }
+                                return null
+                              }
+
+                              return (
+                                <button
+                                  key={page}
+                                  onClick={() => goToListingsPage(page)}
+                                  className={`w-10 h-10 rounded-lg font-semibold transition-all duration-300 ${
+                                    listingsPage === page
+                                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                                      : 'bg-slate-800/50 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                                  }`}
+                                >
+                                  {page}
+                                </button>
+                              )
+                            })}
                           </div>
+
+                          <button
+                            onClick={() => goToListingsPage(listingsPage + 1)}
+                            disabled={listingsPage === totalListingsPages}
+                            className="px-4 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Next →
+                          </button>
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   )}
-                </>
+                </div>
               )}
 
               {/* Orders Tab */}
               {activeTab === 'orders' && (
-                <>
-                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                    <span className="text-purple-400">🛒</span>
-                    My Orders
-                  </h2>
+                <div id="orders-section">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                      <span className="text-purple-400">🛒</span>
+                      My Orders
+                    </h2>
+                    {myOrders.length > 0 && (
+                      <p className="text-sm text-gray-400 mt-1">
+                        Showing {startOrdersIndex + 1}-{Math.min(endOrdersIndex, myOrders.length)} of {myOrders.length} orders
+                      </p>
+                    )}
+                  </div>
 
                   {myOrders.length === 0 ? (
                     <div className="text-center py-16">
@@ -652,63 +765,120 @@ Proceed with withdrawal?`
                       <p className="text-gray-400 mb-6">Your sales will appear here once customers start buying!</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {myOrders.map((order: any) => {
-                        const orderNetEarning = parseFloat(order.amount) * 0.95
-                        const orderCommission = parseFloat(order.amount) * 0.05
-                        
-                        return (
-                          <div key={order.id} className="bg-slate-800/50 border border-white/10 rounded-xl p-5 hover:border-purple-500/30 transition-all duration-300">
-                            <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                {order.listing?.image_url ? (
-                                  <img src={order.listing.image_url} alt={order.listing.title} className="w-full h-full object-cover" />
-                                ) : (
-                                  <span className="text-2xl">
-                                    {order.listing?.category === 'account' ? '🎮' : order.listing?.category === 'items' ? '🎒' : order.listing?.category === 'currency' ? '💰' : '🔑'}
+                    <>
+                      <div className="space-y-4">
+                        {paginatedOrders.map((order: any) => {
+                          const orderNetEarning = parseFloat(order.amount) * 0.95
+                          const orderCommission = parseFloat(order.amount) * 0.05
+                          
+                          return (
+                            <div key={order.id} className="bg-slate-800/50 border border-white/10 rounded-xl p-5 hover:border-purple-500/30 transition-all duration-300">
+                              <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                  {order.listing?.image_url ? (
+                                    <img src={order.listing.image_url} alt={order.listing.title} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-2xl">
+                                      {order.listing?.category === 'account' ? '🎮' : order.listing?.category === 'items' ? '🎒' : order.listing?.category === 'currency' ? '💰' : '🔑'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="text-white font-semibold">{order.listing?.title || 'Unknown Item'}</h4>
+                                  <p className="text-sm text-gray-400">Buyer: <span className="text-purple-400">{order.buyer?.username}</span></p>
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(order.created_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${orderNetEarning.toFixed(2)}</p>
+                                  <p className="text-xs text-gray-500">
+                                    Gross: ${order.amount} | Fee: -${orderCommission.toFixed(2)}
+                                  </p>
+                                  <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold border ${
+                                    order.status === 'completed' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                                    order.status === 'delivered' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                                    order.status === 'paid' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                                    order.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                                    order.status === 'refunded' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                                    order.status === 'cancelled' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' :
+                                    'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                                  }`}>
+                                    {order.status === 'delivered' ? 'Awaiting Confirmation' :
+                                     order.status === 'dispute_raised' ? 'Dispute Active' :
+                                     order.status === 'refunded' ? 'Refunded' :
+                                     order.status.charAt(0).toUpperCase() + order.status.slice(1).replace('_', ' ')}
                                   </span>
-                                )}
+                                </div>
+                                <Link
+                                  href={`/order/${order.id}`}
+                                  className="px-4 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition-all duration-300 border border-purple-500/30"
+                                >
+                                  View Details
+                                </Link>
                               </div>
-                              <div className="flex-1">
-                                <h4 className="text-white font-semibold">{order.listing?.title || 'Unknown Item'}</h4>
-                                <p className="text-sm text-gray-400">Buyer: <span className="text-purple-400">{order.buyer?.username}</span></p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(order.created_at).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${orderNetEarning.toFixed(2)}</p>
-                                <p className="text-xs text-gray-500">
-                                  Gross: ${order.amount} | Fee: -${orderCommission.toFixed(2)}
-                                </p>
-                                <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold border ${
-                                  order.status === 'completed' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                                  order.status === 'delivered' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                                  order.status === 'paid' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                                  order.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                                  order.status === 'refunded' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
-                                  order.status === 'cancelled' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' :
-                                  'bg-purple-500/20 text-purple-400 border-purple-500/30'
-                                }`}>
-                                  {order.status === 'delivered' ? 'Awaiting Confirmation' :
-                                   order.status === 'dispute_raised' ? 'Dispute Active' :
-                                   order.status === 'refunded' ? 'Refunded' :
-                                   order.status.charAt(0).toUpperCase() + order.status.slice(1).replace('_', ' ')}
-                                </span>
-                              </div>
-                              <Link
-                                href={`/order/${order.id}`}
-                                className="px-4 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg text-sm font-semibold transition-all duration-300 border border-purple-500/30"
-                              >
-                                View Details
-                              </Link>
                             </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Pagination Controls for Orders */}
+                      {totalOrdersPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 mt-8">
+                          <button
+                            onClick={() => goToOrdersPage(ordersPage - 1)}
+                            disabled={ordersPage === 1}
+                            className="px-4 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ← Previous
+                          </button>
+                          
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: totalOrdersPages }, (_, i) => i + 1).map((page) => {
+                              const showPage = 
+                                page === 1 || 
+                                page === totalOrdersPages || 
+                                (page >= ordersPage - 1 && page <= ordersPage + 1)
+
+                              if (!showPage) {
+                                if (page === ordersPage - 2 || page === ordersPage + 2) {
+                                  return (
+                                    <span key={page} className="px-2 text-gray-500">
+                                      ...
+                                    </span>
+                                  )
+                                }
+                                return null
+                              }
+
+                              return (
+                                <button
+                                  key={page}
+                                  onClick={() => goToOrdersPage(page)}
+                                  className={`w-10 h-10 rounded-lg font-semibold transition-all duration-300 ${
+                                    ordersPage === page
+                                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
+                                      : 'bg-slate-800/50 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                                  }`}
+                                >
+                                  {page}
+                                </button>
+                              )
+                            })}
                           </div>
-                        )
-                      })}
-                    </div>
+
+                          <button
+                            onClick={() => goToOrdersPage(ordersPage + 1)}
+                            disabled={ordersPage === totalOrdersPages}
+                            className="px-4 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Next →
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
-                </>
+                </div>
               )}
 
               {/* Balance Tab */}
@@ -926,84 +1096,149 @@ Proceed with withdrawal?`
                   )}
 
                   {/* Withdrawal History */}
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                      <span>📋</span>
-                      Withdrawal History
-                    </h3>
+                  <div id="withdrawals-section">
+                    <div className="mb-4">
+                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <span>📋</span>
+                        Withdrawal History
+                      </h3>
+                      {withdrawals.length > 0 && (
+                        <p className="text-sm text-gray-400 mt-1">
+                          Showing {startWithdrawalsIndex + 1}-{Math.min(endWithdrawalsIndex, withdrawals.length)} of {withdrawals.length} withdrawals
+                        </p>
+                      )}
+                    </div>
+                    
                     {withdrawals.length === 0 ? (
                       <div className="text-center py-12 bg-slate-800/50 border border-white/10 rounded-xl">
                         <div className="text-5xl mb-4">📋</div>
                         <p className="text-gray-400">No withdrawals yet</p>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {withdrawals.map((withdrawal) => (
-                          <div key={withdrawal.id} className="bg-slate-800/50 border border-white/10 rounded-xl p-5 hover:border-purple-500/30 transition-all duration-300">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xl">{withdrawal.method === 'bitcoin' ? '₿' : '💳'}</span>
-                                  <span className="text-white font-semibold">
-                                    {withdrawal.method === 'bitcoin' ? 'Bitcoin' : 'Skrill'}
-                                  </span>
-                                  <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${
-                                    withdrawal.status === 'completed' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                                    withdrawal.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                                    withdrawal.status === 'processing' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                                    withdrawal.status === 'rejected' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                                    'bg-gray-500/20 text-gray-400 border-gray-500/30'
-                                  }`}>
-                                    {withdrawal.status.toUpperCase()}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-400">
-                                  To: {withdrawal.address.substring(0, 20)}...
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  Requested: {new Date(withdrawal.created_at).toLocaleString()}
-                                </p>
-                                {withdrawal.processed_at && (
-                                  <p className="text-xs text-gray-500">
-                                    Processed: {new Date(withdrawal.processed_at).toLocaleString()}
+                      <>
+                        <div className="space-y-4">
+                          {paginatedWithdrawals.map((withdrawal) => (
+                            <div key={withdrawal.id} className="bg-slate-800/50 border border-white/10 rounded-xl p-5 hover:border-purple-500/30 transition-all duration-300">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xl">{withdrawal.method === 'bitcoin' ? '₿' : '💳'}</span>
+                                    <span className="text-white font-semibold">
+                                      {withdrawal.method === 'bitcoin' ? 'Bitcoin' : 'Skrill'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${
+                                      withdrawal.status === 'completed' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                                      withdrawal.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                                      withdrawal.status === 'processing' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                                      withdrawal.status === 'rejected' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                                      'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                                    }`}>
+                                      {withdrawal.status.toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-400">
+                                    To: {withdrawal.address.substring(0, 20)}...
                                   </p>
-                                )}
-                                
-                                {withdrawal.status === 'rejected' && withdrawal.admin_notes && (
-                                  <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                                    <p className="text-xs text-red-400 font-semibold mb-1">❌ Rejection Reason:</p>
-                                    <p className="text-sm text-red-300">{withdrawal.admin_notes}</p>
-                                  </div>
-                                )}
-                                
-                                {withdrawal.status === 'completed' && withdrawal.admin_notes && (
-                                  <div className="mt-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                                    <p className="text-xs text-green-400 font-semibold mb-1">✅ Admin Note:</p>
-                                    <p className="text-sm text-green-300">{withdrawal.admin_notes}</p>
-                                  </div>
-                                )}
-                                
-                                {withdrawal.status === 'completed' && withdrawal.transaction_id && (
-                                  <div className="mt-2">
-                                    <p className="text-xs text-gray-400">
-                                      Transaction ID: <span className="text-purple-400 font-mono">{withdrawal.transaction_id}</span>
+                                  <p className="text-xs text-gray-500">
+                                    Requested: {new Date(withdrawal.created_at).toLocaleString()}
+                                  </p>
+                                  {withdrawal.processed_at && (
+                                    <p className="text-xs text-gray-500">
+                                      Processed: {new Date(withdrawal.processed_at).toLocaleString()}
                                     </p>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-right ml-4">
-                                <p className="text-xl font-bold text-white">${parseFloat(withdrawal.amount).toFixed(2)}</p>
-                                <p className="text-sm text-gray-400">
-                                  Fee: ${parseFloat(withdrawal.fee_total).toFixed(2)}
-                                </p>
-                                <p className="text-sm text-green-400 font-semibold">
-                                  {withdrawal.status === 'rejected' ? 'Refunded to balance' : `Receive: $${parseFloat(withdrawal.net_amount).toFixed(2)}`}
-                                </p>
+                                  )}
+                                  
+                                  {withdrawal.status === 'rejected' && withdrawal.admin_notes && (
+                                    <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                                      <p className="text-xs text-red-400 font-semibold mb-1">❌ Rejection Reason:</p>
+                                      <p className="text-sm text-red-300">{withdrawal.admin_notes}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {withdrawal.status === 'completed' && withdrawal.admin_notes && (
+                                    <div className="mt-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                                      <p className="text-xs text-green-400 font-semibold mb-1">✅ Admin Note:</p>
+                                      <p className="text-sm text-green-300">{withdrawal.admin_notes}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {withdrawal.status === 'completed' && withdrawal.transaction_id && (
+                                    <div className="mt-2">
+                                      <p className="text-xs text-gray-400">
+                                        Transaction ID: <span className="text-purple-400 font-mono">{withdrawal.transaction_id}</span>
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-right ml-4">
+                                  <p className="text-xl font-bold text-white">${parseFloat(withdrawal.amount).toFixed(2)}</p>
+                                  <p className="text-sm text-gray-400">
+                                    Fee: ${parseFloat(withdrawal.fee_total).toFixed(2)}
+                                  </p>
+                                  <p className="text-sm text-green-400 font-semibold">
+                                    {withdrawal.status === 'rejected' ? 'Refunded to balance' : `Receive: $${parseFloat(withdrawal.net_amount).toFixed(2)}`}
+                                  </p>
+                                </div>
                               </div>
                             </div>
+                          ))}
+                        </div>
+
+                        {/* Pagination Controls for Withdrawals */}
+                        {totalWithdrawalsPages > 1 && (
+                          <div className="flex items-center justify-center gap-2 mt-8">
+                            <button
+                              onClick={() => goToWithdrawalsPage(withdrawalsPage - 1)}
+                              disabled={withdrawalsPage === 1}
+                              className="px-4 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              ← Previous
+                            </button>
+                            
+                            <div className="flex items-center gap-1">
+                              {Array.from({ length: totalWithdrawalsPages }, (_, i) => i + 1).map((page) => {
+                                const showPage = 
+                                  page === 1 || 
+                                  page === totalWithdrawalsPages || 
+                                  (page >= withdrawalsPage - 1 && page <= withdrawalsPage + 1)
+
+                                if (!showPage) {
+                                  if (page === withdrawalsPage - 2 || page === withdrawalsPage + 2) {
+                                    return (
+                                      <span key={page} className="px-2 text-gray-500">
+                                        ...
+                                      </span>
+                                    )
+                                  }
+                                  return null
+                                }
+
+                                return (
+                                  <button
+                                    key={page}
+                                    onClick={() => goToWithdrawalsPage(page)}
+                                    className={`w-10 h-10 rounded-lg font-semibold transition-all duration-300 ${
+                                      withdrawalsPage === page
+                                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg'
+                                        : 'bg-slate-800/50 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                                    }`}
+                                  >
+                                    {page}
+                                  </button>
+                                )
+                              })}
+                            </div>
+
+                            <button
+                              onClick={() => goToWithdrawalsPage(withdrawalsPage + 1)}
+                              disabled={withdrawalsPage === totalWithdrawalsPages}
+                              className="px-4 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Next →
+                            </button>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </>

@@ -1,11 +1,11 @@
+// app/listing/[id]/ListingDetailClient.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
-import ImageGallery from '@/components/ImageGallery'
 
 interface Listing {
   id: string
@@ -21,17 +21,15 @@ interface Listing {
   stock: number
   created_at: string
   seller_id: string
+  delivery_type: 'manual' | 'automatic'
   profiles: {
     id: string
     username: string
     rating: number
     total_sales: number
-    total_reviews: number
-    average_rating: number
     verified: boolean
     created_at: string
-    avatar_url: string | null  // Added avatar_url
-  }
+  } | null
 }
 
 interface SimilarListing {
@@ -56,21 +54,25 @@ interface Review {
   rating: number
   comment: string
   created_at: string
-  reviewer_id: string
+  buyer_id: string
   profiles: {
     username: string
-  }
+  } | null
 }
 
-export default function ListingDetailClient() {
-  const params = useParams()
+interface Props {
+  initialListing: Listing
+  listingId: string
+}
+
+export default function ListingDetailClient({ initialListing, listingId }: Props) {
   const router = useRouter()
-  const [listing, setListing] = useState<Listing | null>(null)
+  const [listing] = useState<Listing>(initialListing) // Use initial data from server
   const [reviews, setReviews] = useState<Review[]>([])
   const [similarListings, setSimilarListings] = useState<SimilarListing[]>([])
-  const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
   const [activeTab, setActiveTab] = useState('description')
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [user, setUser] = useState<any>(null)
   const [showModal, setShowModal] = useState(false)
   const [modalMessage, setModalMessage] = useState({ title: '', message: '', type: 'info' })
@@ -78,43 +80,14 @@ export default function ListingDetailClient() {
   const supabase = createClient()
 
   useEffect(() => {
-    checkAuth()
-    fetchListing()
-  }, [params.id])
+    checkUser()
+    fetchReviews()
+    fetchSimilarListings()
+  }, [])
 
-  const checkAuth = async () => {
+  const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     setUser(user)
-  }
-
-  const fetchListing = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('listings')
-        .select(`
-          *,
-          profiles (
-            id,
-            username,
-            rating,
-            total_sales,
-            total_reviews,
-            average_rating,
-            verified,
-            created_at,
-            avatar_url
-          )
-        `)
-        .eq('id', params.id)
-        .single()
-
-      if (error) throw error
-      setListing(data)
-    } catch (error) {
-      console.error('Error fetching listing:', error)
-    } finally {
-      setLoading(false)
-    }
   }
 
   const fetchSimilarListings = async () => {
@@ -144,7 +117,8 @@ export default function ListingDetailClient() {
 
       if (error) throw error
 
-      const sorted = (data || []).sort((a: any, b: any) => {
+      // Sort by relevance: same game gets priority
+      const sorted = (data || []).sort((a, b) => {
         const aScore = (a.game === listing.game ? 2 : 0) + (a.category === listing.category ? 1 : 0)
         const bScore = (b.game === listing.game ? 2 : 0) + (b.category === listing.category ? 1 : 0)
         return bScore - aScore
@@ -167,13 +141,17 @@ export default function ListingDetailClient() {
           rating,
           comment,
           created_at,
+          buyer_id,
           buyer:profiles!reviews_buyer_id_fkey(username)
         `)
         .eq('seller_id', listing.seller_id)
         .order('created_at', { ascending: false })
         .limit(10)
 
-      if (error) throw error
+      if (error) {
+        console.error('Reviews query error:', error)
+        return
+      }
       
       const mappedReviews = (data || []).map((review: any) => {
         const buyerData = Array.isArray(review.buyer) ? review.buyer[0] : review.buyer
@@ -182,10 +160,8 @@ export default function ListingDetailClient() {
           rating: review.rating,
           comment: review.comment,
           created_at: review.created_at,
-          reviewer_id: '',
-          profiles: {
-            username: buyerData?.username || 'Anonymous'
-          }
+          buyer_id: review.buyer_id,
+          profiles: buyerData ? { username: buyerData.username } : null
         }
       })
       
@@ -195,91 +171,24 @@ export default function ListingDetailClient() {
     }
   }
 
-  useEffect(() => {
-    if (listing) {
-      fetchReviews()
-      fetchSimilarListings()
-    }
-  }, [listing])
-
-  const handleBuyNow = async () => {
+  const handleBuyNow = () => {
     if (!user) {
       router.push('/login')
       return
     }
-
+    
     if (!listing) return
 
-    if (listing.seller_id === user.id) {
-      alert('You cannot buy your own listing!')
-      return
+    const cart = {
+      listing_id: listing.id,
+      quantity: quantity,
+      price: listing.price,
+      title: listing.title
     }
-
-    if (listing.stock < quantity) {
-      alert('Not enough stock available!')
-      return
-    }
-
-    const totalPrice = listing.price * quantity
-    const serviceFee = totalPrice * 0.05
-    const finalTotal = totalPrice + serviceFee
-
-    const confirmed = confirm(
-      `Confirm Purchase:\n\n` +
-      `Item: ${listing.title}\n` +
-      `Quantity: ${quantity}\n` +
-      `Price: $${totalPrice.toFixed(2)}\n` +
-      `Service Fee (5%): $${serviceFee.toFixed(2)}\n` +
-      `Total: $${finalTotal.toFixed(2)}\n\n` +
-      `Continue with purchase?`
-    )
-
-    if (!confirmed) return
-
-    try {
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          listing_id: listing.id,
-          buyer_id: user.id,
-          seller_id: listing.seller_id,
-          amount: totalPrice,
-          quantity: quantity,
-          status: 'paid',
-          payment_status: 'pending',
-          payment_method: 'test'
-        })
-        .select()
-        .single()
-
-      if (orderError) throw orderError
-
-      const existingCart = localStorage.getItem('cart')
-      if (existingCart) {
-        const cart = JSON.parse(existingCart)
-        if (cart.listing_id === listing.id) {
-          localStorage.removeItem('cart')
-          window.dispatchEvent(new Event('cart-updated'))
-        }
-      }
-
-      alert('Order created! You can now simulate payment on the order page.')
-      router.push(`/order/${order.id}`)
-
-    } catch (error: any) {
-      console.error('Error creating order:', error)
-      alert('Failed to create order: ' + error.message)
-    }
-  }
-
-  const censorUsername = (username: string) => {
-    if (!username || username.length <= 3) return username
+    localStorage.setItem('cart', JSON.stringify(cart))
+    window.dispatchEvent(new Event('cart-updated'))
     
-    const firstTwo = username.substring(0, 2)
-    const lastOne = username.substring(username.length - 1)
-    const middle = '*'.repeat(Math.min(username.length - 3, 4))
-    
-    return `${firstTwo}${middle}${lastOne}`
+    router.push('/cart')
   }
 
   const handleAddToCart = () => {
@@ -296,15 +205,31 @@ export default function ListingDetailClient() {
       if (!proceed) return
     }
 
+    if (quantity > listing.stock) {
+      setModalMessage({
+        title: 'Not Enough Stock',
+        message: `Only ${listing.stock} items available. Please adjust your quantity.`,
+        type: 'warning'
+      })
+      setShowModal(true)
+      return
+    }
+
     const cart = {
       listing_id: listing.id,
-      quantity: quantity
+      quantity: quantity,
+      price: listing.price,
+      title: listing.title
     }
     localStorage.setItem('cart', JSON.stringify(cart))
-    
     window.dispatchEvent(new Event('cart-updated'))
     
-    router.push('/cart')
+    setModalMessage({
+      title: 'Added to Cart!',
+      message: 'Item has been added to your cart successfully.',
+      type: 'success'
+    })
+    setShowModal(true)
   }
 
   const handleContactSeller = async () => {
@@ -356,55 +281,26 @@ export default function ListingDetailClient() {
       router.push(`/messages?conversation=${newConv.id}`)
     } catch (error) {
       console.error('Error creating conversation:', error)
-      alert('Failed to start conversation. Please try again.')
+      setModalMessage({
+        title: 'Failed to Start Chat',
+        message: 'Failed to start conversation. Please try again.',
+        type: 'error'
+      })
+      setShowModal(true)
     }
-  }
-
-  const getListingImages = (): string[] => {
-    if (!listing) return []
-    
-    if (listing.image_urls && listing.image_urls.length > 0) {
-      return listing.image_urls
-    }
-    
-    if (listing.image_url) {
-      return [listing.image_url]
-    }
-    
-    return []
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
-        <div className="fixed inset-0 z-0">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
-          <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-        </div>
-        <div className="relative z-10 text-center">
-          <div className="relative inline-block">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-lg opacity-50 animate-pulse"></div>
-            <div className="relative inline-block animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent"></div>
-          </div>
-          <p className="text-white mt-6 text-lg">Loading listing...</p>
-        </div>
-      </div>
-    )
   }
 
   if (!listing) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
         <div className="fixed inset-0 z-0">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
-          <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
         </div>
         <div className="relative z-10 text-center">
-          <div className="text-6xl mb-4">🔍</div>
+          <div className="text-6xl mb-4">😞</div>
           <h1 className="text-3xl font-bold text-white mb-4">Listing Not Found</h1>
-          <Link href="/browse" className="text-purple-400 hover:text-purple-300 transition">
+          <p className="text-gray-400 mb-6">This listing may have been removed or doesn't exist.</p>
+          <Link href="/browse" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition">
             ← Back to Browse
           </Link>
         </div>
@@ -412,26 +308,76 @@ export default function ListingDetailClient() {
     )
   }
 
+  // Safe access with fallbacks
+  const sellerUsername = listing.profiles?.username || 'Unknown Seller'
+  const sellerId = listing.profiles?.id || listing.seller_id
+  const sellerRating = listing.profiles?.rating || 0
+  const sellerTotalSales = listing.profiles?.total_sales || 0
+  const sellerVerified = listing.profiles?.verified || false
+  const sellerJoinDate = listing.profiles?.created_at 
+    ? new Date(listing.profiles.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : 'Unknown'
+
+  const images = listing.image_urls && listing.image_urls.length > 0 
+    ? listing.image_urls 
+    : listing.image_url 
+      ? [listing.image_url]
+      : []
+
   const totalPrice = listing.price * quantity
-  const sellerJoinDate = new Date(listing.profiles.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  const listingImages = getListingImages()
+  const serviceFee = totalPrice * 0.05
+  const finalTotal = totalPrice + serviceFee
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-      {/* Animated Background */}
+      {/* Custom Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`text-4xl ${
+                modalMessage.type === 'error' ? '❌' :
+                modalMessage.type === 'warning' ? '⚠️' :
+                modalMessage.type === 'success' ? '✅' : 'ℹ️'
+              }`}>
+                {modalMessage.type === 'error' ? '❌' :
+                 modalMessage.type === 'warning' ? '⚠️' :
+                 modalMessage.type === 'success' ? '✅' : 'ℹ️'}
+              </div>
+              <h3 className="text-xl font-bold text-white">{modalMessage.title}</h3>
+            </div>
+            <p className="text-gray-300 mb-6">{modalMessage.message}</p>
+            <button
+              onClick={() => setShowModal(false)}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Cosmic Background */}
       <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-1/4 left-1/3 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '3s' }}></div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-        <div className="absolute top-20 left-[10%] w-2 h-2 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDuration: '3s' }}></div>
-        <div className="absolute top-40 left-[25%] w-1 h-1 bg-pink-400/60 rounded-full animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}></div>
-        <div className="absolute top-60 right-[15%] w-3 h-3 bg-blue-400/40 rounded-full animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}></div>
-        <div className="absolute top-32 right-[30%] w-2 h-2 bg-purple-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1.5s' }}></div>
-        <div className="absolute top-80 left-[40%] w-1 h-1 bg-pink-400/70 rounded-full animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '2s' }}></div>
-        <div className="absolute bottom-40 right-[20%] w-2 h-2 bg-indigo-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.8s', animationDelay: '2.5s' }}></div>
+        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[150px] animate-pulse"></div>
+        <div className="absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
+        
+        {/* Stars */}
+        {[...Array(15)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
+            style={{
+              top: `${Math.random() * 50}%`,
+              left: `${Math.random() * 100}%`,
+              animationDuration: `${2 + Math.random() * 3}s`,
+              animationDelay: `${Math.random() * 2}s`
+            }}
+          />
+        ))}
       </div>
 
       {/* Content */}
@@ -441,42 +387,96 @@ export default function ListingDetailClient() {
         {/* Breadcrumb */}
         <div className="container mx-auto px-4 pt-24 pb-4">
           <div className="flex items-center space-x-2 text-sm">
-            <Link href="/" className="text-gray-400 hover:text-purple-400 transition">Home</Link>
+            <Link href="/" className="text-gray-400 hover:text-white transition">Home</Link>
             <span className="text-gray-600">/</span>
-            <Link href="/browse" className="text-gray-400 hover:text-purple-400 transition">Browse</Link>
+            <Link href="/browse" className="text-gray-400 hover:text-white transition">Browse</Link>
             <span className="text-gray-600">/</span>
-            <Link href={`/browse?game=${listing.game}`} className="text-gray-400 hover:text-purple-400 transition">{listing.game}</Link>
+            <Link href={`/browse?game=${listing.game}`} className="text-gray-400 hover:text-white transition">{listing.game}</Link>
             <span className="text-gray-600">/</span>
-            <span className="text-purple-400">{listing.title}</span>
+            <span className="text-gray-300 truncate max-w-[200px]">{listing.title}</span>
           </div>
         </div>
 
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 pb-12">
           <div className="grid lg:grid-cols-3 gap-8">
+            {/* Left Column - Product Info */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Main Listing Card */}
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all duration-300">
-                <div className="p-6">
-                  <ImageGallery images={listingImages} title={listing.title} compact={true} />
+              {/* Main Product Card */}
+              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all duration-300">
+                {/* Image Gallery */}
+                <div className="relative h-96 bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                  {images.length > 0 ? (
+                    <>
+                      <img
+                        src={images[activeImageIndex]}
+                        alt={listing.title}
+                        className="w-full h-full object-cover"
+                      />
+                      {images.length > 1 && (
+                        <>
+                          <button
+                            onClick={() => setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length)}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white w-10 h-10 rounded-full flex items-center justify-center transition"
+                          >
+                            ←
+                          </button>
+                          <button
+                            onClick={() => setActiveImageIndex((prev) => (prev + 1) % images.length)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white w-10 h-10 rounded-full flex items-center justify-center transition"
+                          >
+                            →
+                          </button>
+                          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+                            {images.map((_, index) => (
+                              <button
+                                key={index}
+                                onClick={() => setActiveImageIndex(index)}
+                                className={`w-2 h-2 rounded-full transition ${
+                                  index === activeImageIndex ? 'bg-white w-8' : 'bg-white/50'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-9xl">
+                        {listing.category === 'account' ? '🎮' : listing.category === 'currency' ? '💰' : '🔑'}
+                      </span>
+                    </div>
+                  )}
+                  {/* Category & Delivery Badge */}
+                  <div className="absolute top-4 left-4 flex gap-2">
+                    <span className="bg-black/50 backdrop-blur-lg px-4 py-2 rounded-full text-sm text-white font-semibold">
+                      {listing.category === 'account' ? '🎮 Account' : listing.category === 'currency' ? '💰 Currency' : '🔑 Game Key'}
+                    </span>
+                    {listing.delivery_type === 'automatic' && (
+                      <span className="bg-green-500/80 backdrop-blur-lg px-4 py-2 rounded-full text-sm text-white font-semibold flex items-center gap-1">
+                        ⚡ Instant Delivery
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="p-6 border-t border-white/10">
-                  <div className="flex items-start justify-between mb-4">
+                {/* Product Details */}
+                <div className="p-8">
+                  <div className="flex items-start justify-between mb-6">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <p className="text-purple-400 font-semibold">{listing.game}</p>
-                        <span className="bg-black/60 backdrop-blur-lg px-3 py-1.5 rounded-full text-xs text-white font-semibold border border-white/10">
-                          {listing.category === 'account' ? '🎮 Gaming Account' : listing.category === 'topup' ? '💰 Top-Up' : '🔑 Game Key'}
+                      <p className="text-purple-400 font-semibold mb-2 flex items-center gap-2">
+                        <span>{listing.game}</span>
+                        {listing.platform && (
+                          <span className="bg-white/5 px-3 py-1 rounded-full text-sm text-gray-300">
+                            {listing.platform}
+                          </span>
+                        )}
+                      </p>
+                      <h1 className="text-4xl font-bold text-white mb-2">
+                        <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
+                          {listing.title}
                         </span>
-                      </div>
-                      <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
-                        {listing.title}
                       </h1>
-                      {listing.platform && (
-                        <span className="inline-block bg-white/5 px-4 py-1.5 rounded-full text-sm text-gray-300 border border-white/10">
-                          {listing.platform}
-                        </span>
-                      )}
                     </div>
                   </div>
 
@@ -485,63 +485,88 @@ export default function ListingDetailClient() {
                     <div className="flex space-x-8">
                       <button
                         onClick={() => setActiveTab('description')}
-                        className={`pb-4 border-b-2 transition font-medium ${
+                        className={`pb-4 border-b-2 transition font-semibold ${
                           activeTab === 'description'
                             ? 'border-purple-500 text-white'
                             : 'border-transparent text-gray-400 hover:text-white'
                         }`}
                       >
-                        Description
+                        📝 Description
                       </button>
                       <button
                         onClick={() => setActiveTab('details')}
-                        className={`pb-4 border-b-2 transition font-medium ${
+                        className={`pb-4 border-b-2 transition font-semibold ${
                           activeTab === 'details'
                             ? 'border-purple-500 text-white'
                             : 'border-transparent text-gray-400 hover:text-white'
                         }`}
                       >
-                        Details
+                        ℹ️ Details
                       </button>
                     </div>
                   </div>
 
+                  {/* Tab Content */}
                   {activeTab === 'description' && (
-                    <div className="text-gray-300">
-                      <p className="whitespace-pre-wrap leading-relaxed">{listing.description || 'No description provided.'}</p>
+                    <div className="text-gray-300 leading-relaxed">
+                      <p className="whitespace-pre-wrap">{listing.description || 'No description provided.'}</p>
                     </div>
                   )}
 
                   {activeTab === 'details' && (
                     <div className="space-y-3">
-                      <div className="flex justify-between py-3 border-b border-white/10 hover:bg-white/5 px-2 rounded transition">
-                        <span className="text-gray-400">Category</span>
+                      <div className="flex justify-between py-3 border-b border-white/10">
+                        <span className="text-gray-400 flex items-center gap-2">
+                          <span>🏷️</span> Category
+                        </span>
                         <span className="text-white font-semibold">
-                          {listing.category === 'account' ? 'Gaming Account' : listing.category === 'topup' ? 'Top-Up' : 'Game Key'}
+                          {listing.category === 'account' ? 'Gaming Account' : listing.category === 'currency' ? 'Currency' : 'Game Key'}
                         </span>
                       </div>
-                      <div className="flex justify-between py-3 border-b border-white/10 hover:bg-white/5 px-2 rounded transition">
-                        <span className="text-gray-400">Game</span>
+                      <div className="flex justify-between py-3 border-b border-white/10">
+                        <span className="text-gray-400 flex items-center gap-2">
+                          <span>🎮</span> Game
+                        </span>
                         <span className="text-white font-semibold">{listing.game}</span>
                       </div>
                       {listing.platform && (
-                        <div className="flex justify-between py-3 border-b border-white/10 hover:bg-white/5 px-2 rounded transition">
-                          <span className="text-gray-400">Platform</span>
+                        <div className="flex justify-between py-3 border-b border-white/10">
+                          <span className="text-gray-400 flex items-center gap-2">
+                            <span>💻</span> Platform
+                          </span>
                           <span className="text-white font-semibold">{listing.platform}</span>
                         </div>
                       )}
-                      <div className="flex justify-between py-3 border-b border-white/10 hover:bg-white/5 px-2 rounded transition">
-                        <span className="text-gray-400">Stock</span>
-                        <span className={`font-semibold ${listing.stock <= 3 ? 'text-orange-400' : 'text-white'}`}>
-                          {listing.stock} available {listing.stock <= 3 && listing.stock > 0 && '⚠️'}
+                      <div className="flex justify-between py-3 border-b border-white/10">
+                        <span className="text-gray-400 flex items-center gap-2">
+                          <span>📦</span> Stock
+                        </span>
+                        <span className={`font-semibold ${listing.stock > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {listing.stock} available
                         </span>
                       </div>
-                      <div className="flex justify-between py-3 border-b border-white/10 hover:bg-white/5 px-2 rounded transition">
-                        <span className="text-gray-400">Images</span>
-                        <span className="text-white font-semibold">{listingImages.length} photo(s)</span>
+                      <div className="flex justify-between py-3 border-b border-white/10">
+                        <span className="text-gray-400 flex items-center gap-2">
+                          <span>🚚</span> Delivery
+                        </span>
+                        <span className="text-white font-semibold flex items-center gap-2">
+                          {listing.delivery_type === 'automatic' ? (
+                            <>
+                              <span className="text-green-400">⚡</span>
+                              Instant (Automatic)
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-blue-400">👤</span>
+                              Manual
+                            </>
+                          )}
+                        </span>
                       </div>
-                      <div className="flex justify-between py-3 border-b border-white/10 hover:bg-white/5 px-2 rounded transition">
-                        <span className="text-gray-400">Listed</span>
+                      <div className="flex justify-between py-3">
+                        <span className="text-gray-400 flex items-center gap-2">
+                          <span>📅</span> Listed
+                        </span>
                         <span className="text-white font-semibold">
                           {new Date(listing.created_at).toLocaleDateString()}
                         </span>
@@ -551,9 +576,9 @@ export default function ListingDetailClient() {
                 </div>
               </div>
 
-              {/* Similar Products */}
+              {/* Similar Products Section */}
               {similarListings.length > 0 && (
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
+                <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
                   <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                     <span className="text-purple-400">✨</span>
                     Similar Products
@@ -579,28 +604,30 @@ export default function ListingDetailClient() {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-4xl group-hover:scale-125 transition-transform duration-300">
-                                {item.category === 'account' ? '🎮' : item.category === 'topup' ? '💰' : '🔑'}
+                                {item.category === 'account' ? '🎮' : item.category === 'currency' ? '💰' : '🔑'}
                               </div>
                             )}
+                            {/* Same Game Badge */}
                             {item.game === listing.game && (
                               <div className="absolute top-2 left-2">
-                                <span className="bg-purple-500/90 backdrop-blur-lg text-white text-xs px-2 py-1 rounded-full font-semibold">
+                                <span className="bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
                                   Same Game
                                 </span>
                               </div>
                             )}
                           </div>
                           <div className="p-3">
-                            <p className="text-xs text-purple-400 mb-1">{item.game}</p>
-                            <h3 className="text-white font-semibold text-sm mb-2 line-clamp-2 group-hover:text-purple-300 transition">
+                            <p className="text-xs text-purple-400 font-semibold mb-1">{item.game}</p>
+                            <h3 className="text-white font-semibold text-sm mb-2 line-clamp-1 group-hover:text-purple-400 transition">
                               {item.title}
                             </h3>
                             <div className="flex items-center justify-between">
-                              <span className="text-green-400 font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${item.price.toFixed(2)}</span>
+                              <p className="text-green-400 font-bold">${item.price.toFixed(2)}</p>
                               {sellerData?.average_rating > 0 && (
-                                <span className="text-xs text-yellow-400">
-                                  ★ {sellerData.average_rating.toFixed(1)}
-                                </span>
+                                <div className="flex items-center gap-1 text-xs text-yellow-400">
+                                  <span>★</span>
+                                  <span>{sellerData.average_rating.toFixed(1)}</span>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -611,34 +638,35 @@ export default function ListingDetailClient() {
                 </div>
               )}
 
-              {/* Reviews Section */}
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
+              {/* Seller Reviews Section */}
+              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
                 <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                  <span className="text-yellow-400">⭐</span>
+                  <span className="text-purple-400">⭐</span>
                   Seller Reviews
                 </h2>
                 
                 {reviews.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="text-4xl mb-3">📝</div>
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">💭</div>
                     <p className="text-gray-400">No reviews yet</p>
+                    <p className="text-gray-500 text-sm mt-2">Be the first to review this seller!</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {reviews.map((review) => (
-                      <div key={review.id} className="bg-slate-800/50 border border-white/10 rounded-xl p-4 hover:border-purple-500/30 transition-all duration-300">
-                        <div className="flex items-center justify-between mb-2">
+                      <div key={review.id} className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition">
+                        <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                              <span className="text-white font-semibold">
-                                {review.profiles.username.charAt(0).toUpperCase()}
+                            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                              <span className="text-white font-bold text-lg">
+                                {review.profiles?.username?.charAt(0).toUpperCase() || 'U'}
                               </span>
                             </div>
                             <div>
-                              <p className="text-white font-semibold">{censorUsername(review.profiles.username)}</p>
+                              <p className="text-white font-semibold">{review.profiles?.username || 'Anonymous'}</p>
                               <div className="flex items-center">
                                 {[...Array(5)].map((_, i) => (
-                                  <span key={i} className={`${i < review.rating ? 'text-yellow-400' : 'text-gray-600'} transition`}>
+                                  <span key={i} className={`text-lg ${i < review.rating ? 'text-yellow-400' : 'text-gray-600'}`}>
                                     ★
                                   </span>
                                 ))}
@@ -649,9 +677,7 @@ export default function ListingDetailClient() {
                             {new Date(review.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                        {review.comment && (
-                          <p className="text-gray-300 text-sm leading-relaxed">{review.comment}</p>
-                        )}
+                        {review.comment && <p className="text-gray-300">{review.comment}</p>}
                       </div>
                     ))}
                   </div>
@@ -659,143 +685,159 @@ export default function ListingDetailClient() {
               </div>
             </div>
 
-            {/* Sidebar */}
-            <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+            {/* Right Column - Purchase & Seller */}
+            <div className="space-y-6">
               {/* Purchase Card */}
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
+              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-all duration-300">
                 <div className="mb-6">
                   <p className="text-gray-400 text-sm mb-2">Price</p>
-                  <p className="text-4xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${listing.price.toFixed(2)}</p>
+                  <p className="text-5xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                    ${listing.price.toFixed(2)}
+                  </p>
                 </div>
 
+                {/* Quantity Selector */}
                 <div className="mb-6">
-                  <label className="block text-white font-semibold mb-2">Quantity</label>
-                  <div className="flex items-center space-x-3">
+                  <label className="block text-white font-semibold mb-3">Quantity</label>
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-lg text-white font-bold transition border border-white/10 hover:border-purple-500/30"
+                      className="w-12 h-12 bg-white/5 hover:bg-white/10 rounded-xl text-white font-bold text-xl transition border border-white/10 hover:border-purple-500/50"
                     >
                       -
                     </button>
                     <input
                       type="number"
                       value={quantity}
-                      onChange={(e) => setQuantity(Math.max(1, Math.min(listing.stock, parseInt(e.target.value) || 1)))}
-                      className="w-20 px-4 py-2 bg-slate-800/80 border border-white/10 rounded-lg text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 1
+                        setQuantity(Math.min(Math.max(1, val), listing.stock))
+                      }}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl text-center text-white text-xl font-bold py-3 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition"
+                      min="1"
+                      max={listing.stock}
                     />
                     <button
                       onClick={() => setQuantity(Math.min(listing.stock, quantity + 1))}
-                      className="w-10 h-10 bg-white/5 hover:bg-white/10 rounded-lg text-white font-bold transition border border-white/10 hover:border-purple-500/30"
+                      className="w-12 h-12 bg-white/5 hover:bg-white/10 rounded-xl text-white font-bold text-xl transition border border-white/10 hover:border-purple-500/50"
                     >
                       +
                     </button>
                   </div>
-                  <p className="text-sm text-gray-400 mt-2">{listing.stock} in stock</p>
+                  <p className="text-gray-400 text-sm mt-2 text-center">
+                    {listing.stock} available
+                  </p>
                 </div>
 
-                <div className="mb-6 pb-6 border-b border-white/10">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Total</span>
-                    <span className="text-2xl font-bold text-white">${totalPrice.toFixed(2)}</span>
+                {/* Price Breakdown */}
+                <div className="space-y-3 mb-6 pb-6 border-b border-white/10">
+                  <div className="flex justify-between text-gray-300">
+                    <span>Subtotal</span>
+                    <span className="font-semibold">${totalPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span>Service Fee (5%)</span>
+                    <span className="font-semibold">${serviceFee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-white font-bold text-xl pt-3 border-t border-white/10">
+                    <span>Total</span>
+                    <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                      ${finalTotal.toFixed(2)}
+                    </span>
                   </div>
                 </div>
 
+                {/* Action Buttons */}
                 <div className="space-y-3">
                   <button
                     onClick={handleBuyNow}
-                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105"
+                    disabled={listing.stock === 0}
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02]"
                   >
-                    Buy Now
+                    {listing.stock === 0 ? '❌ Out of Stock' : '🚀 Buy Now'}
                   </button>
                   <button
                     onClick={handleAddToCart}
-                    className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-semibold border border-white/20 transition-all duration-300 hover:border-purple-500/30"
+                    disabled={listing.stock === 0}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-xl font-bold text-lg border-2 border-white/20 hover:border-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02]"
                   >
-                    Add to Cart
+                    🛒 Add to Cart
                   </button>
                   <button
                     onClick={handleContactSeller}
-                    className="w-full bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl font-semibold border border-white/10 transition-all duration-300 hover:border-purple-500/30"
+                    className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 py-4 rounded-xl font-bold text-lg border-2 border-blue-500/50 transition-all duration-300 hover:scale-[1.02]"
                   >
-                    Contact Seller
+                    💬 Contact Seller
                   </button>
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-white/10 space-y-3">
-                  <div className="flex items-center space-x-3 text-sm group">
-                    <span className="text-green-400 group-hover:scale-110 transition-transform">✓</span>
-                    <span className="text-gray-300">Secure Payment</span>
+                {/* Trust Badges */}
+                <div className="mt-6 space-y-3 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border border-green-500/20">
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400 text-xl">✓</span>
+                    <span>Secure Payment</span>
                   </div>
-                  <div className="flex items-center space-x-3 text-sm group">
-                    <span className="text-green-400 group-hover:scale-110 transition-transform">✓</span>
-                    <span className="text-gray-300">Buyer Protection</span>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400 text-xl">✓</span>
+                    <span>48h Buyer Protection</span>
                   </div>
-                  <div className="flex items-center space-x-3 text-sm group">
-                    <span className="text-green-400 group-hover:scale-110 transition-transform">✓</span>
-                    <span className="text-gray-300">Instant Delivery</span>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400 text-xl">✓</span>
+                    <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Seller Info Card - UPDATED WITH AVATAR */}
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
+              {/* Seller Info Card */}
+              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   <span className="text-purple-400">👤</span>
                   Seller Information
                 </h3>
                 
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-purple-500/30">
-                    {listing.profiles.avatar_url ? (
-                      <img 
-                        src={listing.profiles.avatar_url} 
-                        alt={listing.profiles.username}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-white font-bold text-xl">
-                        {listing.profiles.username.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center ring-4 ring-purple-500/20">
+                    <span className="text-white font-bold text-2xl">
+                      {sellerUsername.charAt(0).toUpperCase()}
+                    </span>
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <Link href={`/profile/${listing.profiles.id}`} className="text-white font-semibold hover:text-purple-400 transition">
-                        {listing.profiles.username}
+                    <div className="flex items-center space-x-2 mb-1">
+                      <Link href={`/seller/${sellerId}`} className="text-white font-bold text-lg hover:text-purple-400 transition">
+                        {sellerUsername}
                       </Link>
-                      {listing.profiles.verified && (
-                        <span className="text-blue-400" title="Verified Seller">✓</span>
+                      {sellerVerified && (
+                        <span className="text-blue-400 text-xl" title="Verified Seller">✓</span>
                       )}
                     </div>
                     <p className="text-sm text-gray-400">Member since {sellerJoinDate}</p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex justify-between py-2 border-b border-white/10">
-                    <span className="text-gray-400">Rating</span>
-                    <div className="flex items-center space-x-2">
+                <div className="space-y-3 mb-4">
+                  <div className="flex justify-between py-3 border-b border-white/10">
+                    <span className="text-gray-400 flex items-center gap-2">
                       <span className="text-yellow-400">★</span>
-                      <span className="text-white font-semibold">
-                        {listing.profiles.average_rating > 0 
-                          ? listing.profiles.average_rating.toFixed(1) 
-                          : 'No reviews yet'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-white/10">
-                    <span className="text-gray-400">Total Reviews</span>
-                    <span className="text-white font-semibold">
-                      {listing.profiles.total_reviews || 0}
+                      Rating
                     </span>
+                    <span className="text-white font-bold text-lg">
+                      {sellerRating > 0 ? sellerRating.toFixed(1) : 'New'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-3">
+                    <span className="text-gray-400 flex items-center gap-2">
+                      <span className="text-green-400">💰</span>
+                      Total Sales
+                    </span>
+                    <span className="text-white font-bold text-lg">{sellerTotalSales}</span>
                   </div>
                 </div>
 
                 <Link
-                  href={`/profile/${listing.profiles.id}`}
-                  className="block w-full mt-4 bg-white/5 hover:bg-white/10 text-white py-2 rounded-xl font-semibold text-center border border-white/10 transition-all duration-300 hover:border-purple-500/30"
+                  href={`/seller/${sellerId}`}
+                  className="block w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-white py-3 rounded-xl font-semibold text-center border-2 border-purple-500/50 transition-all duration-300 hover:scale-[1.02]"
                 >
-                  View Profile
+                  View Full Profile →
                 </Link>
               </div>
             </div>
@@ -809,46 +851,6 @@ export default function ListingDetailClient() {
           </div>
         </footer>
       </div>
-
-      {/* Custom Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
-          <div className="bg-slate-900/90 backdrop-blur-xl border border-white/20 rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="text-center">
-              <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
-                modalMessage.type === 'warning' 
-                  ? 'bg-yellow-500/20 border border-yellow-500/30' 
-                  : modalMessage.type === 'error'
-                  ? 'bg-red-500/20 border border-red-500/30'
-                  : modalMessage.type === 'success'
-                  ? 'bg-green-500/20 border border-green-500/30'
-                  : 'bg-blue-500/20 border border-blue-500/30'
-              }`}>
-                <span className="text-3xl">
-                  {modalMessage.type === 'warning' ? '⚠️' :
-                   modalMessage.type === 'error' ? '❌' :
-                   modalMessage.type === 'success' ? '✅' : 'ℹ️'}
-                </span>
-              </div>
-              
-              <h3 className="text-xl font-bold text-white mb-2">
-                {modalMessage.title}
-              </h3>
-              
-              <p className="text-gray-300 mb-6">
-                {modalMessage.message}
-              </p>
-              
-              <button
-                onClick={() => setShowModal(false)}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
