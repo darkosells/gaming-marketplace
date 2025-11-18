@@ -25,6 +25,7 @@ interface Listing {
   profiles: {
     id: string
     username: string
+    avatar_url: string | null
     rating: number
     average_rating: number
     total_sales: number
@@ -309,31 +310,18 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
     )
   }
 
-  // Debug: Log the listing data to see what we're getting
-console.log('Listing data:', listing)
-console.log('Profiles data:', listing.profiles)
-
-// Safe access with fallbacks
-const profileData = listing.profiles
-const sellerUsername = profileData?.username || 'Unknown Seller'
-const sellerId = profileData?.id || listing.seller_id
-const sellerRating = profileData?.average_rating || profileData?.rating || 0
-const sellerTotalSales = profileData?.total_sales || 0
-const sellerTotalReviews = profileData?.total_reviews || 0
-const sellerVerified = profileData?.verified || false
-const sellerJoinDate = profileData?.created_at 
-  ? new Date(profileData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  : 'Unknown'
-
-// Debug: Log what we extracted
-console.log('Seller info:', {
-  sellerUsername,
-  sellerId,
-  sellerRating,
-  sellerTotalSales,
-  sellerVerified,
-  sellerJoinDate
-})
+  // Safe access with fallbacks
+  const profileData = listing.profiles
+  const sellerUsername = profileData?.username || 'Unknown Seller'
+  const sellerId = profileData?.id || listing.seller_id
+  const sellerRating = profileData?.average_rating || profileData?.rating || 0
+  const sellerTotalSales = profileData?.total_sales || 0
+  const sellerTotalReviews = profileData?.total_reviews || 0
+  const sellerVerified = profileData?.verified || false
+  const sellerAvatar = profileData?.avatar_url || null
+  const sellerJoinDate = profileData?.created_at 
+    ? new Date(profileData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : 'Unknown'
 
   const images = listing.image_urls && listing.image_urls.length > 0 
     ? listing.image_urls 
@@ -379,34 +367,34 @@ console.log('Seller info:', {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
         
         {/* Stars - Static positions to avoid hydration mismatch */}
-{[
-  { top: 10, left: 20, duration: 3, delay: 0 },
-  { top: 25, left: 60, duration: 4, delay: 0.5 },
-  { top: 35, left: 80, duration: 2.5, delay: 1 },
-  { top: 15, left: 45, duration: 3.5, delay: 1.5 },
-  { top: 45, left: 15, duration: 4.5, delay: 0.8 },
-  { top: 5, left: 70, duration: 3.2, delay: 1.2 },
-  { top: 40, left: 35, duration: 2.8, delay: 0.3 },
-  { top: 20, left: 90, duration: 4.2, delay: 1.8 },
-  { top: 48, left: 25, duration: 3.8, delay: 0.6 },
-  { top: 8, left: 55, duration: 2.6, delay: 1.4 },
-  { top: 30, left: 75, duration: 3.3, delay: 0.9 },
-  { top: 42, left: 50, duration: 4.8, delay: 1.6 },
-  { top: 18, left: 85, duration: 2.9, delay: 0.4 },
-  { top: 38, left: 10, duration: 3.6, delay: 1.1 },
-  { top: 12, left: 95, duration: 4.4, delay: 1.9 },
-].map((star, i) => (
-  <div
-    key={i}
-    className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
-    style={{
-      top: `${star.top}%`,
-      left: `${star.left}%`,
-      animationDuration: `${star.duration}s`,
-      animationDelay: `${star.delay}s`
-    }}
-  />
-))}
+        {[
+          { top: 10, left: 20, duration: 3, delay: 0 },
+          { top: 25, left: 60, duration: 4, delay: 0.5 },
+          { top: 35, left: 80, duration: 2.5, delay: 1 },
+          { top: 15, left: 45, duration: 3.5, delay: 1.5 },
+          { top: 45, left: 15, duration: 4.5, delay: 0.8 },
+          { top: 5, left: 70, duration: 3.2, delay: 1.2 },
+          { top: 40, left: 35, duration: 2.8, delay: 0.3 },
+          { top: 20, left: 90, duration: 4.2, delay: 1.8 },
+          { top: 48, left: 25, duration: 3.8, delay: 0.6 },
+          { top: 8, left: 55, duration: 2.6, delay: 1.4 },
+          { top: 30, left: 75, duration: 3.3, delay: 0.9 },
+          { top: 42, left: 50, duration: 4.8, delay: 1.6 },
+          { top: 18, left: 85, duration: 2.9, delay: 0.4 },
+          { top: 38, left: 10, duration: 3.6, delay: 1.1 },
+          { top: 12, left: 95, duration: 4.4, delay: 1.9 },
+        ].map((star, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
+            style={{
+              top: `${star.top}%`,
+              left: `${star.left}%`,
+              animationDuration: `${star.duration}s`,
+              animationDelay: `${star.delay}s`
+            }}
+          />
+        ))}
       </div>
 
       {/* Content */}
@@ -824,7 +812,7 @@ console.log('Seller info:', {
                 </div>
               </div>
 
-              {/* Seller Info Card */}
+              {/* Seller Info Card - WITH AVATAR SUPPORT */}
               <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   <span className="text-purple-400">👤</span>
@@ -832,10 +820,18 @@ console.log('Seller info:', {
                 </h3>
                 
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center ring-4 ring-purple-500/20">
-                    <span className="text-white font-bold text-2xl">
-                      {sellerUsername.charAt(0).toUpperCase()}
-                    </span>
+                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center ring-4 ring-purple-500/20 overflow-hidden">
+                    {sellerAvatar ? (
+                      <img 
+                        src={sellerAvatar} 
+                        alt={sellerUsername}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-white font-bold text-2xl">
+                        {sellerUsername.charAt(0).toUpperCase()}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1">

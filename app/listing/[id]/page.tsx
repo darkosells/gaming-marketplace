@@ -27,6 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       image_url,
       profiles (
         username,
+        avatar_url,
         average_rating,
         total_reviews
       )
@@ -99,6 +100,7 @@ export default async function ListingPage({ params }: Props) {
       profiles (
         id,
         username,
+        avatar_url,
         rating,
         average_rating,
         total_sales,
@@ -120,7 +122,7 @@ export default async function ListingPage({ params }: Props) {
     
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('id, username, rating, average_rating, total_sales, total_reviews, verified, created_at')
+      .select('id, username, avatar_url, rating, average_rating, total_sales, total_reviews, verified, created_at')
       .eq('id', listing.seller_id)
       .single()
     
