@@ -1,6 +1,6 @@
 // supabase/functions/send-order-email/index.ts
-// Complete Edge Function for Nashflare email notifications
-// REPLACE YOUR ENTIRE Edge Function FILE WITH THIS
+// Enhanced Edge Function with Professional Cosmic-Themed Email Templates
+// All emails now feature consistent branding with purple-pink gradients and logo
 
 // @ts-ignore - Deno import
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -35,31 +35,31 @@ serve(async (req) => {
     switch (emailRequest.type) {
       case 'order_confirmation':
         toEmail = emailRequest.buyerEmail
-        subject = `Order Confirmed - ${emailRequest.listingTitle}`
+        subject = `🎮 Order Confirmed - ${emailRequest.listingTitle}`
         htmlContent = generateOrderConfirmationEmail(emailRequest)
         break
 
       case 'delivery_notification':
         toEmail = emailRequest.buyerEmail
-        subject = `Your Order Has Been Delivered - ${emailRequest.listingTitle}`
+        subject = `🎉 Your Order Has Been Delivered - ${emailRequest.listingTitle}`
         htmlContent = generateDeliveryNotificationEmail(emailRequest)
         break
 
       case 'new_sale':
         toEmail = emailRequest.sellerEmail
-        subject = `New Sale! - ${emailRequest.listingTitle}`
+        subject = `💰 New Sale! - ${emailRequest.listingTitle}`
         htmlContent = generateNewSaleEmail(emailRequest)
         break
 
       case 'dispute_opened':
         toEmail = emailRequest.recipientEmail
-        subject = `Dispute Opened - Order #${emailRequest.orderId.substring(0, 8)}`
+        subject = `⚠️ Dispute Opened - Order #${emailRequest.orderId.substring(0, 8)}`
         htmlContent = generateDisputeEmail(emailRequest)
         break
 
       case 'withdrawal_processed':
         toEmail = emailRequest.vendorEmail
-        subject = `Withdrawal Processed - $${emailRequest.amount.toFixed(2)}`
+        subject = `💸 Withdrawal Processed - $${emailRequest.amount.toFixed(2)}`
         htmlContent = generateWithdrawalEmail(emailRequest)
         break
 
@@ -77,7 +77,7 @@ serve(async (req) => {
 
       case 'welcome':
         toEmail = emailRequest.userEmail
-        subject = `🎮 Welcome to Nashflare!`
+        subject = `🎮 Welcome to Nashflare - Your Gaming Marketplace!`
         htmlContent = generateWelcomeEmail(emailRequest)
         break
 
@@ -127,6 +127,70 @@ serve(async (req) => {
 })
 
 // ============================================
+// SHARED EMAIL COMPONENTS
+// ============================================
+
+// Logo URL - PNG version for better email client compatibility
+// Try these URLs in order of likelihood:
+const LOGO_URLS = [
+  'https://gaming-marketplace-five.vercel.app/nashflare-logo.png',
+  'https://gaming-marketplace-five.vercel.app/nashflare-logo',
+  'https://gaming-marketplace-five.vercel.app/logo.png',
+  'https://gaming-marketplace-five.vercel.app/nashflare.png',
+]
+const LOGO_URL = LOGO_URLS[0] // Update index if first one doesn't work
+const USE_LOGO_IMAGE = true // Using PNG logo
+
+function getEmailHeader(title: string): string {
+  const logoHTML = USE_LOGO_IMAGE 
+    ? `<img src="${LOGO_URL}" alt="Nashflare" width="80" height="80" style="display: inline-block; vertical-align: middle;" />`
+    : `
+    <!-- Stylized Text Logo -->
+    <div style="display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.15) 100%); border: 3px solid rgba(255,255,255,0.5); border-radius: 20px; backdrop-filter: blur(10px); position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+        <div style="font-size: 42px; font-weight: 900; color: #ffffff; text-shadow: 0 4px 12px rgba(0,0,0,0.5); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">N</div>
+      </div>
+      <div style="position: absolute; bottom: 2px; right: 2px; width: 20px; height: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; border: 2px solid rgba(255,255,255,0.9);"></div>
+    </div>
+    `
+    
+  return `
+    <tr>
+      <td style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%); padding: 48px 40px; text-align: center; position: relative;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.05) 0%, transparent 50%);"></div>
+        
+        <!-- Logo -->
+        <div style="margin-bottom: 20px; position: relative;">
+          ${logoHTML}
+        </div>
+        
+        <h1 style="margin: 0; color: #ffffff; font-size: 36px; font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 4px 12px rgba(0,0,0,0.3); position: relative;">
+          Nashflare
+        </h1>
+        <div style="margin: 16px 0 0; display: inline-block; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 10px 24px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.3);">
+          <p style="margin: 0; color: #ffffff; font-size: 15px; font-weight: 600; letter-spacing: 0.5px;">${title}</p>
+        </div>
+      </td>
+    </tr>
+  `
+}
+
+function getEmailFooter(): string {
+  return `
+    <tr>
+      <td style="background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 100%); padding: 32px 40px; text-align: center; border-top: 1px solid rgba(167, 139, 250, 0.2);">
+        <p style="margin: 0 0 8px; color: #64748b; font-size: 12px; line-height: 1.6;">
+          © 2025 Nashflare. All rights reserved.
+        </p>
+        <p style="margin: 0; color: #475569; font-size: 11px; line-height: 1.5;">
+          The ultimate marketplace for gaming accounts, currency, and items.
+        </p>
+      </td>
+    </tr>
+  `
+}
+
+// ============================================
 // EMAIL TEMPLATE GENERATORS
 // ============================================
 
@@ -137,54 +201,130 @@ function generateOrderConfirmationEmail(data: any): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
     </head>
-    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); padding: 30px; text-align: center;">
-                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">🎮 Nashflare</h1>
-                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">Order Confirmation</p>
-                </td>
-              </tr>
+            <!-- Main Container -->
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background: linear-gradient(135deg, #1e293b 0%, #312e81 50%, #1e293b 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 100px rgba(139, 92, 246, 0.2);">
               
-              <!-- Content -->
+              ${getEmailHeader('ORDER CONFIRMATION')}
+              
+              <!-- Main Content Area -->
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Thanks for your order, ${data.buyerUsername}!</h2>
+                <td style="padding: 48px 40px; background: linear-gradient(to bottom, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);">
                   
-                  <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <p style="color: #a78bfa; font-weight: 600; margin: 0 0 12px; font-size: 14px; text-transform: uppercase;">Order Details</p>
-                    <p style="color: white; margin: 0 0 8px; font-size: 18px; font-weight: 600;">${data.listingTitle}</p>
-                    <p style="color: #94a3b8; margin: 0 0 8px;">Quantity: ${data.quantity}</p>
-                    <p style="color: #94a3b8; margin: 0 0 8px;">Seller: ${data.sellerUsername}</p>
-                    <p style="color: #34d399; font-size: 24px; font-weight: bold; margin: 16px 0 0;">$${data.amount.toFixed(2)}</p>
-                  </div>
+                  <!-- Success Badge -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 32px;">
+                    <tr>
+                      <td align="center">
+                        <div style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 12px 28px; border-radius: 50px; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);">
+                          <p style="margin: 0; color: #ffffff; font-size: 14px; font-weight: 700; letter-spacing: 0.5px;">✓ ORDER PLACED SUCCESSFULLY</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
 
-                  <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-                    <p style="color: #60a5fa; margin: 0; font-size: 14px;">
-                      📦 Your order is being processed. The seller will deliver your item shortly. You'll receive another email when it's ready!
-                    </p>
-                  </div>
-
-                  <p style="color: #94a3b8; margin: 0; font-size: 14px;">
-                    Order ID: <span style="color: white; font-family: monospace;">${data.orderId.substring(0, 8)}...</span>
+                  <h2 style="color: #ffffff; margin: 0 0 12px; font-size: 28px; font-weight: 700; line-height: 1.2;">
+                    Thanks for your order, <span style="background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${data.buyerUsername}</span>!
+                  </h2>
+                  
+                  <p style="color: #94a3b8; margin: 0 0 32px; font-size: 16px; line-height: 1.6;">
+                    Your order has been confirmed and ${data.sellerUsername} has been notified. We'll send you another email once your items are delivered.
                   </p>
+                  
+                  <!-- Order Details Card with Glassmorphism -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin-bottom: 24px;">
+                    <tr>
+                      <td style="background: linear-gradient(90deg, rgba(167, 139, 250, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%); padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <p style="margin: 0; color: #a78bfa; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">📦 Order Details</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 28px 24px;">
+                        <p style="color: #ffffff; margin: 0 0 16px; font-size: 20px; font-weight: 700; line-height: 1.4;">
+                          ${data.listingTitle}
+                        </p>
+                        
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td style="padding: 8px 0;">
+                              <p style="margin: 0; color: #64748b; font-size: 14px; font-weight: 500;">Quantity</p>
+                            </td>
+                            <td align="right" style="padding: 8px 0;">
+                              <p style="margin: 0; color: #cbd5e1; font-size: 14px; font-weight: 600;">${data.quantity}</p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 0;">
+                              <p style="margin: 0; color: #64748b; font-size: 14px; font-weight: 500;">Seller</p>
+                            </td>
+                            <td align="right" style="padding: 8px 0;">
+                              <p style="margin: 0; color: #cbd5e1; font-size: 14px; font-weight: 600;">${data.sellerUsername}</p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 0;">
+                              <p style="margin: 0; color: #64748b; font-size: 14px; font-weight: 500;">Order ID</p>
+                            </td>
+                            <td align="right" style="padding: 8px 0;">
+                              <p style="margin: 0; color: #cbd5e1; font-size: 12px; font-family: 'Courier New', monospace;">#${data.orderId.substring(0, 8).toUpperCase()}</p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td colspan="2" style="padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05);">
+                              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                  <td>
+                                    <p style="margin: 0; color: #ffffff; font-size: 15px; font-weight: 700;">Total Paid</p>
+                                  </td>
+                                  <td align="right">
+                                    <p style="margin: 0; color: #34d399; font-size: 32px; font-weight: 800; letter-spacing: -1px;">
+                                      $${data.amount.toFixed(2)}
+                                    </p>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Info Alert -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0; color: #c4b5fd; font-size: 14px; line-height: 1.6;">
+                          <strong style="color: #a78bfa;">📦 What's Next?</strong><br>
+                          The seller is preparing your order. You'll receive your items via our secure messaging system. Check your messages regularly for delivery updates!
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Protection Badge -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.05) 100%); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; overflow: hidden;">
+                    <tr>
+                      <td style="padding: 20px 24px; text-align: center;">
+                        <p style="margin: 0 0 8px; color: #34d399; font-size: 24px;">🛡️</p>
+                        <p style="margin: 0; color: #6ee7b7; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                          Protected by Nashflare Buyer Protection
+                        </p>
+                        <p style="margin: 8px 0 0; color: #86efac; font-size: 12px;">
+                          48-hour guarantee • Secure escrow • Dispute resolution
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
                 </td>
               </tr>
 
-              <!-- Footer -->
-              <tr>
-                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <p style="color: #64748b; margin: 0; font-size: 12px;">
-                    © 2024 Nashflare. All rights reserved.<br>
-                    If you didn't make this purchase, please contact our support immediately.
-                  </p>
-                </td>
-              </tr>
+              ${getEmailFooter()}
             </table>
           </td>
         </tr>
@@ -201,57 +341,91 @@ function generateDeliveryNotificationEmail(data: any): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
     </head>
-    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
-                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">🎮 Nashflare</h1>
-                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">🎉 Order Delivered!</p>
-                </td>
-              </tr>
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background: linear-gradient(135deg, #1e293b 0%, #312e81 50%, #1e293b 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 100px rgba(139, 92, 246, 0.2);">
               
-              <!-- Content -->
+              ${getEmailHeader('🎉 ORDER DELIVERED')}
+              
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Great news, ${data.buyerUsername}!</h2>
-                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">Your order has been delivered by ${data.sellerUsername}.</p>
+                <td style="padding: 48px 40px; background: linear-gradient(to bottom, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);">
                   
-                  <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <p style="color: #34d399; font-weight: 600; margin: 0 0 12px; font-size: 14px; text-transform: uppercase;">Your Delivery Code</p>
-                    <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 16px; font-family: monospace; font-size: 14px; color: #fbbf24; word-break: break-all;">
-                      ${data.deliveryCode}
-                    </div>
-                  </div>
-
-                  <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-                    <p style="color: #f87171; margin: 0; font-size: 14px;">
-                      ⚠️ <strong>Important:</strong> Please verify your delivery within 48 hours. If there's an issue, open a dispute before the protection period ends.
-                    </p>
-                  </div>
-
-                  <p style="color: #94a3b8; margin: 0 0 8px; font-size: 14px;">
-                    Item: <span style="color: white;">${data.listingTitle}</span>
+                  <!-- Celebration Badge -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 32px;">
+                    <tr>
+                      <td align="center">
+                        <div style="font-size: 64px; margin-bottom: 16px;">🎊</div>
+                        <h2 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; line-height: 1.2;">
+                          Great news, <span style="background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${data.buyerUsername}</span>!
+                        </h2>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <p style="color: #94a3b8; margin: 0 0 32px; font-size: 16px; line-height: 1.6; text-align: center;">
+                    Your order has been delivered by <strong style="color: #cbd5e1;">${data.sellerUsername}</strong>
                   </p>
-                  <p style="color: #94a3b8; margin: 0; font-size: 14px;">
-                    Order ID: <span style="color: white; font-family: monospace;">${data.orderId.substring(0, 8)}...</span>
-                  </p>
+                  
+                  <!-- Delivery Code Card -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%); border: 2px solid rgba(251, 191, 36, 0.3); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 24px; text-align: center;">
+                        <p style="margin: 0 0 16px; color: #fbbf24; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">🔑 Your Delivery Code</p>
+                        <div style="background: rgba(0,0,0,0.4); border-radius: 12px; padding: 20px; margin-bottom: 12px;">
+                          <p style="margin: 0; font-family: 'Courier New', monospace; font-size: 16px; color: #fde047; word-break: break-all; line-height: 1.6; font-weight: 600;">
+                            ${data.deliveryCode}
+                          </p>
+                        </div>
+                        <p style="margin: 0; color: #fcd34d; font-size: 12px;">
+                          Save this code - you'll need it to access your items
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Item Details -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 12px; margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0 0 4px; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase;">Item</p>
+                        <p style="margin: 0 0 16px; color: #ffffff; font-size: 16px; font-weight: 600;">${data.listingTitle}</p>
+                        <p style="margin: 0 0 4px; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase;">Order ID</p>
+                        <p style="margin: 0; color: #cbd5e1; font-size: 13px; font-family: 'Courier New', monospace;">#${data.orderId.substring(0, 8).toUpperCase()}</p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Critical Warning -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(239, 68, 68, 0.08); border-left: 4px solid #ef4444; border-radius: 12px; margin-bottom: 32px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0; color: #fca5a5; font-size: 14px; line-height: 1.6;">
+                          <strong style="color: #f87171;">⚠️ Important - Action Required</strong><br><br>
+                          You have <strong style="color: #fee2e2;">48 hours</strong> to verify your delivery. If there's any issue with your order, please open a dispute before the buyer protection period ends. After 48 hours, the funds will be released to the seller.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Action Buttons -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td align="center" style="padding: 8px;">
+                        <a href="https://nashflare.com/orders/${data.orderId}" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);">
+                          View Order Details →
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
                 </td>
               </tr>
 
-              <!-- Footer -->
-              <tr>
-                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <p style="color: #64748b; margin: 0; font-size: 12px;">
-                    © 2024 Nashflare. All rights reserved.<br>
-                    Keep this email safe - it contains your delivery information.
-                  </p>
-                </td>
-              </tr>
+              ${getEmailFooter()}
             </table>
           </td>
         </tr>
@@ -268,55 +442,121 @@ function generateNewSaleEmail(data: any): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
     </head>
-    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px; text-align: center;">
-                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">🎮 Nashflare</h1>
-                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">💰 New Sale!</p>
-                </td>
-              </tr>
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background: linear-gradient(135deg, #1e293b 0%, #312e81 50%, #1e293b 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 100px rgba(139, 92, 246, 0.2);">
               
-              <!-- Content -->
+              ${getEmailHeader('💰 NEW SALE')}
+              
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Congratulations, ${data.sellerUsername}! 🎉</h2>
-                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">You just made a sale!</p>
+                <td style="padding: 48px 40px; background: linear-gradient(to bottom, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);">
                   
-                  <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <p style="color: #fbbf24; font-weight: 600; margin: 0 0 12px; font-size: 14px; text-transform: uppercase;">Sale Details</p>
-                    <p style="color: white; margin: 0 0 8px; font-size: 18px; font-weight: 600;">${data.listingTitle}</p>
-                    <p style="color: #94a3b8; margin: 0 0 8px;">Quantity: ${data.quantity}</p>
-                    <p style="color: #94a3b8; margin: 0 0 8px;">Buyer: ${data.buyerUsername}</p>
-                    <p style="color: #34d399; font-size: 24px; font-weight: bold; margin: 16px 0 0;">+$${data.amount.toFixed(2)}</p>
-                  </div>
-
-                  <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-                    <p style="color: #60a5fa; margin: 0; font-size: 14px;">
-                      📦 Please deliver the item to your buyer as soon as possible to maintain your seller rating!
-                    </p>
-                  </div>
-
-                  <p style="color: #94a3b8; margin: 0; font-size: 14px;">
-                    Order ID: <span style="color: white; font-family: monospace;">${data.orderId.substring(0, 8)}...</span>
+                  <!-- Celebration -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 32px;">
+                    <tr>
+                      <td align="center">
+                        <div style="font-size: 64px; margin-bottom: 16px;">💸</div>
+                        <h2 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; line-height: 1.2;">
+                          Congratulations, <span style="background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${data.sellerUsername}</span>!
+                        </h2>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <p style="color: #94a3b8; margin: 0 0 32px; font-size: 16px; line-height: 1.6; text-align: center;">
+                    You just made a sale! 🎉
                   </p>
+                  
+                  <!-- Sale Details Card -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin-bottom: 24px;">
+                    <tr>
+                      <td style="background: linear-gradient(90deg, rgba(167, 139, 250, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%); padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <p style="margin: 0; color: #a78bfa; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">💰 Sale Details</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 28px 24px;">
+                        <p style="color: #ffffff; margin: 0 0 20px; font-size: 20px; font-weight: 700; line-height: 1.4;">
+                          ${data.listingTitle}
+                        </p>
+                        
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td style="padding: 8px 0;">
+                              <p style="margin: 0; color: #64748b; font-size: 14px; font-weight: 500;">Quantity Sold</p>
+                            </td>
+                            <td align="right" style="padding: 8px 0;">
+                              <p style="margin: 0; color: #cbd5e1; font-size: 14px; font-weight: 600;">${data.quantity}</p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 0;">
+                              <p style="margin: 0; color: #64748b; font-size: 14px; font-weight: 500;">Buyer</p>
+                            </td>
+                            <td align="right" style="padding: 8px 0;">
+                              <p style="margin: 0; color: #cbd5e1; font-size: 14px; font-weight: 600;">${data.buyerUsername}</p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 0;">
+                              <p style="margin: 0; color: #64748b; font-size: 14px; font-weight: 500;">Order ID</p>
+                            </td>
+                            <td align="right" style="padding: 8px 0;">
+                              <p style="margin: 0; color: #cbd5e1; font-size: 12px; font-family: 'Courier New', monospace;">#${data.orderId.substring(0, 8).toUpperCase()}</p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td colspan="2" style="padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05);">
+                              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                  <td>
+                                    <p style="margin: 0; color: #a78bfa; font-size: 15px; font-weight: 700;">You Earned</p>
+                                  </td>
+                                  <td align="right">
+                                    <p style="margin: 0; color: #34d399; font-size: 32px; font-weight: 800; letter-spacing: -1px;">
+                                      +$${data.amount.toFixed(2)}
+                                    </p>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Action Required Alert -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; border-radius: 12px; margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0; color: #c4b5fd; font-size: 14px; line-height: 1.6;">
+                          <strong style="color: #a78bfa;">📦 Action Required</strong><br><br>
+                          Please deliver the items to your buyer as soon as possible to maintain your seller rating and ensure customer satisfaction!
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Action Button -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td align="center">
+                        <a href="https://nashflare.com/orders/${data.orderId}" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);">
+                          Deliver Order Now →
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
                 </td>
               </tr>
 
-              <!-- Footer -->
-              <tr>
-                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <p style="color: #64748b; margin: 0; font-size: 12px;">
-                    © 2024 Nashflare. All rights reserved.<br>
-                    Thank you for being a valued seller on our platform!
-                  </p>
-                </td>
-              </tr>
+              ${getEmailFooter()}
             </table>
           </td>
         </tr>
@@ -333,53 +573,98 @@ function generateDisputeEmail(data: any): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
     </head>
-    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 30px; text-align: center;">
-                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">🎮 Nashflare</h1>
-                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">⚠️ Dispute Opened</p>
-                </td>
-              </tr>
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background: linear-gradient(135deg, #1e293b 0%, #312e81 50%, #1e293b 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 100px rgba(139, 92, 246, 0.2);">
               
-              <!-- Content -->
+              ${getEmailHeader('⚠️ DISPUTE OPENED')}
+              
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Attention Required, ${data.recipientUsername}</h2>
-                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">A dispute has been opened on your order.</p>
+                <td style="padding: 48px 40px; background: linear-gradient(to bottom, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);">
                   
-                  <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <p style="color: #f87171; font-weight: 600; margin: 0 0 12px; font-size: 14px; text-transform: uppercase;">Dispute Details</p>
-                    <p style="color: white; margin: 0 0 8px;">Opened by: <strong>${data.openedBy}</strong></p>
-                    <p style="color: #94a3b8; margin: 0;">Reason: ${data.disputeReason}</p>
-                  </div>
+                  <!-- Alert Badge -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 32px;">
+                    <tr>
+                      <td align="center">
+                        <div style="display: inline-block; background: rgba(239, 68, 68, 0.15); border: 2px solid #ef4444; padding: 12px 28px; border-radius: 50px;">
+                          <p style="margin: 0; color: #fca5a5; font-size: 14px; font-weight: 700; letter-spacing: 0.5px;">⚠️ ATTENTION REQUIRED</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
 
-                  <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-                    <p style="color: #60a5fa; margin: 0; font-size: 14px;">
-                      🔍 Please respond to this dispute in your dashboard. An admin will review the case and make a decision.
-                    </p>
-                  </div>
-
-                  <p style="color: #94a3b8; margin: 0; font-size: 14px;">
-                    Order ID: <span style="color: white; font-family: monospace;">${data.orderId.substring(0, 8)}...</span>
+                  <h2 style="color: #ffffff; margin: 0 0 12px; font-size: 28px; font-weight: 700; line-height: 1.2; text-align: center;">
+                    Hello <span style="background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${data.recipientUsername}</span>
+                  </h2>
+                  
+                  <p style="color: #94a3b8; margin: 0 0 32px; font-size: 16px; line-height: 1.6; text-align: center;">
+                    A dispute has been opened on your order and requires your immediate attention.
                   </p>
+                  
+                  <!-- Dispute Details Card -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(239, 68, 68, 0.08); border: 2px solid rgba(239, 68, 68, 0.3); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin-bottom: 24px;">
+                    <tr>
+                      <td style="background: rgba(239, 68, 68, 0.15); padding: 20px 24px; border-bottom: 1px solid rgba(239, 68, 68, 0.2);">
+                        <p style="margin: 0; color: #fca5a5; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">⚠️ Dispute Information</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 28px 24px;">
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td style="padding: 12px 0;">
+                              <p style="margin: 0 0 4px; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase;">Opened By</p>
+                              <p style="margin: 0; color: #ffffff; font-size: 16px; font-weight: 600;">${data.openedBy}</p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 12px 0; border-top: 1px solid rgba(255,255,255,0.05);">
+                              <p style="margin: 0 0 4px; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase;">Reason</p>
+                              <p style="margin: 0; color: #fca5a5; font-size: 14px; line-height: 1.5;">${data.disputeReason}</p>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 12px 0; border-top: 1px solid rgba(255,255,255,0.05);">
+                              <p style="margin: 0 0 4px; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase;">Order ID</p>
+                              <p style="margin: 0; color: #cbd5e1; font-size: 13px; font-family: 'Courier New', monospace;">#${data.orderId.substring(0, 8).toUpperCase()}</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Action Required -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; border-radius: 12px; margin-bottom: 32px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0; color: #c4b5fd; font-size: 14px; line-height: 1.6;">
+                          <strong style="color: #a78bfa;">🔍 What Happens Next?</strong><br><br>
+                          Please respond to this dispute in your dashboard with your side of the story. Our admin team will review all evidence from both parties and make a fair decision. Quick responses help resolve disputes faster!
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Action Button -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td align="center">
+                        <a href="https://nashflare.com/disputes/${data.orderId}" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%); color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);">
+                          Respond to Dispute →
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
                 </td>
               </tr>
 
-              <!-- Footer -->
-              <tr>
-                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <p style="color: #64748b; margin: 0; font-size: 12px;">
-                    © 2024 Nashflare. All rights reserved.<br>
-                    Please respond to disputes promptly to avoid account penalties.
-                  </p>
-                </td>
-              </tr>
+              ${getEmailFooter()}
             </table>
           </td>
         </tr>
@@ -396,50 +681,84 @@ function generateWithdrawalEmail(data: any): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
     </head>
-    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
-                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">🎮 Nashflare</h1>
-                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">💸 Withdrawal Processed</p>
-                </td>
-              </tr>
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background: linear-gradient(135deg, #1e293b 0%, #312e81 50%, #1e293b 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 100px rgba(139, 92, 246, 0.2);">
               
-              <!-- Content -->
+              ${getEmailHeader('💸 WITHDRAWAL PROCESSED')}
+              
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Great news, ${data.vendorUsername}!</h2>
-                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">Your withdrawal has been processed successfully.</p>
+                <td style="padding: 48px 40px; background: linear-gradient(to bottom, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);">
                   
-                  <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <p style="color: #34d399; font-weight: 600; margin: 0 0 12px; font-size: 14px; text-transform: uppercase;">Withdrawal Details</p>
-                    <p style="color: #34d399; font-size: 32px; font-weight: bold; margin: 0 0 16px;">$${data.amount.toFixed(2)}</p>
-                    <p style="color: #94a3b8; margin: 0 0 8px;">Method: <span style="color: white;">${data.method}</span></p>
-                    ${data.transactionId ? `<p style="color: #94a3b8; margin: 0;">Transaction ID: <span style="color: white; font-family: monospace;">${data.transactionId}</span></p>` : ''}
-                  </div>
-
-                  <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px;">
-                    <p style="color: #60a5fa; margin: 0; font-size: 14px;">
-                      ℹ️ The funds should arrive in your account within 1-3 business days depending on your payment method.
-                    </p>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- Footer -->
-              <tr>
-                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <p style="color: #64748b; margin: 0; font-size: 12px;">
-                    © 2024 Nashflare. All rights reserved.<br>
-                    Thank you for being a valued seller on our platform!
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 32px;">
+                    <tr>
+                      <td align="center">
+                        <div style="font-size: 64px; margin-bottom: 16px;">💵</div>
+                        <h2 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; line-height: 1.2;">
+                          Great news, <span style="background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${data.vendorUsername}</span>!
+                        </h2>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <p style="color: #94a3b8; margin: 0 0 32px; font-size: 16px; line-height: 1.6; text-align: center;">
+                    Your withdrawal has been processed successfully.
                   </p>
+                  
+                  <!-- Amount Card -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%); border: 2px solid rgba(16, 185, 129, 0.3); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 40px; text-align: center;">
+                        <p style="margin: 0 0 16px; color: #6ee7b7; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Withdrawal Amount</p>
+                        <p style="margin: 0 0 24px; color: #34d399; font-size: 48px; font-weight: 800; letter-spacing: -2px; text-shadow: 0 4px 12px rgba(52, 211, 153, 0.3);">
+                          $${data.amount.toFixed(2)}
+                        </p>
+                        <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 16px;">
+                          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td style="padding: 8px 0; text-align: left;">
+                                <p style="margin: 0; color: #64748b; font-size: 13px; font-weight: 500;">Payment Method</p>
+                              </td>
+                              <td align="right" style="padding: 8px 0;">
+                                <p style="margin: 0; color: #ffffff; font-size: 13px; font-weight: 600;">${data.method}</p>
+                              </td>
+                            </tr>
+                            ${data.transactionId ? `
+                            <tr>
+                              <td style="padding: 8px 0; text-align: left; border-top: 1px solid rgba(255,255,255,0.05);">
+                                <p style="margin: 0; color: #64748b; font-size: 13px; font-weight: 500;">Transaction ID</p>
+                              </td>
+                              <td align="right" style="padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.05);">
+                                <p style="margin: 0; color: #cbd5e1; font-size: 11px; font-family: 'Courier New', monospace;">${data.transactionId}</p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Info Alert -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; border-radius: 12px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0; color: #c4b5fd; font-size: 14px; line-height: 1.6;">
+                          <strong style="color: #a78bfa;">ℹ️ Processing Time</strong><br><br>
+                          The funds should arrive in your account within <strong style="color: #d8b4fe;">1-3 business days</strong> depending on your payment method. If you have any questions, feel free to contact our support team!
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
                 </td>
               </tr>
+
+              ${getEmailFooter()}
             </table>
           </td>
         </tr>
@@ -466,63 +785,73 @@ function generatePasswordChangedEmail(data: any): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
     </head>
-    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
-                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">🎮 Nashflare</h1>
-                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">🔒 Security Alert</p>
-                </td>
-              </tr>
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background: linear-gradient(135deg, #1e293b 0%, #312e81 50%, #1e293b 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 100px rgba(139, 92, 246, 0.2);">
               
-              <!-- Content -->
+              ${getEmailHeader('🔒 SECURITY ALERT')}
+              
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Password Changed Successfully</h2>
-                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">Hi ${data.username}, your password has been updated.</p>
+                <td style="padding: 48px 40px; background: linear-gradient(to bottom, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);">
                   
-                  <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <p style="color: #34d399; font-weight: 600; margin: 0 0 12px; font-size: 14px; text-transform: uppercase;">Change Details</p>
-                    <p style="color: white; margin: 0 0 8px; font-size: 16px;">
-                      <strong>✅ Password Updated</strong>
-                    </p>
-                    <p style="color: #94a3b8; margin: 0; font-size: 14px;">
-                      Changed on: ${changeTime}
-                    </p>
-                  </div>
-
-                  <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-                    <p style="color: #f87171; margin: 0; font-size: 14px;">
-                      ⚠️ <strong>Didn't change your password?</strong><br><br>
-                      If you didn't make this change, your account may be compromised. Please contact our support team immediately and secure your account.
-                    </p>
-                  </div>
-
-                  <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px;">
-                    <p style="color: #60a5fa; margin: 0; font-size: 14px;">
-                      💡 <strong>Security Tips:</strong><br>
-                      • Use a unique password for Nashflare<br>
-                      • Never share your password with anyone<br>
-                      • Enable two-factor authentication when available
-                    </p>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- Footer -->
-              <tr>
-                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <p style="color: #64748b; margin: 0; font-size: 12px;">
-                    © 2024 Nashflare. All rights reserved.<br>
-                    This is an automated security notification. Please do not reply to this email.
+                  <h2 style="color: #ffffff; margin: 0 0 12px; font-size: 28px; font-weight: 700; line-height: 1.2;">
+                    Password Changed Successfully
+                  </h2>
+                  
+                  <p style="color: #94a3b8; margin: 0 0 32px; font-size: 16px; line-height: 1.6;">
+                    Hi <strong style="color: #cbd5e1;">${data.username}</strong>, your password has been updated.
                   </p>
+                  
+                  <!-- Success Card -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 16px; overflow: hidden; margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 28px 24px; text-align: center;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+                        <p style="margin: 0 0 8px; color: #6ee7b7; font-size: 16px; font-weight: 700;">
+                          Password Updated
+                        </p>
+                        <p style="margin: 0; color: #86efac; font-size: 13px;">
+                          Changed on: ${changeTime}
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Warning Alert -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(239, 68, 68, 0.08); border-left: 4px solid #ef4444; border-radius: 12px; margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0; color: #fca5a5; font-size: 14px; line-height: 1.6;">
+                          <strong style="color: #f87171;">⚠️ Didn't change your password?</strong><br><br>
+                          If you didn't make this change, your account may be compromised. Please contact our support team immediately and secure your account.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Security Tips -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; border-radius: 12px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0 0 12px; color: #a78bfa; font-size: 14px; font-weight: 700;">💡 Security Tips</p>
+                        <p style="margin: 0; color: #c4b5fd; font-size: 13px; line-height: 1.6;">
+                          • Use a unique password for Nashflare<br>
+                          • Never share your password with anyone<br>
+                          • Enable two-factor authentication when available<br>
+                          • Use a password manager for extra security
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
                 </td>
               </tr>
+
+              ${getEmailFooter()}
             </table>
           </td>
         </tr>
@@ -549,76 +878,80 @@ function generateUsernameChangedEmail(data: any): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
     </head>
-    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); padding: 30px; text-align: center;">
-                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">🎮 Nashflare</h1>
-                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">✨ Account Update</p>
-                </td>
-              </tr>
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background: linear-gradient(135deg, #1e293b 0%, #312e81 50%, #1e293b 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 100px rgba(139, 92, 246, 0.2);">
               
-              <!-- Content -->
+              ${getEmailHeader('✨ ACCOUNT UPDATE')}
+              
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Username Changed Successfully</h2>
-                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">Your username has been updated on Nashflare.</p>
+                <td style="padding: 48px 40px; background: linear-gradient(to bottom, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);">
                   
-                  <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <p style="color: #a78bfa; font-weight: 600; margin: 0 0 16px; font-size: 14px; text-transform: uppercase;">Username Change</p>
-                    
-                    <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                      <div style="flex: 1;">
-                        <p style="color: #94a3b8; margin: 0 0 4px; font-size: 12px; text-transform: uppercase;">Previous Username</p>
-                        <p style="color: #f87171; margin: 0; font-size: 18px; font-weight: 600; text-decoration: line-through;">
-                          ${data.oldUsername}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div style="text-align: center; margin: 12px 0;">
-                      <span style="color: #a78bfa; font-size: 24px;">↓</span>
-                    </div>
-                    
-                    <div>
-                      <p style="color: #94a3b8; margin: 0 0 4px; font-size: 12px; text-transform: uppercase;">New Username</p>
-                      <p style="color: #34d399; margin: 0; font-size: 18px; font-weight: 600;">
-                        ${data.newUsername}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-                    <p style="color: white; margin: 0; font-size: 14px;">
-                      📅 Changed on: <span style="color: #94a3b8;">${changeTime}</span>
-                    </p>
-                  </div>
-
-                  <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 16px;">
-                    <p style="color: #60a5fa; margin: 0; font-size: 14px;">
-                      ℹ️ <strong>What this means:</strong><br>
-                      • Your new username is now active across all of Nashflare<br>
-                      • Other users will see your new username<br>
-                      • Your profile URL will use your new username
-                    </p>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- Footer -->
-              <tr>
-                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <p style="color: #64748b; margin: 0; font-size: 12px;">
-                    © 2024 Nashflare. All rights reserved.<br>
-                    If you didn't make this change, please contact support immediately.
+                  <h2 style="color: #ffffff; margin: 0 0 12px; font-size: 28px; font-weight: 700; line-height: 1.2;">
+                    Username Changed Successfully
+                  </h2>
+                  
+                  <p style="color: #94a3b8; margin: 0 0 32px; font-size: 16px; line-height: 1.6;">
+                    Your username has been updated on Nashflare.
                   </p>
+                  
+                  <!-- Username Change Card -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%); border: 1px solid rgba(167, 139, 250, 0.3); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 32px 24px;">
+                        <p style="margin: 0 0 24px; color: #a78bfa; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; text-align: center;">Username Change</p>
+                        
+                        <!-- Old Username -->
+                        <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+                          <p style="margin: 0 0 8px; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Previous Username</p>
+                          <p style="margin: 0; color: #f87171; font-size: 20px; font-weight: 700; text-decoration: line-through; opacity: 0.7;">
+                            ${data.oldUsername}
+                          </p>
+                        </div>
+                        
+                        <!-- Arrow -->
+                        <div style="text-align: center; margin: 16px 0;">
+                          <span style="color: #a78bfa; font-size: 32px; font-weight: bold;">↓</span>
+                        </div>
+                        
+                        <!-- New Username -->
+                        <div style="background: linear-gradient(135deg, rgba(167, 139, 250, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%); border: 2px solid rgba(167, 139, 250, 0.4); border-radius: 12px; padding: 20px; text-align: center;">
+                          <p style="margin: 0 0 8px; color: #a78bfa; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">New Username</p>
+                          <p style="margin: 0; color: #34d399; font-size: 24px; font-weight: 800;">
+                            ${data.newUsername}
+                          </p>
+                        </div>
+                        
+                        <p style="margin: 24px 0 0; color: #64748b; font-size: 12px; text-align: center;">
+                          Changed on: <span style="color: #94a3b8;">${changeTime}</span>
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Info Box -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; border-radius: 12px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0 0 12px; color: #a78bfa; font-size: 14px; font-weight: 700;">ℹ️ What this means</p>
+                        <p style="margin: 0; color: #c4b5fd; font-size: 13px; line-height: 1.6;">
+                          • Your new username is now active across all of Nashflare<br>
+                          • Other users will see your new username in chats and listings<br>
+                          • Your profile URL will use your new username<br>
+                          • All your orders and reviews remain unchanged
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
                 </td>
               </tr>
+
+              ${getEmailFooter()}
             </table>
           </td>
         </tr>
@@ -635,71 +968,123 @@ function generateWelcomeEmail(data: any): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
     </head>
-    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-              <!-- Header -->
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background: linear-gradient(135deg, #1e293b 0%, #312e81 50%, #1e293b 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 100px rgba(139, 92, 246, 0.2);">
+              
+              <!-- Welcome Header -->
               <tr>
-                <td style="background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); padding: 30px; text-align: center;">
-                  <h1 style="margin: 0; color: white; font-size: 32px; font-weight: bold;">🎮 Welcome to Nashflare!</h1>
-                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">Your Gaming Marketplace Adventure Begins</p>
+                <td style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%); padding: 48px 40px; text-align: center; position: relative;">
+                  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.05) 0%, transparent 50%);"></div>
+                  
+                  <!-- Logo -->
+                  <div style="margin-bottom: 20px; position: relative;">
+                    ${USE_LOGO_IMAGE 
+                      ? `<img src="${LOGO_URL}" alt="Nashflare" width="100" height="100" style="display: inline-block; vertical-align: middle;" />`
+                      : `
+                      <div style="display: inline-block; width: 100px; height: 100px; background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.15) 100%); border: 4px solid rgba(255,255,255,0.5); border-radius: 24px; backdrop-filter: blur(10px); position: relative; box-shadow: 0 12px 40px rgba(0,0,0,0.4);">
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                          <div style="font-size: 52px; font-weight: 900; color: #ffffff; text-shadow: 0 4px 16px rgba(0,0,0,0.5); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">N</div>
+                        </div>
+                        <div style="position: absolute; bottom: 4px; right: 4px; width: 24px; height: 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; border: 3px solid rgba(255,255,255,0.9);"></div>
+                      </div>
+                      `
+                    }
+                  </div>
+                  
+                  <div style="font-size: 64px; margin-bottom: 16px; position: relative;">🎮</div>
+                  <h1 style="margin: 0; color: #ffffff; font-size: 40px; font-weight: 800; letter-spacing: -1px; text-shadow: 0 4px 12px rgba(0,0,0,0.3); position: relative;">
+                    Welcome to Nashflare!
+                  </h1>
+                  <p style="margin: 16px 0 0; color: rgba(255,255,255,0.95); font-size: 17px; font-weight: 500; position: relative;">
+                    Your Gaming Marketplace Adventure Begins
+                  </p>
                 </td>
               </tr>
               
-              <!-- Content -->
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Hey ${data.username}! 🎉</h2>
-                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">
-                    Welcome to Nashflare - the ultimate marketplace for gaming accounts, in-game currency, items, and game keys!
+                <td style="padding: 48px 40px; background: linear-gradient(to bottom, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);">
+                  
+                  <h2 style="color: #ffffff; margin: 0 0 12px; font-size: 28px; font-weight: 700; line-height: 1.2;">
+                    Hey <span style="background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${data.username}</span>! 🎉
+                  </h2>
+                  
+                  <p style="color: #94a3b8; margin: 0 0 32px; font-size: 16px; line-height: 1.6;">
+                    Welcome to <strong style="color: #cbd5e1;">Nashflare</strong> - the ultimate marketplace for gaming accounts, in-game currency, items, and game keys. We're excited to have you join our growing community!
                   </p>
                   
-                  <div style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                    <p style="color: #a78bfa; font-weight: 600; margin: 0 0 16px; font-size: 14px; text-transform: uppercase;">What You Can Do</p>
-                    
-                    <div style="margin-bottom: 12px;">
-                      <p style="color: white; margin: 0 0 4px; font-size: 16px; font-weight: 600;">🛒 Browse & Buy</p>
-                      <p style="color: #94a3b8; margin: 0; font-size: 14px;">Find amazing deals on gaming accounts, items, and more</p>
-                    </div>
-                    
-                    <div style="margin-bottom: 12px;">
-                      <p style="color: white; margin: 0 0 4px; font-size: 16px; font-weight: 600;">💰 Sell Your Items</p>
-                      <p style="color: #94a3b8; margin: 0; font-size: 14px;">Upgrade to vendor status and start earning</p>
-                    </div>
-                    
-                    <div>
-                      <p style="color: white; margin: 0 0 4px; font-size: 16px; font-weight: 600;">🔒 Safe & Secure</p>
-                      <p style="color: #94a3b8; margin: 0; font-size: 14px;">Buyer protection and secure transactions</p>
-                    </div>
-                  </div>
+                  <!-- Features Grid -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(167, 139, 250, 0.2); border-radius: 16px; overflow: hidden; margin-bottom: 32px;">
+                    <tr>
+                      <td style="background: linear-gradient(90deg, rgba(167, 139, 250, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%); padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <p style="margin: 0; color: #a78bfa; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">✨ What You Can Do</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 28px 24px;">
+                        
+                        <!-- Feature 1 -->
+                        <div style="margin-bottom: 24px; padding-left: 16px; border-left: 3px solid #8b5cf6;">
+                          <p style="margin: 0 0 6px; color: #ffffff; font-size: 17px; font-weight: 700;">🛒 Browse & Buy</p>
+                          <p style="margin: 0; color: #94a3b8; font-size: 14px; line-height: 1.5;">
+                            Find amazing deals on gaming accounts, in-game currency, rare items, and exclusive game keys across all popular games.
+                          </p>
+                        </div>
+                        
+                        <!-- Feature 2 -->
+                        <div style="margin-bottom: 24px; padding-left: 16px; border-left: 3px solid #ec4899;">
+                          <p style="margin: 0 0 6px; color: #ffffff; font-size: 17px; font-weight: 700;">💰 Sell Your Items</p>
+                          <p style="margin: 0; color: #94a3b8; font-size: 14px; line-height: 1.5;">
+                            Want to earn money? Upgrade to vendor status and start listing your gaming assets to thousands of buyers.
+                          </p>
+                        </div>
+                        
+                        <!-- Feature 3 -->
+                        <div style="padding-left: 16px; border-left: 3px solid #10b981;">
+                          <p style="margin: 0 0 6px; color: #ffffff; font-size: 17px; font-weight: 700;">🔒 Safe & Secure</p>
+                          <p style="margin: 0; color: #94a3b8; font-size: 14px; line-height: 1.5;">
+                            Shop with confidence! Every transaction is protected by our 48-hour buyer protection, secure escrow system, and dispute resolution.
+                          </p>
+                        </div>
+                        
+                      </td>
+                    </tr>
+                  </table>
 
-                  <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-                    <p style="color: #34d399; margin: 0; font-size: 14px;">
-                      ✅ <strong>Your account is ready!</strong><br>
-                      Start exploring the marketplace and find your next gaming treasure.
-                    </p>
-                  </div>
+                  <!-- Account Ready Badge -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; margin-bottom: 32px;">
+                    <tr>
+                      <td style="padding: 20px 24px; text-align: center;">
+                        <p style="margin: 0 0 8px; color: #34d399; font-size: 20px;">✅</p>
+                        <p style="margin: 0; color: #6ee7b7; font-size: 15px; font-weight: 700;">
+                          Your account is ready!
+                        </p>
+                        <p style="margin: 8px 0 0; color: #86efac; font-size: 13px;">
+                          Start exploring the marketplace and find your next gaming treasure.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
 
-                  <div style="text-align: center;">
-                    <a href="https://nashflare.com/browse" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: bold; font-size: 16px;">
-                      Start Browsing →
-                    </a>
-                  </div>
+                  <!-- CTA Button -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td align="center">
+                        <a href="https://nashflare.com/browse" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%); color: #ffffff; text-decoration: none; padding: 18px 48px; border-radius: 14px; font-weight: 700; font-size: 16px; box-shadow: 0 10px 40px rgba(139, 92, 246, 0.4);">
+                          Start Browsing →
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
                 </td>
               </tr>
 
-              <!-- Footer -->
-              <tr>
-                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <p style="color: #64748b; margin: 0; font-size: 12px;">
-                    © 2024 Nashflare. All rights reserved.<br>
-                    Thanks for joining our gaming community!
-                  </p>
-                </td>
-              </tr>
+              ${getEmailFooter()}
             </table>
           </td>
         </tr>
@@ -716,69 +1101,85 @@ function generateVerificationEmail(data: any): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
     </head>
-    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
         <tr>
           <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; text-align: center;">
-                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">🎮 Nashflare</h1>
-                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">🔐 Email Verification</p>
-                </td>
-              </tr>
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background: linear-gradient(135deg, #1e293b 0%, #312e81 50%, #1e293b 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 100px rgba(139, 92, 246, 0.2);">
               
-              <!-- Content -->
+              ${getEmailHeader('🔐 EMAIL VERIFICATION')}
+              
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Hey ${data.username}! 👋</h2>
-                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">
-                    Thanks for signing up for Nashflare! To complete your registration, please verify your email address.
+                <td style="padding: 48px 40px; background: linear-gradient(to bottom, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);">
+                  
+                  <h2 style="color: #ffffff; margin: 0 0 12px; font-size: 28px; font-weight: 700; line-height: 1.2;">
+                    Hey <span style="background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${data.username}</span>! 👋
+                  </h2>
+                  
+                  <p style="color: #94a3b8; margin: 0 0 32px; font-size: 16px; line-height: 1.6;">
+                    Thanks for signing up for Nashflare! To complete your registration and secure your account, please verify your email address.
                   </p>
                   
-                  <div style="background: rgba(59, 130, 246, 0.1); border: 2px solid rgba(59, 130, 246, 0.3); border-radius: 16px; padding: 32px; margin-bottom: 24px; text-align: center;">
-                    <p style="color: #60a5fa; font-weight: 600; margin: 0 0 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Verification Code</p>
-                    <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; display: inline-block;">
-                      <p style="margin: 0; font-size: 48px; font-weight: bold; letter-spacing: 8px; color: white; font-family: 'Courier New', monospace;">
-                        ${data.verificationCode}
-                      </p>
-                    </div>
-                    <p style="color: #94a3b8; margin: 16px 0 0; font-size: 14px;">
-                      Enter this code on the verification page
-                    </p>
-                  </div>
+                  <!-- Verification Code Card -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.1) 100%); border: 3px solid rgba(139, 92, 246, 0.4); border-radius: 20px; overflow: hidden; box-shadow: 0 12px 48px rgba(139, 92, 246, 0.3); margin-bottom: 32px;">
+                    <tr>
+                      <td style="padding: 48px 32px; text-align: center;">
+                        <div style="font-size: 48px; margin-bottom: 20px;">🔐</div>
+                        <p style="margin: 0 0 24px; color: #a78bfa; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;">Your Verification Code</p>
+                        <div style="background: rgba(0,0,0,0.4); border-radius: 16px; padding: 28px 20px; display: inline-block; min-width: 280px; border: 2px solid rgba(167, 139, 250, 0.2);">
+                          <p style="margin: 0; font-size: 56px; font-weight: 800; letter-spacing: 12px; color: #ffffff; font-family: 'Courier New', monospace; text-shadow: 0 4px 12px rgba(139, 92, 246, 0.5);">
+                            ${data.verificationCode}
+                          </p>
+                        </div>
+                        <p style="margin: 24px 0 0; color: #c4b5fd; font-size: 13px;">
+                          Enter this code on the verification page to activate your account
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
 
-                  <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-                    <p style="color: #fbbf24; margin: 0; font-size: 14px;">
-                      ⏰ <strong>Important:</strong> This code will expire in 10 minutes for security reasons.
-                    </p>
-                  </div>
+                  <!-- Warning Alert -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(251, 191, 36, 0.08); border-left: 4px solid #fbbf24; border-radius: 12px; margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0; color: #fde047; font-size: 14px; line-height: 1.6;">
+                          <strong style="color: #fbbf24;">⏰ Important:</strong><br>
+                          This verification code will expire in <strong style="color: #fef08a;">10 minutes</strong> for security reasons. If it expires, you can request a new code.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
 
-                  <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-                    <p style="color: #f87171; margin: 0; font-size: 14px;">
-                      🔒 <strong>Security Note:</strong> Never share this code with anyone. Nashflare will never ask for your verification code via email, phone, or any other method.
-                    </p>
-                  </div>
+                  <!-- Security Notice -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: rgba(239, 68, 68, 0.08); border-left: 4px solid #ef4444; border-radius: 12px; margin-bottom: 32px;">
+                    <tr>
+                      <td style="padding: 20px 24px;">
+                        <p style="margin: 0; color: #fca5a5; font-size: 14px; line-height: 1.6;">
+                          <strong style="color:#f87171;">🔒 Security Note:</strong><br><br>
+                          Never share this code with anyone. Nashflare will <strong>never</strong> ask for your verification code via email, phone, or any other method. If you receive such a request, it's a scam!
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
 
-                  <div style="text-align: center; margin-top: 32px;">
-                    <p style="color: #94a3b8; margin: 0; font-size: 14px;">
-                      If you didn't create an account on Nashflare, you can safely ignore this email.
-                    </p>
-                  </div>
+                  <!-- Additional Info -->
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td align="center">
+                        <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">
+                          If you didn't create an account on Nashflare,<br>
+                          you can safely ignore this email.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+
                 </td>
               </tr>
 
-              <!-- Footer -->
-              <tr>
-                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
-                  <p style="color: #64748b; margin: 0; font-size: 12px;">
-                    © 2024 Nashflare. All rights reserved.<br>
-                    This is an automated verification email. Please do not reply.
-                  </p>
-                </td>
-              </tr>
+              ${getEmailFooter()}
             </table>
           </td>
         </tr>
