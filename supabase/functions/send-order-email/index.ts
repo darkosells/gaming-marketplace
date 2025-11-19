@@ -1,5 +1,6 @@
 // supabase/functions/send-order-email/index.ts
-// Updated Edge Function for Nashflare email notifications
+// Complete Edge Function for Nashflare email notifications
+// REPLACE YOUR ENTIRE Edge Function FILE WITH THIS
 
 // @ts-ignore - Deno import
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -14,7 +15,7 @@ const corsHeaders = {
 }
 
 interface EmailRequest {
-  type: 'order_confirmation' | 'delivery_notification' | 'new_sale' | 'dispute_opened' | 'withdrawal_processed' | 'password_changed' | 'username_changed' | 'welcome'
+  type: 'order_confirmation' | 'delivery_notification' | 'new_sale' | 'dispute_opened' | 'withdrawal_processed' | 'password_changed' | 'username_changed' | 'welcome' | 'email_verification'
   [key: string]: any
 }
 
@@ -80,6 +81,12 @@ serve(async (req) => {
         htmlContent = generateWelcomeEmail(emailRequest)
         break
 
+      case 'email_verification':
+        toEmail = emailRequest.userEmail
+        subject = `🔐 Verify Your Nashflare Account - Code: ${emailRequest.verificationCode}`
+        htmlContent = generateVerificationEmail(emailRequest)
+        break
+
       default:
         throw new Error(`Unknown email type: ${emailRequest.type}`)
     }
@@ -119,7 +126,10 @@ serve(async (req) => {
   }
 })
 
-// Email template generators
+// ============================================
+// EMAIL TEMPLATE GENERATORS
+// ============================================
+
 function generateOrderConfirmationEmail(data: any): string {
   return `
     <!DOCTYPE html>
@@ -687,6 +697,85 @@ function generateWelcomeEmail(data: any): string {
                   <p style="color: #64748b; margin: 0; font-size: 12px;">
                     © 2024 Nashflare. All rights reserved.<br>
                     Thanks for joining our gaming community!
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+}
+
+function generateVerificationEmail(data: any): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0f172a; padding: 40px 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #1e293b 0%, #312e81 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 30px; text-align: center;">
+                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">🎮 Nashflare</h1>
+                  <p style="margin: 10px 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">🔐 Email Verification</p>
+                </td>
+              </tr>
+              
+              <!-- Content -->
+              <tr>
+                <td style="padding: 40px;">
+                  <h2 style="color: white; margin: 0 0 20px; font-size: 24px;">Hey ${data.username}! 👋</h2>
+                  <p style="color: #94a3b8; margin: 0 0 24px; font-size: 16px;">
+                    Thanks for signing up for Nashflare! To complete your registration, please verify your email address.
+                  </p>
+                  
+                  <div style="background: rgba(59, 130, 246, 0.1); border: 2px solid rgba(59, 130, 246, 0.3); border-radius: 16px; padding: 32px; margin-bottom: 24px; text-align: center;">
+                    <p style="color: #60a5fa; font-weight: 600; margin: 0 0 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your Verification Code</p>
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; display: inline-block;">
+                      <p style="margin: 0; font-size: 48px; font-weight: bold; letter-spacing: 8px; color: white; font-family: 'Courier New', monospace;">
+                        ${data.verificationCode}
+                      </p>
+                    </div>
+                    <p style="color: #94a3b8; margin: 16px 0 0; font-size: 14px;">
+                      Enter this code on the verification page
+                    </p>
+                  </div>
+
+                  <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                    <p style="color: #fbbf24; margin: 0; font-size: 14px;">
+                      ⏰ <strong>Important:</strong> This code will expire in 10 minutes for security reasons.
+                    </p>
+                  </div>
+
+                  <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                    <p style="color: #f87171; margin: 0; font-size: 14px;">
+                      🔒 <strong>Security Note:</strong> Never share this code with anyone. Nashflare will never ask for your verification code via email, phone, or any other method.
+                    </p>
+                  </div>
+
+                  <div style="text-align: center; margin-top: 32px;">
+                    <p style="color: #94a3b8; margin: 0; font-size: 14px;">
+                      If you didn't create an account on Nashflare, you can safely ignore this email.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="background: rgba(0,0,0,0.3); padding: 20px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1);">
+                  <p style="color: #64748b; margin: 0; font-size: 12px;">
+                    © 2024 Nashflare. All rights reserved.<br>
+                    This is an automated verification email. Please do not reply.
                   </p>
                 </td>
               </tr>

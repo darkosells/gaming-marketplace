@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { sendWelcomeEmail, getSiteUrl } from '@/lib/email'
+import { sendVerificationEmail, generateVerificationCode, getSiteUrl } from '@/lib/email'
 import Image from 'next/image'
 
 export default function SignupPage() {
@@ -29,6 +29,7 @@ export default function SignupPage() {
     }
 
     try {
+      // Step 1: Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -37,6 +38,7 @@ export default function SignupPage() {
       if (authError) throw authError
       if (!authData.user) throw new Error('No user created')
 
+      // Step 2: Create profile (email_verified = false by default)
       const { error: profileError } = await supabase.rpc('create_user_profile', {
         user_id: authData.user.id,
         user_name: username
@@ -44,23 +46,43 @@ export default function SignupPage() {
 
       if (profileError) throw profileError
 
-      // Send welcome email (fire and forget - don't block on this)
-      sendWelcomeEmail({
+      // Step 3: Generate and store verification code
+      const verificationCode = generateVerificationCode()
+      const expiresAt = new Date()
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10) // Expires in 10 minutes
+
+      const { error: codeError } = await supabase
+        .from('profiles')
+        .update({
+          verification_code: verificationCode,
+          verification_code_expires: expiresAt.toISOString(),
+          verification_code_attempts: 0
+        })
+        .eq('id', authData.user.id)
+
+      if (codeError) {
+        console.error('Failed to save verification code:', codeError)
+        throw new Error('Failed to generate verification code')
+      }
+
+      // Step 4: Send verification email (fire and forget)
+      sendVerificationEmail({
+        userEmail: email,
         username: username,
-        email: email,
-        site_url: getSiteUrl()
+        verificationCode: verificationCode
       }).then(result => {
         if (result.success) {
-          console.log('Welcome email sent successfully!')
+          console.log('Verification email sent successfully!')
         } else {
-          console.error('Failed to send welcome email:', result.error)
+          console.error('Failed to send verification email:', result.error)
         }
       }).catch(err => {
-        console.error('Error sending welcome email:', err)
+        console.error('Error sending verification email:', err)
       })
 
-      alert('Account created! Check your email for a welcome message. Redirecting to login...')
-      router.push('/login')
+      // Step 5: DON'T sign out - keep user logged in for verification
+      // Step 6: Redirect to verification page with email
+      router.push(`/verify-email?email=${encodeURIComponent(email)}`)
 
     } catch (error: any) {
       console.error('Signup error:', error)

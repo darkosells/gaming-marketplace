@@ -366,4 +366,39 @@ export async function sendDisputeEmails(data: {
     console.error('Failed to send dispute emails:', error)
     return { success: false, error: error.message }
   }
+  
+}
+// Send email verification code
+export async function sendVerificationEmail(data: {
+  userEmail: string
+  username: string
+  verificationCode: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'email_verification',
+        ...data
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send verification email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Generate a 6-digit verification code
+export function generateVerificationCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString()
 }

@@ -1,40 +1,63 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 
-export default function LoginPage() {
+function LoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  useEffect(() => {
+    // Check if user just verified their email
+    if (searchParams.get('verified') === 'true') {
+      setSuccess('✅ Email verified! You can now login.')
+    }
+  }, [searchParams])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSuccess('')
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) throw error
+      if (authError) throw authError
 
+      // Get user profile to check role and email verification
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('role, is_admin')
-        .eq('id', data.user.id)
+        .select('role, is_admin, email_verified, username')
+        .eq('id', authData.user.id)
         .single()
 
       if (profileError) throw profileError
 
+      // Check if email is verified
+      if (!profile.email_verified) {
+        // Sign them out and redirect to verification
+        await supabase.auth.signOut()
+        setError('Please verify your email before logging in.')
+        setTimeout(() => {
+          router.push(`/verify-email?email=${encodeURIComponent(email)}`)
+        }, 1500)
+        return
+      }
+
+      // Redirect based on role
       if (profile.is_admin) {
         router.push('/admin')
       } else if (profile.role === 'vendor') {
@@ -45,6 +68,7 @@ export default function LoginPage() {
 
       router.refresh()
     } catch (error: any) {
+      console.error('Login error:', error)
       setError(error.message || 'Failed to login')
     } finally {
       setLoading(false)
@@ -98,31 +122,38 @@ export default function LoginPage() {
           </div>
         </Link>
 
-        {/* Login Card */}
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl hover:border-purple-500/30 transition-all duration-300">
-          <div className="text-center mb-8">
-            <div className="inline-block mb-4">
-              <span className="px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-sm font-medium">
-                👋 Welcome Back
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Sign <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">In</span>
-            </h1>
-            <p className="text-gray-400">Access your gaming marketplace</p>
+        <div className="text-center mb-8">
+          <div className="inline-block mb-4">
+            <span className="px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-sm font-medium">
+              🎮 Welcome Back
+            </span>
           </div>
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+            Sign In to <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Nashflare</span>
+          </h1>
+          <p className="text-gray-400">Access your gaming marketplace</p>
+        </div>
 
-          {error && (
-            <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 mb-6">
-              <p className="text-red-200 text-sm flex items-center gap-2">
-                <span>❌</span> {error}
-              </p>
-            </div>
-          )}
-
+        <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
           <form onSubmit={handleLogin} className="space-y-5">
+            {success && (
+              <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4">
+                <p className="text-green-200 text-sm flex items-center gap-2">
+                  <span>✓</span> {success}
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4">
+                <p className="text-red-200 text-sm flex items-center gap-2">
+                  <span>❌</span> {error}
+                </p>
+              </div>
+            )}
+
             <div>
-              <label className="block text-white font-medium mb-2 text-sm">Email</label>
+              <label className="block text-white font-semibold mb-2 text-sm">Email</label>
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
                 <input
@@ -130,14 +161,14 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
+                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
-                  className="relative w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-white font-medium mb-2 text-sm">Password</label>
+              <label className="block text-white font-semibold mb-2 text-sm">Password</label>
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
                 <input
@@ -145,18 +176,21 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
-                  className="relative w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center cursor-pointer group">
-                <input type="checkbox" className="rounded bg-slate-800/80 border-white/10 text-purple-500 focus:ring-purple-500/50" />
-                <span className="ml-2 text-sm text-gray-400 group-hover:text-gray-300 transition">Remember me</span>
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center text-gray-400 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-white/10 bg-slate-800 text-purple-500 focus:ring-purple-500/50 focus:ring-2"
+                />
+                <span className="ml-2 group-hover:text-white transition">Remember me</span>
               </label>
-              <Link href="/forgot-password" className="text-sm text-purple-400 hover:text-purple-300 transition">
+              <Link href="/forgot-password" className="text-purple-400 hover:text-purple-300 transition">
                 Forgot password?
               </Link>
             </div>
@@ -211,5 +245,17 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }
