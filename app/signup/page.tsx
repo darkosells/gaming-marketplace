@@ -17,10 +17,75 @@ export default function SignupPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  // Validation functions
+  const validateUsername = (username: string): string | null => {
+    if (username.length < 3) {
+      return 'Username must be at least 3 characters'
+    }
+    if (username.length > 20) {
+      return 'Username must be at most 20 characters'
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      return 'Username can only contain letters, numbers, underscores, and hyphens'
+    }
+    if (/^[0-9]/.test(username)) {
+      return 'Username cannot start with a number'
+    }
+    
+    // Reserved usernames
+    const reserved = ['admin', 'support', 'help', 'nashflare', 'moderator', 'mod', 'staff', 'official', 'system', 'null', 'undefined']
+    if (reserved.includes(username.toLowerCase())) {
+      return 'This username is reserved'
+    }
+    
+    return null
+  }
+
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters'
+    }
+    if (password.length > 72) {
+      return 'Password must be at most 72 characters'
+    }
+    
+    // Check for at least one number OR one special character
+    const hasNumber = /[0-9]/.test(password)
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    
+    if (!hasNumber && !hasSpecialChar) {
+      return 'Password must contain at least one number or special character'
+    }
+    
+    // Check against common weak passwords
+    const weakPasswords = ['password', '12345678', 'qwerty123', 'abc12345', 'password1', 'welcome1', 'letmein1']
+    if (weakPasswords.includes(password.toLowerCase())) {
+      return 'This password is too common. Please choose a stronger password'
+    }
+    
+    return null
+  }
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
+
+    // Validate username
+    const usernameError = validateUsername(username)
+    if (usernameError) {
+      setError(usernameError)
+      setLoading(false)
+      return
+    }
+
+    // Validate password
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      setError(passwordError)
+      setLoading(false)
+      return
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match')
@@ -173,8 +238,12 @@ export default function SignupPage() {
                   className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
                   minLength={3}
+                  maxLength={20}
+                  pattern="[a-zA-Z0-9_-]+"
+                  title="Username can only contain letters, numbers, underscores, and hyphens"
                 />
               </div>
+              <p className="text-xs text-gray-500 mt-1">3-20 characters, letters/numbers/_ /- only</p>
             </div>
 
             <div>
@@ -188,6 +257,7 @@ export default function SignupPage() {
                   placeholder="your@email.com"
                   className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
+                  maxLength={100}
                 />
               </div>
             </div>
@@ -203,10 +273,11 @@ export default function SignupPage() {
                   placeholder="••••••••"
                   className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
-                  minLength={6}
+                  minLength={8}
+                  maxLength={72}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Must be at least 6 characters</p>
+              <p className="text-xs text-gray-500 mt-1">At least 8 characters with a number or special character</p>
             </div>
 
             <div>
@@ -220,6 +291,8 @@ export default function SignupPage() {
                   placeholder="••••••••"
                   className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
+                  minLength={8}
+                  maxLength={72}
                 />
               </div>
             </div>

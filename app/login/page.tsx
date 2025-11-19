@@ -29,6 +29,25 @@ function LoginContent() {
     setSuccess('')
     setLoading(true)
 
+    // Basic validation
+    if (!email || !password) {
+      setError('Please enter both email and password')
+      setLoading(false)
+      return
+    }
+
+    if (email.length > 100) {
+      setError('Email is too long')
+      setLoading(false)
+      return
+    }
+
+    if (password.length > 72) {
+      setError('Password is too long')
+      setLoading(false)
+      return
+    }
+
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -69,7 +88,15 @@ function LoginContent() {
       router.refresh()
     } catch (error: any) {
       console.error('Login error:', error)
-      setError(error.message || 'Failed to login')
+      
+      // Provide user-friendly error messages
+      if (error.message.includes('Invalid login credentials')) {
+        setError('Invalid email or password')
+      } else if (error.message.includes('Email not confirmed')) {
+        setError('Please verify your email before logging in')
+      } else {
+        setError(error.message || 'Failed to login')
+      }
     } finally {
       setLoading(false)
     }
@@ -163,6 +190,7 @@ function LoginContent() {
                   placeholder="your@email.com"
                   className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
+                  maxLength={100}
                 />
               </div>
             </div>
@@ -178,6 +206,7 @@ function LoginContent() {
                   placeholder="••••••••"
                   className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
+                  maxLength={72}
                 />
               </div>
             </div>

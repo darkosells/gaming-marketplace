@@ -15,11 +15,16 @@ function VerifyEmailContent() {
   const [resending, setResending] = useState(false)
   const [canResend, setCanResend] = useState(true)
   const [resendTimer, setResendTimer] = useState(0)
-  const [userId, setUserId] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get('email')
   const supabase = createClient()
+
+  // Rate limiting constants
+  const MIN_RESEND_INTERVAL = 60 // 60 seconds between resends
+  const MAX_CODES_PER_HOUR = 5 // Maximum 5 codes per hour
+  const MAX_CODES_PER_DAY = 15 // Maximum 15 codes per 24 hours
 
   useEffect(() => {
     if (!email) {
@@ -27,11 +32,10 @@ function VerifyEmailContent() {
       return
     }
     
-    // Get the current user (they should still be in session after signup)
     const getCurrentUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        setUserId(user.id)
+        await checkRateLimit(user.id)
       }
     }
     getCurrentUser()
@@ -46,6 +50,63 @@ function VerifyEmailContent() {
     }
   }, [resendTimer])
 
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [toast])
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info') => {
+    setToast({ message, type })
+  }
+
+  const checkRateLimit = async (userId: string) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('verification_codes_sent, verification_last_sent_at, verification_daily_reset')
+        .eq('id', userId)
+        .single()
+
+      if (!profile) return
+
+      const now = new Date()
+
+      // Check if we need to reset daily counter (24 hours passed)
+      if (profile.verification_daily_reset) {
+        const resetTime = new Date(profile.verification_daily_reset)
+        const hoursSinceReset = (now.getTime() - resetTime.getTime()) / (1000 * 60 * 60)
+
+        if (hoursSinceReset >= 24) {
+          // Reset daily counter
+          await supabase
+            .from('profiles')
+            .update({
+              verification_codes_sent: 0,
+              verification_daily_reset: now.toISOString()
+            })
+            .eq('id', userId)
+          return // Counter reset, user can proceed
+        }
+      }
+
+      // Check if last send was too recent (60 second cooldown)
+      if (profile.verification_last_sent_at) {
+        const lastSent = new Date(profile.verification_last_sent_at)
+        const secondsSinceLastSend = (now.getTime() - lastSent.getTime()) / 1000
+        
+        if (secondsSinceLastSend < MIN_RESEND_INTERVAL) {
+          const remainingSeconds = Math.ceil(MIN_RESEND_INTERVAL - secondsSinceLastSend)
+          setResendTimer(remainingSeconds)
+          setCanResend(false)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking rate limit:', error)
+    }
+  }
+
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) {
       value = value[0]
@@ -59,13 +120,11 @@ function VerifyEmailContent() {
     newCode[index] = value
     setCode(newCode)
 
-    // Auto-focus next input
     if (value && index < 5) {
       const nextInput = document.getElementById(`code-${index + 1}`)
       nextInput?.focus()
     }
 
-    // Auto-submit when all 6 digits are entered
     if (index === 5 && value && newCode.every(digit => digit !== '')) {
       handleVerify(newCode.join(''))
     }
@@ -101,14 +160,12 @@ function VerifyEmailContent() {
     setLoading(true)
 
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
         throw new Error('Please sign up first')
       }
 
-      // Get profile with verification data
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, verification_code, verification_code_expires, verification_code_attempts, username')
@@ -133,27 +190,36 @@ function VerifyEmailContent() {
     // Check if code has expired
     if (new Date(profile.verification_code_expires) < new Date()) {
       setError('Verification code has expired. Please request a new one.')
+      setCode(['', '', '', '', '', ''])
+      document.getElementById('code-0')?.focus()
       return
     }
 
     // Check attempt limit
     if (profile.verification_code_attempts >= 5) {
-      setError('Too many failed attempts. Please request a new code.')
+      setError('Too many failed attempts. Please request a new code using "Resend Code" below.')
+      setCode(['', '', '', '', '', ''])
+      document.getElementById('code-0')?.focus()
       return
     }
 
     // Check if code matches
     if (profile.verification_code !== codeToVerify) {
-      // Increment attempts
+      const newAttempts = profile.verification_code_attempts + 1
       await supabase
         .from('profiles')
         .update({ 
-          verification_code_attempts: profile.verification_code_attempts + 1 
+          verification_code_attempts: newAttempts
         })
         .eq('id', profile.id)
 
-      const attemptsLeft = 5 - (profile.verification_code_attempts + 1)
-      setError(`Invalid code. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`)
+      if (newAttempts >= 5) {
+        setError('Too many failed attempts. Please request a new code using "Resend Code" below.')
+      } else {
+        const attemptsLeft = 5 - newAttempts
+        setError(`Invalid code. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`)
+      }
+      
       setCode(['', '', '', '', '', ''])
       document.getElementById('code-0')?.focus()
       return
@@ -173,11 +239,8 @@ function VerifyEmailContent() {
     if (updateError) throw updateError
 
     setSuccess(true)
-
-    // Sign out the user so they have to login with verified account
     await supabase.auth.signOut()
 
-    // Redirect to login after 2 seconds
     setTimeout(() => {
       router.push('/login?verified=true')
     }, 2000)
@@ -190,39 +253,99 @@ function VerifyEmailContent() {
     setError('')
 
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
         throw new Error('Please sign up first')
       }
 
+      // Get current rate limit status
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, username')
+        .select('id, username, verification_codes_sent, verification_last_sent_at, verification_daily_reset')
         .eq('id', user.id)
         .single()
 
       if (profileError || !profile) throw new Error('Profile not found')
 
-      // Generate new code
+      const now = new Date()
+
+      // Check daily reset
+      let codesSent = profile.verification_codes_sent || 0
+      if (profile.verification_daily_reset) {
+        const resetTime = new Date(profile.verification_daily_reset)
+        const hoursSinceReset = (now.getTime() - resetTime.getTime()) / (1000 * 60 * 60)
+
+        if (hoursSinceReset >= 24) {
+          // Reset counter
+          codesSent = 0
+        }
+      }
+
+      // Check daily limit
+      if (codesSent >= MAX_CODES_PER_DAY) {
+        setError(`Daily limit of ${MAX_CODES_PER_DAY} codes reached. Please try again tomorrow or contact support@nashflare.com`)
+        showToast('❌ Daily limit reached. Contact support if you need help.', 'error')
+        setResending(false)
+        return
+      }
+
+      // Check hourly limit
+      if (profile.verification_last_sent_at) {
+        const lastSent = new Date(profile.verification_last_sent_at)
+        const minutesSinceLastSend = (now.getTime() - lastSent.getTime()) / (1000 * 60)
+
+        // Count codes sent in last hour
+        if (minutesSinceLastSend < 60) {
+          // For simplicity, we'll track that user is within hourly window
+          // In production, you'd want a more sophisticated tracking system
+          const recentCodes = codesSent % MAX_CODES_PER_HOUR
+          if (recentCodes >= MAX_CODES_PER_HOUR && minutesSinceLastSend < 60) {
+            const minutesRemaining = Math.ceil(60 - minutesSinceLastSend)
+            setError(`Hourly limit of ${MAX_CODES_PER_HOUR} codes reached. Please wait ${minutesRemaining} minute(s) or contact support@nashflare.com`)
+            showToast(`⏰ Please wait ${minutesRemaining} minute(s) before requesting another code.`, 'info')
+            setResending(false)
+            return
+          }
+        }
+      }
+
+      // Check 60-second cooldown
+      if (profile.verification_last_sent_at) {
+        const lastSent = new Date(profile.verification_last_sent_at)
+        const secondsSinceLastSend = (now.getTime() - lastSent.getTime()) / 1000
+        
+        if (secondsSinceLastSend < MIN_RESEND_INTERVAL) {
+          const remainingSeconds = Math.ceil(MIN_RESEND_INTERVAL - secondsSinceLastSend)
+          setError(`Please wait ${remainingSeconds} second(s) before requesting another code.`)
+          setResendTimer(remainingSeconds)
+          setCanResend(false)
+          setResending(false)
+          return
+        }
+      }
+
+      // All checks passed - generate and send new code
       const newCode = generateVerificationCode()
       const expiresAt = new Date()
       expiresAt.setMinutes(expiresAt.getMinutes() + 10)
 
-      // Update database
+      // Update database with new code and increment counter
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
           verification_code: newCode,
           verification_code_expires: expiresAt.toISOString(),
-          verification_code_attempts: 0
+          verification_code_attempts: 0,  // Reset attempts for new code
+          verification_codes_sent: codesSent + 1,
+          verification_last_sent_at: now.toISOString(),
+          verification_daily_reset: profile.verification_daily_reset || now.toISOString()
         })
         .eq('id', profile.id)
 
       if (updateError) throw updateError
 
-      // Send new email
+      // Send email
       const result = await sendVerificationEmail({
         userEmail: email,
         username: profile.username,
@@ -233,14 +356,16 @@ function VerifyEmailContent() {
 
       // Set 60 second cooldown
       setCanResend(false)
-      setResendTimer(60)
+      setResendTimer(MIN_RESEND_INTERVAL)
       setCode(['', '', '', '', '', ''])
       
-      alert('✅ New verification code sent! Check your email.')
+      const codesRemaining = MAX_CODES_PER_DAY - (codesSent + 1)
+      showToast(`✅ New verification code sent! (${codesRemaining} codes remaining today)`, 'success')
 
     } catch (error: any) {
       console.error('Resend error:', error)
       setError(error.message || 'Failed to resend code')
+      showToast('❌ Failed to resend code. Please try again.', 'error')
     } finally {
       setResending(false)
     }
@@ -253,7 +378,6 @@ function VerifyEmailContent() {
   if (success) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
-        {/* Same animated background as signup */}
         <div className="fixed inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
@@ -281,7 +405,32 @@ function VerifyEmailContent() {
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
-      {/* Animated Background - same as signup */}
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 transform transition-all duration-300 ${
+          toast ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        }`}>
+          <div className={`rounded-xl p-4 shadow-2xl border backdrop-blur-xl min-w-[320px] ${
+            toast.type === 'success' 
+              ? 'bg-green-500/20 border-green-500/50' 
+              : toast.type === 'error'
+              ? 'bg-red-500/20 border-red-500/50'
+              : 'bg-blue-500/20 border-blue-500/50'
+          }`}>
+            <p className={`text-sm font-medium ${
+              toast.type === 'success' 
+                ? 'text-green-200' 
+                : toast.type === 'error'
+                ? 'text-red-200'
+                : 'text-blue-200'
+            }`}>
+              {toast.message}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Animated Background */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
@@ -398,11 +547,20 @@ function VerifyEmailContent() {
           </div>
         </div>
 
-        {/* Back to signup */}
+        {/* Skip verification option */}
         <div className="text-center mt-6">
-          <Link href="/signup" className="text-gray-400 hover:text-purple-400 transition flex items-center justify-center gap-2">
-            <span>←</span> Back to Signup
-          </Link>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut()
+              router.push('/')
+            }}
+            className="text-gray-400 hover:text-purple-400 transition flex items-center justify-center gap-2 mx-auto"
+          >
+            <span>←</span> Verify Later (Sign Out)
+          </button>
+          <p className="text-xs text-gray-500 mt-2">
+            You can verify your email anytime by logging in
+          </p>
         </div>
       </div>
     </div>
