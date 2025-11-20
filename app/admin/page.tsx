@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
+import AdminAnalytics from '@/components/AdminAnalytics'
+import SearchFilterBar from '@/components/SearchFilterBar'
+import AdminNotifications from '@/components/AdminNotifications'
 
 const ITEMS_PER_PAGE = 10
 
@@ -11,10 +14,12 @@ export default function AdminDashboard() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('users')
+  const [activeTab, setActiveTab] = useState('analytics')
   const [disputeSubTab, setDisputeSubTab] = useState('active')
   const [verificationSubTab, setVerificationSubTab] = useState('pending')
   const [currentPage, setCurrentPage] = useState(1)
+  
+  // Data states
   const [users, setUsers] = useState<any[]>([])
   const [listings, setListings] = useState<any[]>([])
   const [orders, setOrders] = useState<any[]>([])
@@ -26,6 +31,39 @@ export default function AdminDashboard() {
   const [processedWithdrawals, setProcessedWithdrawals] = useState<any[]>([])
   const [pendingVerifications, setPendingVerifications] = useState<any[]>([])
   const [pastVerifications, setPastVerifications] = useState<any[]>([])
+  
+  // Search/Filter states
+  const [searchQuery, setSearchQuery] = useState('')
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [gameFilter, setGameFilter] = useState('all')
+  
+  // Bulk action states
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
+  
+  // Notification states
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  
+  // Analytics states
+const [analyticsData, setAnalyticsData] = useState<{
+  revenueChart: any[]
+  ordersChart: any[]
+  disputeRate: number
+  avgOrderValue: number
+  topGames: any[]
+  topSellers: any[]
+}>({
+  revenueChart: [],
+  ordersChart: [],
+  disputeRate: 0,
+  avgOrderValue: 0,
+  topGames: [],
+  topSellers: []
+})
+  
+  // Modal states
   const [editingReview, setEditingReview] = useState<any>(null)
   const [editedComment, setEditedComment] = useState('')
   const [showRejectModal, setShowRejectModal] = useState(false)
@@ -52,31 +90,32 @@ export default function AdminDashboard() {
   useEffect(() => { checkAdmin() }, [])
   
   useEffect(() => {
-    if (profile?.is_admin) {
-      // Fetch ALL data immediately on load for accurate stats
-      fetchUsers()
-      fetchListings()
-      fetchOrders()
-      fetchConversations()
-      fetchDisputes()
-      fetchReviews()
-      fetchWithdrawals()
-      fetchVerifications()
+  if (profile?.is_admin) {
+    const loadData = async () => {
+      await Promise.all([
+        fetchUsers(),
+        fetchListings(),
+        fetchOrders(),
+        fetchConversations(),
+        fetchDisputes(),
+        fetchReviews(),
+        fetchWithdrawals(),
+        fetchVerifications(),
+        fetchNotifications()
+      ])
+    }
+    loadData()
+
+    
+    
       
-      // Set up real-time subscriptions for live updates
+      // Real-time subscriptions
       const ordersChannel = supabase
         .channel('admin-orders-realtime')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
           fetchOrders()
           fetchDisputes()
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
-          fetchOrders()
-          fetchDisputes()
-        })
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, () => {
-          fetchOrders()
-          fetchDisputes()
+          calculateAnalytics()
         })
         .subscribe()
       
@@ -112,7 +151,7 @@ export default function AdminDashboard() {
       
       const verificationsChannel = supabase
         .channel('admin-verifications-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'verifications' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_verifications' }, () => {
           fetchVerifications()
         })
         .subscribe()
@@ -131,6 +170,13 @@ export default function AdminDashboard() {
         })
         .subscribe()
       
+      const notificationsChannel = supabase
+        .channel('admin-notifications-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_notifications' }, () => {
+          fetchNotifications()
+        })
+        .subscribe()
+      
       return () => {
         supabase.removeChannel(ordersChannel)
         supabase.removeChannel(disputesChannel)
@@ -140,11 +186,21 @@ export default function AdminDashboard() {
         supabase.removeChannel(verificationsChannel)
         supabase.removeChannel(reviewsChannel)
         supabase.removeChannel(conversationsChannel)
+        supabase.removeChannel(notificationsChannel)
       }
     }
   }, [profile])
+
+useEffect(() => {
+  if (profile?.is_admin && orders.length > 0) {
+    calculateAnalytics()
+  }
+}, [orders, users, activeDisputes])
   
-  useEffect(() => { setCurrentPage(1) }, [activeTab, disputeSubTab, verificationSubTab])
+useEffect(() => { 
+  setCurrentPage(1)
+  setSelectedItems([])
+}, [activeTab, disputeSubTab, verificationSubTab])
 
   const checkAdmin = async () => {
     try {
@@ -158,6 +214,7 @@ export default function AdminDashboard() {
     } catch (error) { router.push('/') }
   }
 
+  // Fetch functions
   const fetchUsers = async () => { const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }); if (data) setUsers(data) }
   const fetchListings = async () => { const { data } = await supabase.from('listings').select('*, profiles(username)').order('created_at', { ascending: false }); if (data) setListings(data) }
   const fetchOrders = async () => { const { data } = await supabase.from('orders').select('*, buyer:profiles!buyer_id(username), seller:profiles!seller_id(username)').order('created_at', { ascending: false }); if (data) setOrders(data) }
@@ -192,6 +249,151 @@ export default function AdminDashboard() {
     const { data: pastData } = await supabase.from('vendor_verifications').select('*, user:profiles!user_id(username, id), reviewer:profiles!reviewed_by(username)').neq('status', 'pending').order('reviewed_at', { ascending: false })
     setPastVerifications(pastData || [])
   }
+
+  const fetchNotifications = async () => {
+    const { data } = await supabase
+      .from('admin_notifications')
+      .select('*')
+      .eq('admin_id', user?.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    
+    if (data) {
+      setNotifications(data)
+      setUnreadCount(data.filter(n => !n.read).length)
+    }
+  }
+
+  const calculateAnalytics = async () => {
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (6 - i))
+      return d.toISOString().split('T')[0]
+    })
+    
+    const revenueChart = last7Days.map(date => {
+      const dayOrders = orders.filter(o => o.created_at?.startsWith(date))
+      return {
+        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        revenue: dayOrders.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0),
+        orders: dayOrders.length
+      }
+    })
+
+    const completedOrders = orders.filter(o => o.status === 'completed')
+    const totalRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0)
+    const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
+    const disputeRate = orders.length > 0 ? (activeDisputes.length / orders.length) * 100 : 0
+
+    const gameRevenue: { [key: string]: { revenue: number; count: number } } = {}
+    completedOrders.forEach(o => {
+      const game = o.listing_game || 'Unknown'
+      if (!gameRevenue[game]) gameRevenue[game] = { revenue: 0, count: 0 }
+      gameRevenue[game].revenue += parseFloat(o.amount || 0)
+      gameRevenue[game].count += 1
+    })
+    const topGames = Object.entries(gameRevenue)
+      .map(([game, data]) => ({ game, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
+
+    const sellerStats: { [key: string]: any } = {}
+users.filter(u => u.role === 'vendor').forEach(vendor => {
+  const vendorSales = completedOrders.filter(o => o.seller_id === vendor.id)
+  sellerStats[vendor.id] = {
+  username: vendor.username,
+  total_sales: vendorSales.length,
+  rating: vendor.average_rating || 0
+}
+})
+    const topSellers = Object.values(sellerStats)
+      .sort((a: any, b: any) => b.total_sales - a.total_sales)
+      .slice(0, 5)
+
+    setAnalyticsData({
+      revenueChart,
+      ordersChart: revenueChart,
+      disputeRate: parseFloat(disputeRate.toFixed(2)),
+      avgOrderValue: parseFloat(avgOrderValue.toFixed(2)),
+      topGames,
+      topSellers
+    })
+  }
+  // Notification handlers
+  const handleMarkNotificationRead = async (id: string) => {
+    await supabase
+      .from('admin_notifications')
+      .update({ read: true })
+      .eq('id', id)
+    fetchNotifications()
+  }
+
+  const handleMarkAllNotificationsRead = async () => {
+    await supabase
+      .from('admin_notifications')
+      .update({ read: true })
+      .eq('admin_id', user?.id)
+      .eq('read', false)
+    fetchNotifications()
+  }
+
+  // Bulk action handlers
+  const handleSelectItem = (id: string) => {
+    setSelectedItems(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  const handleSelectAll = (items: any[]) => {
+    if (selectedItems.length === items.length) {
+      setSelectedItems([])
+    } else {
+      setSelectedItems(items.map(i => i.id))
+    }
+  }
+
+  const handleBulkAction = async (action: string) => {
+    if (selectedItems.length === 0) return
+    
+    if (!confirm(`Are you sure you want to ${action} ${selectedItems.length} items?`)) return
+
+    try {
+      if (activeTab === 'users' && action === 'ban') {
+        const reason = prompt('Ban reason (optional):') || 'Bulk ban by admin'
+        await Promise.all(selectedItems.map(id => 
+          supabase.from('profiles').update({ 
+            is_banned: true, 
+            banned_at: new Date().toISOString(),
+            ban_reason: reason 
+          }).eq('id', id)
+        ))
+        alert(`✅ Banned ${selectedItems.length} users`)
+        fetchUsers()
+      } else if (activeTab === 'listings' && action === 'delete') {
+        await Promise.all(selectedItems.map(id => 
+          supabase.from('listings').delete().eq('id', id)
+        ))
+        alert(`✅ Deleted ${selectedItems.length} listings`)
+        fetchListings()
+      } else if (activeTab === 'orders' && action === 'refund') {
+        await Promise.all(selectedItems.map(id => 
+          supabase.from('orders').update({ 
+            status: 'refunded',
+            completed_at: new Date().toISOString(),
+            resolution_notes: 'Bulk refunded by admin'
+          }).eq('id', id)
+        ))
+        alert(`✅ Refunded ${selectedItems.length} orders`)
+        fetchOrders()
+      }
+      setSelectedItems([])
+    } catch (error) {
+      console.error('Bulk action error:', error)
+      alert('Failed to complete bulk action')
+    }
+  }
+
+  const handleClearSelection = () => setSelectedItems([])
 
   const handleViewVerificationDetails = (v: any) => { 
     setSelectedVerification(v)
@@ -317,6 +519,7 @@ export default function AdminDashboard() {
   const confirmRejectWithdrawal = async () => { if (rejectionReason.trim().length < 5) { alert('Provide reason (min 5 chars)'); return }; await supabase.from('withdrawals').update({ status: 'rejected', processed_by: user.id, processed_at: new Date().toISOString(), admin_notes: rejectionReason.trim() }).eq('id', rejectingWithdrawalId); alert('❌ Rejected.'); setShowRejectModal(false); setRejectingWithdrawalId(null); fetchWithdrawals() }
   const handleBanUser = async (id: string, banned: boolean) => { const reason = banned ? null : prompt('Ban reason:'); if (!banned && !reason) return; await supabase.from('profiles').update({ is_banned: !banned, banned_at: !banned ? new Date().toISOString() : null, ban_reason: reason }).eq('id', id); alert(`User ${banned ? 'unbanned' : 'banned'}`); fetchUsers() }
   const handleDeleteListing = async (id: string) => { if (!confirm('Delete listing?')) return; await supabase.from('listings').delete().eq('id', id); alert('Listing deleted'); fetchListings() }
+  
   const handleResolveDispute = async (id: string, res: 'buyer' | 'seller') => { 
     const isBuyer = res === 'buyer'
     if (!confirm(isBuyer ? 'Refund buyer?' : 'Complete for seller?')) return
@@ -324,7 +527,6 @@ export default function AdminDashboard() {
     const newStatus = isBuyer ? 'refunded' : 'completed'
     
     try {
-      // Get the order details first
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*, buyer:profiles!orders_buyer_id_fkey(username), seller:profiles!orders_seller_id_fkey(username)')
@@ -333,7 +535,6 @@ export default function AdminDashboard() {
       
       if (orderError) throw orderError
       
-      // Update the order status
       const { error: updateError } = await supabase
         .from('orders')
         .update({ 
@@ -346,38 +547,16 @@ export default function AdminDashboard() {
       
       if (updateError) throw updateError
       
-      // Get the conversation for this order
       const { data: convData } = await supabase
         .from('conversations')
         .select('id, listing_id')
         .eq('order_id', id)
         .single()
       
-      // If conversation exists, create system notification
       if (convData) {
         const resolutionMessage = isBuyer
-          ? `✅ DISPUTE RESOLVED - REFUNDED ✅
-
-This dispute has been resolved in favor of the BUYER.
-
-The order has been refunded and the buyer will receive their funds back.
-
-Resolved by: ${profile.username}${notes ? `
-
-Admin Notes: ${notes}` : ''}
-
-This conversation is now closed.`
-          : `✅ DISPUTE RESOLVED - COMPLETED ✅
-
-This dispute has been resolved in favor of the SELLER.
-
-The order has been marked as completed and the seller will receive their payment.
-
-Resolved by: ${profile.username}${notes ? `
-
-Admin Notes: ${notes}` : ''}
-
-This conversation is now closed.`
+          ? `✅ DISPUTE RESOLVED - REFUNDED ✅\n\nThis dispute has been resolved in favor of the BUYER.\n\nThe order has been refunded and the buyer will receive their funds back.\n\nResolved by: ${profile.username}${notes ? `\n\nAdmin Notes: ${notes}` : ''}\n\nThis conversation is now closed.`
+          : `✅ DISPUTE RESOLVED - COMPLETED ✅\n\nThis dispute has been resolved in favor of the SELLER.\n\nThe order has been marked as completed and the seller will receive their payment.\n\nResolved by: ${profile.username}${notes ? `\n\nAdmin Notes: ${notes}` : ''}\n\nThis conversation is now closed.`
 
         await supabase.from('messages').insert({
           conversation_id: convData.id,
@@ -389,7 +568,6 @@ This conversation is now closed.`
           message_type: 'system'
         })
 
-        // Update conversation last message
         await supabase.from('conversations').update({
           last_message: isBuyer ? '✅ Dispute resolved - Buyer refunded' : '✅ Dispute resolved - Order completed',
           last_message_at: new Date().toISOString()
@@ -404,7 +582,72 @@ This conversation is now closed.`
       alert('Failed to resolve dispute')
     }
   }
+  
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/') }
+
+  // Filtering and pagination helpers
+  const applyFilters = (items: any[]) => {
+    let filtered = items
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(item => {
+        if (activeTab === 'users') {
+          return item.username?.toLowerCase().includes(query) || 
+                 item.email?.toLowerCase().includes(query)
+        } else if (activeTab === 'listings') {
+          return item.title?.toLowerCase().includes(query) || 
+                 item.game?.toLowerCase().includes(query)
+        } else if (activeTab === 'orders' || activeTab === 'messages') {
+          return item.listing_title?.toLowerCase().includes(query) ||
+                 item.buyer?.username?.toLowerCase().includes(query) ||
+                 item.seller?.username?.toLowerCase().includes(query)
+        } else if (activeTab === 'reviews') {
+          return item.buyer?.username?.toLowerCase().includes(query) ||
+                 item.seller?.username?.toLowerCase().includes(query) ||
+                 item.comment?.toLowerCase().includes(query)
+        }
+        return true
+      })
+    }
+
+    if (dateFilter !== 'all') {
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+      const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+      filtered = filtered.filter(item => {
+        const itemDate = new Date(item.created_at || item.last_message_at || 0)
+        if (dateFilter === 'today') return itemDate >= today
+        if (dateFilter === 'week') return itemDate >= weekAgo
+        if (dateFilter === 'month') return itemDate >= monthAgo
+        return true
+      })
+    }
+
+    if (statusFilter !== 'all' && activeTab === 'orders') {
+      filtered = filtered.filter(item => item.status === statusFilter)
+    }
+
+    if (gameFilter !== 'all' && (activeTab === 'listings' || activeTab === 'orders')) {
+      filtered = filtered.filter(item => 
+        item.game === gameFilter || item.listing_game === gameFilter
+      )
+    }
+
+    return filtered
+  }
+
+  const getAvailableGames = () => {
+    if (activeTab === 'listings') {
+      return [...new Set(listings.map(l => l.game).filter(Boolean))]
+    } else if (activeTab === 'orders') {
+      return [...new Set(orders.map(o => o.listing_game).filter(Boolean))]
+    }
+    return []
+  }
+
   const getCurrentPageData = (d: any[]) => d.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
   const getTotalPages = (d: any[]) => Math.ceil(d.length / ITEMS_PER_PAGE)
   
@@ -431,37 +674,40 @@ This conversation is now closed.`
     </div>
   )
 
-  const stats = { totalUsers: users.length, totalListings: listings.length, totalOrders: orders.length, activeDisputes: activeDisputes.length, solvedDisputes: solvedDisputes.length, pendingVerifications: pendingVerifications.length }
-  const currentUsers = getCurrentPageData(users), currentListings = getCurrentPageData(listings), currentOrders = getCurrentPageData(orders), currentConversations = getCurrentPageData(conversations), currentActiveDisputes = getCurrentPageData(activeDisputes), currentSolvedDisputes = getCurrentPageData(solvedDisputes), currentPendingVerifications = getCurrentPageData(pendingVerifications), currentPastVerifications = getCurrentPageData(pastVerifications)
+  const stats = { 
+    totalUsers: users.length, 
+    totalListings: listings.length, 
+    totalOrders: orders.length, 
+    activeDisputes: activeDisputes.length, 
+    solvedDisputes: solvedDisputes.length, 
+    pendingVerifications: pendingVerifications.length,
+    totalRevenue: orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + parseFloat(o.amount || 0), 0)
+  }
 
+  const filteredUsers = applyFilters(users)
+  const filteredListings = applyFilters(listings)
+  const filteredOrders = applyFilters(orders)
+  const filteredConversations = applyFilters(conversations)
+  const filteredReviews = applyFilters(reviews)
+
+  const currentUsers = getCurrentPageData(filteredUsers)
+  const currentListings = getCurrentPageData(filteredListings)
+  const currentOrders = getCurrentPageData(filteredOrders)
+  const currentConversations = getCurrentPageData(filteredConversations)
+  const currentActiveDisputes = getCurrentPageData(activeDisputes)
+  const currentSolvedDisputes = getCurrentPageData(solvedDisputes)
+  const currentPendingVerifications = getCurrentPageData(pendingVerifications)
+  const currentPastVerifications = getCurrentPageData(pastVerifications)
+  const currentReviews = getCurrentPageData(filteredReviews)
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-      {/* Simplified Cosmic Background - Lighter on animations */}
+      {/* Simplified Cosmic Background */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-        
-        {/* Static Nebula Clouds - No animation */}
         <div className="absolute top-1/4 left-1/4 w-[700px] h-[700px] bg-purple-600/15 rounded-full blur-[150px]"></div>
         <div className="absolute bottom-1/3 right-1/4 w-[600px] h-[600px] bg-pink-600/10 rounded-full blur-[140px]"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600/8 rounded-full blur-[160px]"></div>
-        
-        {/* Static Stars - No animations */}
-        <div className="absolute top-[5%] left-[10%] w-1 h-1 bg-white/60 rounded-full"></div>
-        <div className="absolute top-[15%] left-[25%] w-1 h-1 bg-white/50 rounded-full"></div>
-        <div className="absolute top-[8%] left-[60%] w-1 h-1 bg-white/70 rounded-full"></div>
-        <div className="absolute top-[25%] left-[85%] w-1 h-1 bg-white/40 rounded-full"></div>
-        <div className="absolute top-[40%] left-[5%] w-1 h-1 bg-white/55 rounded-full"></div>
-        <div className="absolute top-[55%] left-[92%] w-1 h-1 bg-white/65 rounded-full"></div>
-        <div className="absolute top-[70%] left-[15%] w-1 h-1 bg-white/45 rounded-full"></div>
-        <div className="absolute top-[85%] left-[78%] w-1 h-1 bg-white/50 rounded-full"></div>
-        <div className="absolute top-[12%] left-[45%] w-1 h-1 bg-white/60 rounded-full"></div>
-        <div className="absolute top-[62%] left-[35%] w-1 h-1 bg-white/55 rounded-full"></div>
-        <div className="absolute top-[30%] left-[75%] w-1.5 h-1.5 bg-purple-200/40 rounded-full"></div>
-        <div className="absolute top-[50%] left-[8%] w-1.5 h-1.5 bg-pink-200/40 rounded-full"></div>
-        <div className="absolute top-[75%] left-[60%] w-1.5 h-1.5 bg-cyan-200/40 rounded-full"></div>
-        
-        {/* Vignette */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
       </div>
       
@@ -476,6 +722,14 @@ This conversation is now closed.`
               <span className="text-xl font-bold text-white">Admin Panel</span>
             </Link>
             <div className="flex items-center space-x-4">
+              <AdminNotifications
+                notifications={notifications}
+                unreadCount={unreadCount}
+                showNotifications={showNotifications}
+                setShowNotifications={setShowNotifications}
+                onMarkRead={handleMarkNotificationRead}
+                onMarkAllRead={handleMarkAllNotificationsRead}
+              />
               <Link href="/" className="text-gray-300 hover:text-white transition">Main Site</Link>
               <button onClick={handleLogout} className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-white transition border border-white/10">
                 {profile?.username} (Logout)
@@ -532,6 +786,7 @@ This conversation is now closed.`
           {/* Tab Navigation */}
           <div className="flex flex-wrap gap-2 mb-6">
             {[
+              { id: 'analytics', label: 'Analytics', icon: '📊' },
               { id: 'users', label: 'Users', icon: '👥' },
               { id: 'listings', label: 'Listings', icon: '📦' },
               { id: 'orders', label: 'Orders', icon: '💰' },
@@ -564,22 +819,67 @@ This conversation is now closed.`
           {/* Content Area */}
           <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-2xl">
             
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <AdminAnalytics 
+                analyticsData={analyticsData}
+                stats={stats}
+                users={users}
+              />
+            )}
+            
+            {/* Search/Filter Bar for data tabs */}
+            {['users', 'listings', 'orders', 'messages', 'reviews'].includes(activeTab) && (
+              <SearchFilterBar
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                dateFilter={dateFilter}
+                setDateFilter={setDateFilter}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                gameFilter={gameFilter}
+                setGameFilter={setGameFilter}
+                activeTab={activeTab}
+                games={getAvailableGames()}
+                selectedItems={selectedItems}
+                onBulkAction={handleBulkAction}
+                onClearSelection={handleClearSelection}
+              />
+            )}
+
             {/* Users Tab */}
             {activeTab === 'users' && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-6">All Users ({users.length})</h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">All Users ({filteredUsers.length})</h2>
+                  <button
+                    onClick={() => handleSelectAll(filteredUsers)}
+                    className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition border border-purple-500/30"
+                  >
+                    {selectedItems.length === filteredUsers.length ? '✓ Deselect All' : 'Select All'}
+                  </button>
+                </div>
                 <div className="space-y-4">
                   {currentUsers.map((u) => (
                     <div key={u.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between hover:bg-white/10 transition">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-white font-semibold">{u.username}</span>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${u.is_admin ? 'bg-red-500/20 text-red-400 border border-red-500/30' : u.role === 'vendor' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
-                            {u.is_admin ? 'ADMIN' : u.role}
-                          </span>
-                          {u.is_banned && <span className="px-2 py-1 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/30">BANNED</span>}
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.includes(u.id)}
+                          onChange={() => handleSelectItem(u.id)}
+                          disabled={u.is_admin}
+                          className="w-5 h-5 rounded"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-white font-semibold">{u.username}</span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${u.is_admin ? 'bg-red-500/20 text-red-400 border border-red-500/30' : u.role === 'vendor' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
+                              {u.is_admin ? 'ADMIN' : u.role}
+                            </span>
+                            {u.is_banned && <span className="px-2 py-1 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/30">BANNED</span>}
+                          </div>
+                          <p className="text-sm text-gray-400">Rating: {u.rating} ⭐ | Sales: {u.total_sales} | Joined: {new Date(u.created_at).toLocaleDateString()}</p>
                         </div>
-                        <p className="text-sm text-gray-400">Rating: {u.rating} ⭐ | Sales: {u.total_sales} | Joined: {new Date(u.created_at).toLocaleDateString()}</p>
                       </div>
                       {!u.is_admin && (
                         <button onClick={() => handleBanUser(u.id, u.is_banned)} className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${u.is_banned ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30' : 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'}`}>
@@ -589,25 +889,41 @@ This conversation is now closed.`
                     </div>
                   ))}
                 </div>
-                {renderPagination(users)}
+                {renderPagination(filteredUsers)}
               </div>
             )}
 
             {/* Listings Tab */}
             {activeTab === 'listings' && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-6">All Listings ({listings.length})</h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">All Listings ({filteredListings.length})</h2>
+                  <button
+                    onClick={() => handleSelectAll(filteredListings)}
+                    className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition border border-purple-500/30"
+                  >
+                    {selectedItems.length === filteredListings.length ? '✓ Deselect All' : 'Select All'}
+                  </button>
+                </div>
                 <div className="space-y-4">
                   {currentListings.map((l) => (
                     <div key={l.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between hover:bg-white/10 transition">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-white font-semibold">{l.title}</span>
-                          <span className={`px-2 py-1 rounded text-xs ${l.status === 'active' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
-                            {l.status}
-                          </span>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.includes(l.id)}
+                          onChange={() => handleSelectItem(l.id)}
+                          className="w-5 h-5 rounded"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-white font-semibold">{l.title}</span>
+                            <span className={`px-2 py-1 rounded text-xs ${l.status === 'active' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}`}>
+                              {l.status}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-400">{l.game} | ${l.price} | Stock: {l.stock} | Seller: {l.profiles?.username}</p>
                         </div>
-                        <p className="text-sm text-gray-400">{l.game} | ${l.price} | Stock: {l.stock} | Seller: {l.profiles?.username}</p>
                       </div>
                       <div className="flex gap-2">
                         <Link href={`/listing/${l.id}`} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30 transition border border-blue-500/30">View</Link>
@@ -616,38 +932,54 @@ This conversation is now closed.`
                     </div>
                   ))}
                 </div>
-                {renderPagination(listings)}
+                {renderPagination(filteredListings)}
               </div>
             )}
 
             {/* Orders Tab */}
             {activeTab === 'orders' && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-6">All Orders ({orders.length})</h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">All Orders ({filteredOrders.length})</h2>
+                  <button
+                    onClick={() => handleSelectAll(filteredOrders)}
+                    className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition border border-purple-500/30"
+                  >
+                    {selectedItems.length === filteredOrders.length ? '✓ Deselect All' : 'Select All'}
+                  </button>
+                </div>
                 <div className="space-y-4">
                   {currentOrders.map((o) => (
                     <div key={o.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between hover:bg-white/10 transition">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-white font-semibold">{o.listing_title || 'Unknown'}</span>
-                          <span className={`px-2 py-1 rounded text-xs ${o.status === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : o.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'}`}>
-                            {o.status}
-                          </span>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.includes(o.id)}
+                          onChange={() => handleSelectItem(o.id)}
+                          className="w-5 h-5 rounded"
+                        />
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-white font-semibold">{o.listing_title || 'Unknown'}</span>
+                            <span className={`px-2 py-1 rounded text-xs ${o.status === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : o.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'}`}>
+                              {o.status}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-400">${o.amount} | Buyer: {o.buyer?.username} | Seller: {o.seller?.username}</p>
                         </div>
-                        <p className="text-sm text-gray-400">${o.amount} | Buyer: {o.buyer?.username} | Seller: {o.seller?.username}</p>
                       </div>
                       <Link href={`/order/${o.id}`} className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg text-sm hover:bg-blue-500/30 transition border border-blue-500/30">View</Link>
                     </div>
                   ))}
                 </div>
-                {renderPagination(orders)}
+                {renderPagination(filteredOrders)}
               </div>
             )}
 
             {/* Messages Tab */}
             {activeTab === 'messages' && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-6">Conversations ({conversations.length})</h2>
+                <h2 className="text-2xl font-bold text-white mb-6">Conversations ({filteredConversations.length})</h2>
                 <div className="space-y-4">
                   {currentConversations.map((c) => (
                     <div key={c.id} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4 hover:bg-white/10 transition">
@@ -661,11 +993,11 @@ This conversation is now closed.`
                     </div>
                   ))}
                 </div>
-                {renderPagination(conversations)}
+                {renderPagination(filteredConversations)}
               </div>
             )}
 
-            {/* Disputes Tab - ENHANCED */}
+            {/* Disputes Tab */}
             {activeTab === 'disputes' && (
               <div>
                 <div className="flex gap-3 mb-6">
@@ -722,7 +1054,6 @@ This conversation is now closed.`
                           </div>
                         </div>
                         
-                        {/* Admin Actions */}
                         <div className="border-t border-white/10 pt-4">
                           <p className="text-xs text-gray-400 mb-3 font-semibold">ADMIN ACTIONS</p>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -787,8 +1118,7 @@ This conversation is now closed.`
                 )}
               </div>
             )}
-
-            {/* Verifications Tab */}
+            {/* Verifications Tab - CONTINUES FROM PART 3 */}
             {activeTab === 'verifications' && (
               <div>
                 <div className="flex gap-3 mb-6">
@@ -858,9 +1188,9 @@ This conversation is now closed.`
             {/* Reviews Tab */}
             {activeTab === 'reviews' && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-6">Reviews ({reviews.length})</h2>
+                <h2 className="text-2xl font-bold text-white mb-6">Reviews ({filteredReviews.length})</h2>
                 <div className="space-y-4">
-                  {getCurrentPageData(reviews).map((r) => (
+                  {currentReviews.map((r) => (
                     <div key={r.id} className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="flex">{[1,2,3,4,5].map(s => <span key={s} className={s <= r.rating ? 'text-yellow-400' : 'text-gray-600'}>★</span>)}</div>
@@ -888,7 +1218,7 @@ This conversation is now closed.`
                     </div>
                   ))}
                 </div>
-                {renderPagination(reviews)}
+                {renderPagination(filteredReviews)}
               </div>
             )}
 
@@ -950,7 +1280,9 @@ This conversation is now closed.`
         </div>
       </div>
 
-      {/* Modals - Same as before but optimized */}
+      {/* ALL MODALS BELOW */}
+      
+      {/* Agreement Modal */}
       {showAgreementModal && selectedVerification && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-lg w-full">
@@ -977,6 +1309,7 @@ This conversation is now closed.`
         </div>
       )}
 
+      {/* Verification Details Modal */}
       {showVerificationDetailsModal && selectedVerification && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-gradient-to-br from-slate-900 to-purple-900 border border-white/20 rounded-2xl p-8 max-w-4xl w-full my-8">
@@ -1045,6 +1378,7 @@ This conversation is now closed.`
         </div>
       )}
 
+      {/* Verification Decision Modal */}
       {verificationDecisionModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto">
           <div className={`border-2 rounded-2xl p-8 max-w-2xl w-full my-8 ${verificationDecisionModal === 'approve' ? 'bg-gradient-to-br from-slate-900 to-green-900 border-green-500/50' : 'bg-gradient-to-br from-slate-900 to-red-900 border-red-500/50'}`}>
@@ -1124,6 +1458,7 @@ This conversation is now closed.`
         </div>
       )}
 
+      {/* Approve Withdrawal Modal */}
       {showApproveModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gradient-to-br from-slate-900 to-green-900 border-2 border-green-500/50 rounded-2xl p-8 max-w-md w-full">
@@ -1144,6 +1479,7 @@ This conversation is now closed.`
         </div>
       )}
 
+      {/* Reject Withdrawal Modal */}
       {showRejectModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-md w-full">
