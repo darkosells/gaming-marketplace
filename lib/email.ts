@@ -368,6 +368,7 @@ export async function sendDisputeEmails(data: {
   }
   
 }
+
 // Send email verification code
 export async function sendVerificationEmail(data: {
   userEmail: string
@@ -394,6 +395,47 @@ export async function sendVerificationEmail(data: {
     return { success: true }
   } catch (error: any) {
     console.error('Failed to send verification email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// 🔐 NEW: Send password reset verification code
+export async function sendPasswordResetEmail(data: {
+  userEmail: string
+  username: string
+  resetCode: string
+}): Promise<EmailResponse> {
+  try {
+    console.log('📨 sendPasswordResetEmail called with:', data.userEmail)
+    console.log('📨 Edge Function URL:', EDGE_FUNCTION_URL)
+    
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'password_reset',
+        ...data
+      })
+    })
+
+    console.log('📨 Response status:', response.status)
+    console.log('📨 Response ok:', response.ok)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.log('📨 Error response:', errorText)
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('📨 Result:', result)
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('❌ Failed to send password reset email:', error)
     return { success: false, error: error.message }
   }
 }
