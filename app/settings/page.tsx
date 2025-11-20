@@ -309,6 +309,32 @@ export default function SettingsPage() {
     }
   }
 
+  // Same password validation as signup/reset password pages
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters'
+    }
+    if (password.length > 72) {
+      return 'Password must be at most 72 characters'
+    }
+    
+    // Check for at least one number OR one special character
+    const hasNumber = /[0-9]/.test(password)
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+    
+    if (!hasNumber && !hasSpecialChar) {
+      return 'Password must contain at least one number or special character'
+    }
+    
+    // Check against common weak passwords
+    const weakPasswords = ['password', '12345678', 'qwerty123', 'abc12345', 'password1', 'welcome1', 'letmein1']
+    if (weakPasswords.includes(password.toLowerCase())) {
+      return 'This password is too common. Please choose a stronger password'
+    }
+    
+    return null
+  }
+
   const handleChangePassword = async () => {
     setPasswordError('')
     setPasswordSuccess('')
@@ -323,8 +349,10 @@ export default function SettingsPage() {
       return
     }
 
-    if (newPassword.length < 6) {
-      setPasswordError('New password must be at least 6 characters')
+    // Use the same password validation as signup/reset password
+    const passwordError = validatePassword(newPassword)
+    if (passwordError) {
+      setPasswordError(passwordError)
       return
     }
 
@@ -995,9 +1023,11 @@ export default function SettingsPage() {
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           placeholder="Enter new password"
+                          minLength={8}
+                          maxLength={72}
                           className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition"
                         />
-                        <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+                        <p className="text-xs text-gray-500 mt-1">At least 8 characters with a number or special character</p>
                       </div>
 
                       <div>
@@ -1007,6 +1037,8 @@ export default function SettingsPage() {
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           placeholder="Confirm new password"
+                          minLength={8}
+                          maxLength={72}
                           className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition"
                         />
                       </div>
