@@ -1,4 +1,4 @@
-// app/listing/[id]/edit/page.tsx - MODERNIZED EDIT LISTING WITH PAGINATION & ORDER TRACKING
+// app/listing/[id]/edit/page.tsx - MODERNIZED EDIT LISTING WITH TAGS & VALIDATION
 
 'use client'
 
@@ -15,6 +15,27 @@ const categoryGamesMap: { [key: string]: string[] } = {
   items: ['Steal a Brainrot', 'Grow a Garden', 'Adopt me', 'Blox Fruits', 'Plants vs Brainrots'],
   currency: ['Roblox', 'Fortnite'],
   key: ['Steam', 'Playstation', 'Xbox']
+}
+
+// Tags for each game in Account category
+const accountGameTags: { [key: string]: string[] } = {
+  'Fortnite': ['Renegade Raider', 'Travis Scott', 'Black Knight', 'Take The L', 'Omega', 'Elite Agent', 'Blue Squire', 'Floss', 'IKONIK', 'Galaxy', 'Wonder', 'Reaper', 'Leviathan Axe', 'Mako', 'Lara Croft', 'Glow', 'Sparkle Specialist', 'Royale Knight', 'Peely', 'Deadpool', 'Havoc', 'Skull Trooper', 'Ghoul Trooper', 'STW', 'Midas', 'Wildcat'],
+  'GTA 5': ['High Level', 'Modded Account', 'Rare Vehicles', 'Full Businesses', 'Bunker', 'CEO Office', 'MC Clubhouse', 'Hangar', 'Facility', 'Arena Workshop', 'Nightclub', 'Arcade', 'Casino Penthouse', 'Kosatka', 'Agency'],
+  'Valorant': ['Radiant', 'Immortal', 'Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'Skins', 'Champions Bundle', 'Protocol 781-A', 'Prime Collection', 'Elderflame'],
+  'Roblox': ['High RAP', 'Limiteds', 'Headless', 'Dominus', 'Korblox', 'Valkyrie', 'Sparkle Time Fedora', 'OG Account'],
+  'League of Legends': ['Challenger', 'Grandmaster', 'Master', 'Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'PAX Skins', 'Championship Riven', 'Black Alistar', 'Silver Kayle'],
+  'Clash Royale': ['Level 14 King Tower', 'Max Cards', 'Champion Cards', 'Legendary Cards', 'High Trophy', 'Arena 15+'],
+  'Clash of Clans': ['TH15', 'TH14', 'TH13', 'Max Heroes', 'Max Walls', 'High Trophies', 'Clan War League'],
+  'Steam': ['High Level', 'Rare Games', 'VAC-Free', 'Prime Status', 'Trading Cards', 'Badges']
+}
+
+// Tags for each game in Items category
+const itemsGameTags: { [key: string]: string[] } = {
+  'Steal a Brainrot': ['Rare Items', 'Limited Edition', 'Event Items', 'Collectibles'],
+  'Grow a Garden': ['Seeds', 'Tools', 'Decorations', 'Rare Plants'],
+  'Adopt me': ['Legendary Pets', 'Neon Pets', 'Mega Neon', 'Vehicles', 'Toys', 'Gifts'],
+  'Blox Fruits': ['Legendary Fruits', 'Mythical Fruits', 'Swords', 'Fighting Styles', 'Accessories'],
+  'Plants vs Brainrots': ['Premium Plants', 'Power-ups', 'Coins', 'Gems']
 }
 
 interface DeliveryCode {
@@ -52,6 +73,8 @@ export default function EditListingPage() {
   const [stock, setStock] = useState('')
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [deliveryType, setDeliveryType] = useState<'manual' | 'automatic'>('manual')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [tagSearchQuery, setTagSearchQuery] = useState('')
 
   useEffect(() => {
     checkAuth()
@@ -72,6 +95,14 @@ export default function EditListingPage() {
       }
     }
   }, [category])
+
+  // Reset tags when category or game changes
+  useEffect(() => {
+    if (listing && (category !== listing.category || game !== listing.game)) {
+      setSelectedTags([])
+      setTagSearchQuery('')
+    }
+  }, [category, game])
 
   const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -109,7 +140,12 @@ export default function EditListingPage() {
       setPrice(data.price.toString())
       setPlatform(data.platform || '')
       setStock(data.stock.toString())
-      setDeliveryType(data.delivery_type || 'manual')
+      setDeliveryType(data.delivery_type === 'instant' ? 'automatic' : 'manual')
+      
+      // Load existing tags
+      if (data.tags && Array.isArray(data.tags)) {
+        setSelectedTags(data.tags)
+      }
 
       // Handle images - support both old single image and new array
       if (data.image_urls && data.image_urls.length > 0) {
@@ -121,7 +157,7 @@ export default function EditListingPage() {
       }
 
       // Fetch delivery codes if automatic
-      if (data.delivery_type === 'automatic') {
+      if (data.delivery_type === 'instant' || data.delivery_type === 'automatic') {
         await fetchDeliveryCodes()
       }
     } catch (error: any) {
@@ -215,6 +251,47 @@ export default function EditListingPage() {
     }
   }
 
+  // Get available tags based on selected category and game
+  const getAvailableTags = () => {
+    // Only show tags for Account and Items categories
+    if (category !== 'account' && category !== 'items') {
+      return []
+    }
+
+    if (!game) {
+      return []
+    }
+
+    const tags = category === 'account' 
+      ? accountGameTags[game] || []
+      : itemsGameTags[game] || []
+
+    // Filter tags based on search query
+    if (tagSearchQuery) {
+      return tags.filter(tag => 
+        tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
+      )
+    }
+
+    return tags
+  }
+
+  const shouldShowTags = () => {
+    return (category === 'account' || category === 'items') && game
+  }
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) 
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    )
+  }
+
+  const removeTag = (tag: string) => {
+    setSelectedTags(prev => prev.filter(t => t !== tag))
+  }
+
   const getAvailableGames = () => {
     return categoryGamesMap[category] || []
   }
@@ -232,8 +309,18 @@ export default function EditListingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!title || !game || !price) {
+    if (!title || !game || !description || !price || !platform) {
       alert('Please fill in all required fields')
+      return
+    }
+
+    if (title.length < 10) {
+      alert('Title must be at least 10 characters long')
+      return
+    }
+
+    if (description.length < 20) {
+      alert('Description must be at least 20 characters long')
       return
     }
 
@@ -286,7 +373,7 @@ export default function EditListingPage() {
         newStatus = 'out_of_stock' // Mark as out of stock when no stock
       }
 
-      // Update listing with correct stock count AND status
+      // Update listing with correct stock count, status, AND tags
       const { error: listingError } = await supabase
         .from('listings')
         .update({
@@ -300,7 +387,8 @@ export default function EditListingPage() {
           status: newStatus,
           image_url: imageUrls[0] || null, // Keep for backward compatibility
           image_urls: imageUrls, // New array field
-          delivery_type: deliveryType
+          delivery_type: deliveryType === 'automatic' ? 'instant' : 'manual',
+          tags: selectedTags.length > 0 ? selectedTags : null
         })
         .eq('id', params.id)
 
@@ -425,7 +513,7 @@ export default function EditListingPage() {
               <h1 className="text-4xl font-bold text-white mb-2">
                 <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Edit Listing</span>
               </h1>
-              <p className="text-gray-400">Update your listing details, images, and delivery codes</p>
+              <p className="text-gray-400">Update your listing details, images, tags, and delivery codes</p>
             </div>
 
             {/* Form */}
@@ -439,7 +527,9 @@ export default function EditListingPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-white mb-2 font-semibold">Title *</label>
+                    <label className="block text-white mb-2 font-semibold">
+                      Title <span className="text-red-400">*</span>
+                    </label>
                     <input
                       type="text"
                       value={title}
@@ -447,7 +537,14 @@ export default function EditListingPage() {
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition"
                       placeholder="Epic Fortnite Account - Level 200"
                       required
+                      minLength={10}
                     />
+                    <p className="text-sm text-gray-400 mt-2">
+                      {title.length}/100 characters
+                      {title.length > 0 && title.length < 10 && (
+                        <span className="text-orange-400 ml-2">• Minimum 10 characters required</span>
+                      )}
+                    </p>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
@@ -508,14 +605,110 @@ export default function EditListingPage() {
                     </div>
                   </div>
 
+                  {/* Tags Selection - Only for Accounts and Items */}
+                  {shouldShowTags() && (
+                    <div>
+                      <label className="block text-white mb-2 font-semibold">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                          Tags <span className="text-gray-400 text-sm font-normal ml-2">(Optional - helps buyers find your listing)</span>
+                        </div>
+                      </label>
+                      
+                      {/* Tag Search */}
+                      <div className="relative mb-3">
+                        <input
+                          type="text"
+                          value={tagSearchQuery}
+                          onChange={(e) => setTagSearchQuery(e.target.value)}
+                          placeholder="Search tags..."
+                          className="w-full px-4 py-3 pl-10 rounded-xl bg-slate-800 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+
+                      {/* Selected Tags Display */}
+                      {selectedTags.length > 0 && (
+                        <div className="mb-3 p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-semibold text-white">Selected Tags ({selectedTags.length})</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTags([])}
+                              className="text-xs text-purple-400 hover:text-purple-300 transition font-medium"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedTags.map(tag => (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => removeTag(tag)}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg text-sm text-purple-300 transition group"
+                              >
+                                <span>{tag}</span>
+                                <svg className="w-3.5 h-3.5 group-hover:text-red-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Available Tags */}
+                      <div className="bg-slate-800 border border-white/10 rounded-xl p-4 max-h-60 overflow-y-auto">
+                        <p className="text-sm text-gray-400 mb-3">Click to select tags:</p>
+                        {getAvailableTags().length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {getAvailableTags().map(tag => (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => toggleTag(tag)}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                  selectedTags.includes(tag)
+                                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+                                    : 'bg-slate-700/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:bg-slate-700/80'
+                                }`}
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 text-center py-8">
+                            {tagSearchQuery ? 'No tags found matching your search' : 'No tags available for this game'}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
-                    <label className="block text-white mb-2 font-semibold">Description</label>
+                    <label className="block text-white mb-2 font-semibold">
+                      Description <span className="text-red-400">*</span>
+                    </label>
                     <textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 h-32 transition"
                       placeholder="Describe your item..."
+                      required
+                      minLength={20}
                     />
+                    <p className="text-sm text-gray-400 mt-2">
+                      {description.length}/1000 characters
+                      {description.length > 0 && description.length < 20 && (
+                        <span className="text-orange-400 ml-2">• Minimum 20 characters required</span>
+                      )}
+                    </p>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
@@ -536,13 +729,16 @@ export default function EditListingPage() {
                     </div>
 
                     <div>
-                      <label className="block text-white mb-2 font-semibold">Platform</label>
+                      <label className="block text-white mb-2 font-semibold">
+                        Platform <span className="text-red-400">*</span>
+                      </label>
                       <input
                         type="text"
                         value={platform}
                         onChange={(e) => setPlatform(e.target.value)}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition"
                         placeholder="PC, PS5, Xbox..."
+                        required
                       />
                     </div>
                   </div>
@@ -587,9 +783,9 @@ export default function EditListingPage() {
                             : 'border-white/10 bg-white/5 hover:border-white/20'
                         }`}
                       >
-                        <div className="text-4xl mb-3">👤</div>
+                        <div className="text-4xl mb-3">📦</div>
                         <div className="text-white font-bold mb-2">Manual Delivery</div>
-                        <div className="text-sm text-gray-400">You manually deliver after payment</div>
+                        <div className="text-sm text-gray-400">You manually deliver after payment (up to 48h)</div>
                       </button>
 
                       <button
@@ -602,7 +798,7 @@ export default function EditListingPage() {
                         }`}
                       >
                         <div className="text-4xl mb-3">⚡</div>
-                        <div className="text-white font-bold mb-2">Automatic Delivery</div>
+                        <div className="text-white font-bold mb-2">Instant Delivery</div>
                         <div className="text-sm text-gray-400">Instant delivery with codes</div>
                       </button>
                     </div>
@@ -865,7 +1061,7 @@ export default function EditListingPage() {
                     </div>
                   )}
 
-                  {/* Add New Codes Section - IMPROVED */}
+                  {/* Add New Codes Section */}
                   <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl p-6">
                     <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                       <span className="text-3xl">➕</span>
@@ -969,7 +1165,7 @@ export default function EditListingPage() {
         {/* Footer */}
         <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
           <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2024 GameVault. All rights reserved.</p>
+            <p>&copy; 2024 Nashflare. All rights reserved.</p>
           </div>
         </footer>
       </div>

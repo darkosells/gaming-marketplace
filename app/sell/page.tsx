@@ -15,6 +15,27 @@ const categoryGamesMap: { [key: string]: string[] } = {
   key: ['Steam', 'Playstation', 'Xbox']
 }
 
+// Tags for each game in Account category
+const accountGameTags: { [key: string]: string[] } = {
+  'Fortnite': ['Renegade Raider', 'Travis Scott', 'Black Knight', 'Take The L', 'Omega', 'Elite Agent', 'Blue Squire', 'Floss', 'IKONIK', 'Galaxy', 'Wonder', 'Reaper', 'Leviathan Axe', 'Mako', 'Lara Croft', 'Glow', 'Sparkle Specialist', 'Royale Knight', 'Peely', 'Deadpool', 'Havoc', 'Skull Trooper', 'Ghoul Trooper', 'STW', 'Midas', 'Wildcat'],
+  'GTA 5': ['High Level', 'Modded Account', 'Rare Vehicles', 'Full Businesses', 'Bunker', 'CEO Office', 'MC Clubhouse', 'Hangar', 'Facility', 'Arena Workshop', 'Nightclub', 'Arcade', 'Casino Penthouse', 'Kosatka', 'Agency'],
+  'Valorant': ['Radiant', 'Immortal', 'Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'Skins', 'Champions Bundle', 'Protocol 781-A', 'Prime Collection', 'Elderflame'],
+  'Roblox': ['High RAP', 'Limiteds', 'Headless', 'Dominus', 'Korblox', 'Valkyrie', 'Sparkle Time Fedora', 'OG Account'],
+  'League of Legends': ['Challenger', 'Grandmaster', 'Master', 'Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'PAX Skins', 'Championship Riven', 'Black Alistar', 'Silver Kayle'],
+  'Clash Royale': ['Level 14 King Tower', 'Max Cards', 'Champion Cards', 'Legendary Cards', 'High Trophy', 'Arena 15+'],
+  'Clash of Clans': ['TH15', 'TH14', 'TH13', 'Max Heroes', 'Max Walls', 'High Trophies', 'Clan War League'],
+  'Steam': ['High Level', 'Rare Games', 'VAC-Free', 'Prime Status', 'Trading Cards', 'Badges']
+}
+
+// Tags for each game in Items category
+const itemsGameTags: { [key: string]: string[] } = {
+  'Steal a Brainrot': ['Rare Items', 'Limited Edition', 'Event Items', 'Collectibles'],
+  'Grow a Garden': ['Seeds', 'Tools', 'Decorations', 'Rare Plants'],
+  'Adopt me': ['Legendary Pets', 'Neon Pets', 'Mega Neon', 'Vehicles', 'Toys', 'Gifts'],
+  'Blox Fruits': ['Legendary Fruits', 'Mythical Fruits', 'Swords', 'Fighting Styles', 'Accessories'],
+  'Plants vs Brainrots': ['Premium Plants', 'Power-ups', 'Coins', 'Gems']
+}
+
 export default function CreateListingPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -34,6 +55,8 @@ export default function CreateListingPage() {
   const [platform, setPlatform] = useState('')
   const [stock, setStock] = useState('1')
   const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [tagSearchQuery, setTagSearchQuery] = useState('')
   
   // Delivery fields
   const [deliveryType, setDeliveryType] = useState<'manual' | 'automatic'>('manual')
@@ -52,10 +75,18 @@ export default function CreateListingPage() {
     checkAuth()
   }, [])
 
-  // Reset game when category changes
+  // Reset game and tags when category changes
   useEffect(() => {
     setGame('')
+    setSelectedTags([])
+    setTagSearchQuery('')
   }, [category])
+
+  // Reset tags when game changes
+  useEffect(() => {
+    setSelectedTags([])
+    setTagSearchQuery('')
+  }, [game])
 
   // Update delivery codes array when stock changes
   useEffect(() => {
@@ -100,6 +131,47 @@ export default function CreateListingPage() {
     return categoryGamesMap[category] || []
   }
 
+  // Get available tags based on selected category and game
+  const getAvailableTags = () => {
+    // Only show tags for Account and Items categories
+    if (category !== 'account' && category !== 'items') {
+      return []
+    }
+
+    if (!game) {
+      return []
+    }
+
+    const tags = category === 'account' 
+      ? accountGameTags[game] || []
+      : itemsGameTags[game] || []
+
+    // Filter tags based on search query
+    if (tagSearchQuery) {
+      return tags.filter(tag => 
+        tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
+      )
+    }
+
+    return tags
+  }
+
+  const shouldShowTags = () => {
+    return (category === 'account' || category === 'items') && game
+  }
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) 
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    )
+  }
+
+  const removeTag = (tag: string) => {
+    setSelectedTags(prev => prev.filter(t => t !== tag))
+  }
+
   const getCategoryEmoji = (cat: string) => {
     switch (cat) {
       case 'account': return '🎮'
@@ -125,8 +197,20 @@ export default function CreateListingPage() {
     setError('')
     setSubmitting(true)
 
-    if (!game || !title || !price) {
+    if (!game || !title || !description || !price || !platform) {
       setError('Please fill in all required fields')
+      setSubmitting(false)
+      return
+    }
+
+    if (title.length < 10) {
+      setError('Title must be at least 10 characters long')
+      setSubmitting(false)
+      return
+    }
+
+    if (description.length < 20) {
+      setError('Description must be at least 20 characters long')
       setSubmitting(false)
       return
     }
@@ -174,7 +258,8 @@ export default function CreateListingPage() {
             image_url: imageUrls[0] || null,
             image_urls: imageUrls,
             status: 'active',
-            delivery_type: deliveryType
+            delivery_type: deliveryType === 'automatic' ? 'instant' : 'manual',
+            tags: selectedTags.length > 0 ? selectedTags : null
           }
         ])
         .select()
@@ -390,6 +475,103 @@ export default function CreateListingPage() {
               </select>
             </div>
 
+            {/* Tags Selection - Only for Accounts and Items */}
+            {shouldShowTags() && (
+              <div className="mb-8">
+                <label className="block text-white font-bold text-lg mb-2">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    Tags <span className="text-gray-400 text-sm font-normal ml-2">(Optional - helps buyers find your listing)</span>
+                  </div>
+                </label>
+                
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
+                  <div className="flex items-start space-x-3">
+                    <svg className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm text-blue-200">
+                      Select relevant tags to help buyers find your listing when filtering. Choose all that apply to your {category === 'account' ? 'account' : 'items'}.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tag Search */}
+                <div className="relative mb-4">
+                  <input
+                    type="text"
+                    value={tagSearchQuery}
+                    onChange={(e) => setTagSearchQuery(e.target.value)}
+                    placeholder="Search tags..."
+                    className="w-full px-5 py-3 pl-12 rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
+                {/* Selected Tags Display */}
+                {selectedTags.length > 0 && (
+                  <div className="mb-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-semibold text-white">Selected Tags ({selectedTags.length})</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTags([])}
+                        className="text-xs text-purple-400 hover:text-purple-300 transition font-medium"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTags.map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg text-sm text-purple-300 transition group"
+                        >
+                          <span>{tag}</span>
+                          <svg className="w-4 h-4 group-hover:text-red-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Available Tags */}
+                <div className="bg-slate-900/50 border border-white/10 rounded-xl p-4 max-h-80 overflow-y-auto">
+                  <p className="text-sm text-gray-400 mb-3">Click to select tags:</p>
+                  {getAvailableTags().length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {getAvailableTags().map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleTag(tag)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                            selectedTags.includes(tag)
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+                              : 'bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:bg-slate-800/80'
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 text-center py-8">
+                      {tagSearchQuery ? 'No tags found matching your search' : 'No tags available for this game'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Title */}
             <div className="mb-8">
               <label className="block text-white font-bold text-lg mb-2">
@@ -406,26 +588,39 @@ export default function CreateListingPage() {
                   'e.g., Steam Gift Card $50 Value'
                 }
                 required
+                minLength={10}
                 maxLength={100}
                 className="w-full px-5 py-4 rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
               />
-              <p className="text-sm text-gray-400 mt-2">{title.length}/100 characters</p>
+              <p className="text-sm text-gray-400 mt-2">
+                {title.length}/100 characters
+                {title.length > 0 && title.length < 10 && (
+                  <span className="text-orange-400 ml-2">• Minimum 10 characters required</span>
+                )}
+              </p>
             </div>
 
             {/* Description */}
             <div className="mb-8">
               <label className="block text-white font-bold text-lg mb-2">
-                Description
+                Description <span className="text-red-400">*</span>
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe your item in detail. Include level, features, items included, condition, etc."
                 rows={6}
+                required
+                minLength={20}
                 maxLength={1000}
                 className="w-full px-5 py-4 rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none transition-all"
               />
-              <p className="text-sm text-gray-400 mt-2">{description.length}/1000 characters</p>
+              <p className="text-sm text-gray-400 mt-2">
+                {description.length}/1000 characters
+                {description.length > 0 && description.length < 20 && (
+                  <span className="text-orange-400 ml-2">• Minimum 20 characters required</span>
+                )}
+              </p>
             </div>
 
             {/* Price and Stock Row */}
@@ -468,11 +663,12 @@ export default function CreateListingPage() {
             {/* Platform */}
             <div className="mb-8">
               <label className="block text-white font-bold text-lg mb-2">
-                Platform
+                Platform <span className="text-red-400">*</span>
               </label>
               <select
                 value={platform}
                 onChange={(e) => setPlatform(e.target.value)}
+                required
                 className="w-full px-5 py-4 rounded-xl bg-slate-900/50 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none cursor-pointer transition-all"
                 style={{
                   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
@@ -482,7 +678,7 @@ export default function CreateListingPage() {
                   paddingRight: '3.5rem'
                 }}
               >
-                <option value="">Select platform (optional)</option>
+                <option value="">Select a platform...</option>
                 {platforms.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
@@ -504,9 +700,9 @@ export default function CreateListingPage() {
                       : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
                   }`}
                 >
-                  <div className="text-4xl mb-3">👤</div>
+                  <div className="text-4xl mb-3">📦</div>
                   <div className="text-white font-bold text-lg mb-2">Manual Delivery</div>
-                  <div className="text-sm text-gray-400">You manually send account details after payment confirmation</div>
+                  <div className="text-sm text-gray-400">You manually send account details after payment confirmation (up to 48h)</div>
                 </button>
                 <button
                   type="button"
@@ -522,7 +718,7 @@ export default function CreateListingPage() {
                   }`}
                 >
                   <div className="text-4xl mb-3">⚡</div>
-                  <div className="text-white font-bold text-lg mb-2">Automatic Delivery</div>
+                  <div className="text-white font-bold text-lg mb-2">Instant Delivery</div>
                   <div className="text-sm text-gray-400">System auto-sends details via messenger immediately after payment</div>
                 </button>
               </div>
