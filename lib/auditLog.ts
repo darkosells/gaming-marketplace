@@ -244,3 +244,30 @@ export async function getAuditStats(adminId?: string) {
     recentActions: data.slice(0, 10)
   }
 }
+/**
+ * Simple wrapper for quick audit logging (legacy compatibility)
+ */
+export async function logAdminActionSimple(
+  adminId: string,
+  actionType: string,
+  details: string
+) {
+  const supabase = createClient()
+  
+  try {
+    const { error } = await supabase
+      .from('admin_audit_logs')
+      .insert({
+        admin_id: adminId,
+        action: actionType,
+        details: details,
+        created_at: new Date().toISOString()
+      })
+    
+    if (error) {
+      console.error('Error logging admin action:', error)
+    }
+  } catch (error) {
+    console.error('Error in logAdminActionSimple:', error)
+  }
+}
