@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Navigation from '@/components/Navigation'
+import Image from 'next/image'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
@@ -39,97 +39,139 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
       {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute w-96 h-96 -top-48 -left-48 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-        <div className="absolute w-96 h-96 -bottom-48 -right-48 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute w-96 h-96 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+      <div className="fixed inset-0 z-0">
+        {/* Gradient Mesh */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+        
+        {/* Animated Orbs */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
+        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+        
+        {/* Grid Pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+        
+        {/* Floating Particles */}
+        <div className="absolute top-20 left-[10%] w-2 h-2 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDuration: '3s' }}></div>
+        <div className="absolute top-40 left-[25%] w-1 h-1 bg-pink-400/60 rounded-full animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}></div>
+        <div className="absolute top-60 right-[15%] w-3 h-3 bg-blue-400/40 rounded-full animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}></div>
+        <div className="absolute top-32 right-[30%] w-2 h-2 bg-purple-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1.5s' }}></div>
+        <div className="absolute top-80 left-[40%] w-1 h-1 bg-pink-400/70 rounded-full animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '2s' }}></div>
+        <div className="absolute bottom-40 right-[20%] w-2 h-2 bg-indigo-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.8s', animationDelay: '2.5s' }}></div>
       </div>
 
-      <Navigation />
+      {/* Content */}
+      <div className="relative z-10 max-w-md w-full">
+        {/* Logo */}
+        <Link href="/" className="flex items-center justify-center space-x-3 mb-8 group">
+          <div className="relative">
+            <Image
+              src="/logo6.svg"
+              alt="Nashflare"
+              width={48}
+              height={48}
+              className="transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300"
+              priority
+            />
+            <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-2xl font-black text-white tracking-tight">
+              Nash<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">flare</span>
+            </span>
+            <span className="text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-1">Marketplace</span>
+          </div>
+        </Link>
 
-      <div className="relative min-h-screen flex items-center justify-center px-4 pt-20">
-        <div className="w-full max-w-md">
-          {/* Main Card */}
-          <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 p-8 relative overflow-hidden">
-            {/* Glassmorphism Shine */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
-            
-            <div className="relative">
-              {/* Header */}
-              <div className="text-center mb-8">
-                <div className="inline-block p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl mb-4">
-                  <svg className="w-12 h-12 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                </div>
-                <h1 className="text-3xl font-bold text-white mb-2">Forgot Password?</h1>
-                <p className="text-gray-400">No worries, we'll send you a reset code</p>
-              </div>
+        <div className="text-center mb-8">
+          <div className="inline-block mb-4">
+            <div className="w-16 h-16 bg-purple-500/20 border border-purple-500/30 rounded-2xl flex items-center justify-center mx-auto">
+              <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </div>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+            Forgot <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Password?</span>
+          </h1>
+          <p className="text-gray-400">No worries! We'll send you a reset code</p>
+        </div>
 
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {error && (
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-                    <p className="text-red-400 text-sm flex items-center gap-2">
-                      <span>❌</span> {error}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-white font-medium mb-2 text-sm">Email Address</label>
-                  <div className="relative group">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      required
-                      className="relative w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                >
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Sending Code...
-                    </span>
-                  ) : (
-                    'Send Reset Code'
-                  )}
-                </button>
-              </form>
-
-              {/* Info Box */}
-              <div className="mt-6 bg-purple-500/10 border border-purple-500/30 rounded-xl p-4">
-                <p className="text-purple-300 text-sm flex items-center gap-2">
-                  <span>💡</span>
-                  <span>We'll send a 6-digit code to your email. It expires in 10 minutes.</span>
+        <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4">
+                <p className="text-red-200 text-sm flex items-center gap-2">
+                  <span>❌</span> {error}
                 </p>
               </div>
+            )}
 
-              {/* Back to Login */}
-              <div className="mt-6 text-center">
-                <Link 
-                  href="/login" 
-                  className="text-sm text-purple-400 hover:text-purple-300 transition flex items-center justify-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  Back to Login
-                </Link>
+            <div>
+              <label className="block text-white font-semibold mb-2 text-sm">Email Address</label>
+              <div className="relative group">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+                  required
+                  maxLength={100}
+                />
               </div>
+              <p className="text-xs text-gray-500 mt-1">We'll send a 6-digit verification code to this email</p>
             </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Sending Code...
+                </span>
+              ) : (
+                'Send Reset Code'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-gray-400">
+              Remember your password?{' '}
+              <Link href="/login" className="text-purple-400 hover:text-purple-300 font-semibold transition">
+                Log in
+              </Link>
+            </p>
+          </div>
+        </div>
+
+        {/* Back to Home */}
+        <div className="text-center mt-6">
+          <Link href="/" className="text-gray-400 hover:text-purple-400 transition flex items-center justify-center gap-2">
+            <span>←</span> Back to Home
+          </Link>
+        </div>
+
+        {/* Trust indicators */}
+        <div className="mt-8 flex items-center justify-center gap-6 text-xs text-gray-500">
+          <div className="flex items-center gap-1">
+            <span className="text-green-400">🔒</span>
+            <span>Secure</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-blue-400">✓</span>
+            <span>Verified</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-purple-400">⚡</span>
+            <span>Fast</span>
           </div>
         </div>
       </div>
