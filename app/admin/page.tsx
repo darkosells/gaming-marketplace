@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase'
 import AdminAnalytics from '@/components/AdminAnalytics'
 import SearchFilterBar from '@/components/SearchFilterBar'
 import AdminNotifications from '@/components/AdminNotifications'
+import { logAdminAction } from '@/lib/auditLog'
+import AuditLogViewer from '@/components/AuditLogViewer'
 
 const ITEMS_PER_PAGE = 10
 
@@ -794,7 +796,8 @@ users.filter(u => u.role === 'vendor').forEach(vendor => {
               { id: 'disputes', label: 'Disputes', icon: '⚠️' },
               { id: 'verifications', label: 'Verifications', icon: '🔍', badge: stats.pendingVerifications > 0 ? stats.pendingVerifications : undefined },
               { id: 'reviews', label: 'Reviews', icon: '⭐' },
-              { id: 'withdrawals', label: 'Withdrawals', icon: '💸' }
+              { id: 'withdrawals', label: 'Withdrawals', icon: '💸' },
+              { id: 'audit', label: 'Audit Logs', icon: '📜' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1279,6 +1282,13 @@ users.filter(u => u.role === 'vendor').forEach(vendor => {
           </div>
         </div>
       </div>
+
+      {/* Audit Logs Tab */}
+            {activeTab === 'audit' && (
+              <div className="relative z-10 pointer-events-auto">
+                <AuditLogViewer currentAdminId={user?.id} />
+              </div>
+            )}
 
       {/* ALL MODALS BELOW */}
       
