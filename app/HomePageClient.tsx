@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 import { gameNameToSlug } from '@/lib/games-config'
 
 export default function HomePageClient() {
@@ -286,10 +287,10 @@ export default function HomePageClient() {
             </p>
 
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-  {games.map((game) => (
-    <Link
-      key={game.name}
-      href={`/games/${gameNameToSlug(game.name)}`}  // NEW
+              {games.map((game) => (
+                <Link
+                  key={game.name}
+                  href={`/games/${gameNameToSlug(game.name)}`}
                   className="group relative overflow-hidden rounded-xl bg-slate-900/30 border border-white/5 p-6 hover:bg-slate-800/50 hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-1"
                 >
                   <div className="text-center">
@@ -415,55 +416,7 @@ export default function HomePageClient() {
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="bg-slate-950/80 border-t border-white/5 py-12">
-          <div className="container mx-auto px-4">
-            <div className="grid md:grid-cols-4 gap-8 mb-8">
-              <div>
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                    <span className="text-xl">🎮</span>
-                  </div>
-                  <span className="text-lg font-bold text-white">Nashflare</span>
-                </div>
-                <p className="text-gray-500 text-sm">
-                  The most trusted marketplace for gaming assets.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="text-white font-semibold mb-4">Marketplace</h4>
-                <ul className="space-y-2 text-gray-500 text-sm">
-                  <li><Link href="/browse?category=account" className="hover:text-white transition">Gaming Accounts</Link></li>
-                  <li><Link href="/browse?category=topup" className="hover:text-white transition">Top-Ups</Link></li>
-                  <li><Link href="/browse?category=key" className="hover:text-white transition">Game Keys</Link></li>
-                  <li><Link href="/browse" className="hover:text-white transition">All Items</Link></li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="text-white font-semibold mb-4">Company</h4>
-                <ul className="space-y-2 text-gray-500 text-sm">
-                  <li><Link href="/how-it-works" className="hover:text-white transition">How It Works</Link></li>
-                  <li><Link href="/contact" className="hover:text-white transition">Contact</Link></li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="text-white font-semibold mb-4">Legal</h4>
-                <ul className="space-y-2 text-gray-500 text-sm">
-                  <li><Link href="/terms" className="hover:text-white transition">Terms of Service</Link></li>
-                  <li><Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link></li>
-                  <li><Link href="/cookies" className="hover:text-white transition">Cookie Policy</Link></li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="border-t border-white/5 pt-8 text-center text-gray-500 text-sm">
-              <p>&copy; 2024 Nashflare. All rights reserved.</p>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
 
       {/* Optimized CSS animations - Simplified */}

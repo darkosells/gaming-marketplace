@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 
 interface Listing {
   id: string
@@ -17,6 +18,7 @@ interface Listing {
   platform: string
   image_url: string
   image_urls: string[]
+  tags: string[]
   status: string
   stock: number
   created_at: string
@@ -73,7 +75,7 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
   const [listing] = useState<Listing>(initialListing)
   const [reviews, setReviews] = useState<Review[]>([])
   const [similarListings, setSimilarListings] = useState<SimilarListing[]>([])
-  const [quantity, setQuantity] = useState(1)
+  const quantity = 1 // Fixed quantity - always 1
   const [activeTab, setActiveTab] = useState('description')
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [user, setUser] = useState<any>(null)
@@ -494,6 +496,20 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                           {listing.title}
                         </span>
                       </h1>
+                      
+                      {/* Tags Display */}
+                      {listing.tags && listing.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          {listing.tags.map((tag, index) => (
+                            <span
+                              key={index}
+                              className="px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 rounded-lg text-sm text-purple-300 font-medium hover:bg-purple-500/20 transition"
+                            >
+                              🏷️ {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -720,39 +736,6 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                   </p>
                 </div>
 
-                {/* Quantity Selector */}
-                <div className="mb-6">
-                  <label className="block text-white font-semibold mb-3">Quantity</label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="w-12 h-12 bg-white/5 hover:bg-white/10 rounded-xl text-white font-bold text-xl transition border border-white/10 hover:border-purple-500/50"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="number"
-                      value={quantity}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 1
-                        setQuantity(Math.min(Math.max(1, val), listing.stock))
-                      }}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-xl text-center text-white text-xl font-bold py-3 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition"
-                      min="1"
-                      max={listing.stock}
-                    />
-                    <button
-                      onClick={() => setQuantity(Math.min(listing.stock, quantity + 1))}
-                      className="w-12 h-12 bg-white/5 hover:bg-white/10 rounded-xl text-white font-bold text-xl transition border border-white/10 hover:border-purple-500/50"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <p className="text-gray-400 text-sm mt-2 text-center">
-                    {listing.stock} available
-                  </p>
-                </div>
-
                 {/* Price Breakdown */}
                 <div className="space-y-3 mb-6 pb-6 border-b border-white/10">
                   <div className="flex justify-between text-gray-300">
@@ -876,12 +859,7 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
           </div>
         </div>
 
-        {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
-          <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2024 Nashflare. All rights reserved.</p>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   )
