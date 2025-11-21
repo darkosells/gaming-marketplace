@@ -450,12 +450,12 @@ export default function SettingsPage() {
 
   const getRoleBadge = () => {
     if (profile?.is_admin) {
-      return <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm font-semibold border border-red-500/30">👑 Admin</span>
+      return <span className="px-2 sm:px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs sm:text-sm font-semibold border border-red-500/30">👑 Admin</span>
     }
     if (profile?.role === 'vendor') {
-      return <span className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-sm font-semibold border border-purple-500/30">🏪 Vendor</span>
+      return <span className="px-2 sm:px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-xs sm:text-sm font-semibold border border-purple-500/30">🏪 Vendor</span>
     }
-    return <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm font-semibold border border-blue-500/30">🛒 Customer</span>
+    return <span className="px-2 sm:px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs sm:text-sm font-semibold border border-blue-500/30">🛒 Customer</span>
   }
 
   if (loading) {
@@ -496,15 +496,15 @@ export default function SettingsPage() {
         <div className="absolute top-[20%] left-[70%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '3.5s', animationDelay: '1.5s' }}></div>
         <div className="absolute top-[25%] left-[85%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDuration: '2.8s', animationDelay: '0.8s' }}></div>
         
-        {/* Planets */}
-        <div className="absolute top-[15%] right-[10%] group">
-          <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-amber-600 rounded-full shadow-lg relative">
+        {/* Planets - Hidden on smallest mobile screens */}
+        <div className="hidden sm:block absolute top-[15%] right-[10%] group">
+          <div className="w-16 sm:w-20 h-16 sm:h-20 bg-gradient-to-br from-orange-400 to-amber-600 rounded-full shadow-lg relative">
             <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/20 rounded-full"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-6 border-4 border-orange-300/60 rounded-full -rotate-12"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 sm:w-32 h-4 sm:h-6 border-2 sm:border-4 border-orange-300/60 rounded-full -rotate-12"></div>
           </div>
         </div>
-        <div className="absolute bottom-[20%] left-[8%]">
-          <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-violet-700 rounded-full shadow-lg relative">
+        <div className="hidden sm:block absolute bottom-[20%] left-[8%]">
+          <div className="w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-purple-500 to-violet-700 rounded-full shadow-lg relative">
             <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/30 rounded-full"></div>
           </div>
         </div>
@@ -514,92 +514,93 @@ export default function SettingsPage() {
       <div className="relative z-10">
         <Navigation />
 
-        <div className="container mx-auto px-4 pt-24 pb-12">
+        <div className="container mx-auto px-3 sm:px-4 pt-20 sm:pt-24 pb-8 sm:pb-12">
           <div className="max-w-4xl mx-auto">
-            {/* Header */}
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 mb-8 hover:border-purple-500/30 transition-all duration-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="inline-block mb-4">
-                    <span className="px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-sm font-medium">
+            {/* Header - Mobile Optimized */}
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6 lg:mb-8 hover:border-purple-500/30 transition-all duration-300">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="w-full sm:w-auto">
+                  <div className="inline-block mb-3 sm:mb-4">
+                    <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-xs sm:text-sm font-medium">
                       ⚙️ Account Settings
                     </span>
                   </div>
-                  <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
+                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-2">
                     <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Settings</span>
                   </h1>
-                  <p className="text-gray-400">Manage your account settings and preferences</p>
+                  <p className="text-gray-400 text-sm sm:text-base">Manage your account settings and preferences</p>
                 </div>
-                <div className="text-right">
-                  <div className="mb-2">{getRoleBadge()}</div>
-                  <p className="text-sm text-gray-400">Member since {new Date(profile?.created_at).toLocaleDateString()}</p>
+                <div className="w-full sm:w-auto sm:text-right">
+                  <div className="mb-2 flex sm:justify-end">{getRoleBadge()}</div>
+                  <p className="text-xs sm:text-sm text-gray-400">Member since {new Date(profile?.created_at).toLocaleDateString()}</p>
                 </div>
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
-              <div className="flex flex-wrap gap-2 mb-8 border-b border-white/10 pb-4">
+            {/* Tabs - Mobile Scroll */}
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 hover:border-purple-500/30 transition-all duration-300">
+              {/* Mobile: Horizontal Scroll Tabs */}
+              <div className="flex overflow-x-auto gap-2 mb-6 sm:mb-8 border-b border-white/10 pb-3 sm:pb-4 -mx-1 px-1 scrollbar-hide">
                 <button
                   onClick={() => setActiveTab('profile')}
-                  className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                  className={`flex-shrink-0 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base whitespace-nowrap ${
                     activeTab === 'profile'
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  👤 Profile
+                  <span className="hidden xs:inline">👤 </span>Profile
                 </button>
                 <button
                   onClick={() => setActiveTab('preferences')}
-                  className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                  className={`flex-shrink-0 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base whitespace-nowrap ${
                     activeTab === 'preferences'
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  🔔 Preferences
+                  <span className="hidden xs:inline">🔔 </span>Preferences
                 </button>
                 <button
                   onClick={() => setActiveTab('security')}
-                  className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                  className={`flex-shrink-0 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base whitespace-nowrap ${
                     activeTab === 'security'
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  🔒 Security
+                  <span className="hidden xs:inline">🔒 </span>Security
                 </button>
                 <button
                   onClick={() => setActiveTab('account')}
-                  className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                  className={`flex-shrink-0 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base whitespace-nowrap ${
                     activeTab === 'account'
                       ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg shadow-red-500/30'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  ⚠️ Account
+                  <span className="hidden xs:inline">⚠️ </span>Account
                 </button>
               </div>
 
               {/* Profile Tab */}
               {activeTab === 'profile' && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                <div className="space-y-4 sm:space-y-6">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                     <span className="text-purple-400">📝</span>
-                    Profile Information
+                    <span className="text-base sm:text-2xl">Profile Information</span>
                   </h2>
 
-                  {/* Avatar Upload Section */}
-                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300">
-                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  {/* Avatar Upload Section - Mobile Optimized */}
+                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
+                    <h3 className="text-base sm:text-lg font-semibold text-white mb-4 flex items-center gap-2">
                       <span>📷</span> Profile Picture
                     </h3>
                     
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                       {/* Avatar Preview */}
-                      <div className="relative group">
-                        <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ring-4 ring-purple-500/30">
+                      <div className="relative group flex-shrink-0">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center ring-4 ring-purple-500/30">
                           {avatarUrl ? (
                             <img 
                               src={avatarUrl} 
@@ -607,27 +608,27 @@ export default function SettingsPage() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <span className="text-white font-bold text-3xl">
+                            <span className="text-white font-bold text-2xl sm:text-3xl">
                               {profile?.username?.charAt(0).toUpperCase() || 'U'}
                             </span>
                           )}
                         </div>
                         {uploadingAvatar && (
                           <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
-                            <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            <div className="w-6 sm:w-8 h-6 sm:h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                           </div>
                         )}
                       </div>
 
                       {/* Upload Controls */}
-                      <div className="flex-1">
-                        <div className="flex flex-wrap gap-3 mb-3">
+                      <div className="flex-1 w-full">
+                        <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 mb-3">
                           <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploadingAvatar}
-                            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
+                            className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2.5 sm:py-2 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 text-sm sm:text-base"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             {avatarUrl ? 'Change Avatar' : 'Upload Avatar'}
@@ -637,9 +638,9 @@ export default function SettingsPage() {
                             <button
                               onClick={handleRemoveAvatar}
                               disabled={uploadingAvatar}
-                              className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg font-semibold transition-all duration-300 border border-red-500/30 disabled:opacity-50 flex items-center gap-2"
+                              className="w-full sm:w-auto bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2.5 sm:py-2 rounded-lg font-semibold transition-all duration-300 border border-red-500/30 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
                             >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
                               Remove
@@ -655,12 +656,12 @@ export default function SettingsPage() {
                           className="hidden"
                         />
                         
-                        <p className="text-gray-400 text-sm">
+                        <p className="text-gray-400 text-xs sm:text-sm">
                           JPG, PNG, GIF or WebP. Max size 2MB.
                         </p>
                         
                         {avatarError && (
-                          <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                          <p className="text-red-400 text-xs sm:text-sm mt-2 flex items-center gap-1">
                             <span>❌</span> {avatarError}
                           </p>
                         )}
@@ -670,19 +671,19 @@ export default function SettingsPage() {
 
                   {/* Email (Read-only) */}
                   <div>
-                    <label className="block text-white font-semibold mb-2 text-sm">Email Address</label>
+                    <label className="block text-white font-semibold mb-2 text-xs sm:text-sm">Email Address</label>
                     <input
                       type="email"
                       value={user?.email || ''}
                       disabled
-                      className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-gray-400 cursor-not-allowed"
+                      className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-gray-400 cursor-not-allowed text-sm sm:text-base"
                     />
                     <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
                   </div>
 
                   {/* Username */}
                   <div>
-                    <label className="block text-white font-semibold mb-2 text-sm">Username</label>
+                    <label className="block text-white font-semibold mb-2 text-xs sm:text-sm">Username</label>
                     <div className="relative group">
                       <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
                       <input
@@ -690,11 +691,11 @@ export default function SettingsPage() {
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         placeholder="Your username"
-                        className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300"
+                        className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-300 text-sm sm:text-base"
                       />
                     </div>
                     {usernameError && (
-                      <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+                      <p className="text-red-400 text-xs sm:text-sm mt-1 flex items-center gap-1">
                         <span>❌</span> {usernameError}
                       </p>
                     )}
@@ -703,14 +704,14 @@ export default function SettingsPage() {
 
                   {/* Account Type */}
                   <div>
-                    <label className="block text-white font-semibold mb-2 text-sm">Account Type</label>
-                    <div className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-white capitalize">{profile?.role || 'customer'}</span>
+                    <label className="block text-white font-semibold mb-2 text-xs sm:text-sm">Account Type</label>
+                    <div className="bg-slate-800/50 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <span className="text-white capitalize text-sm sm:text-base">{profile?.role || 'customer'}</span>
                         {profile?.role === 'customer' && !profile?.is_admin && (
                           <Link
                             href="/customer-dashboard"
-                            className="text-purple-400 hover:text-purple-300 text-sm transition flex items-center gap-1"
+                            className="text-purple-400 hover:text-purple-300 text-xs sm:text-sm transition flex items-center gap-1"
                           >
                             <span>🚀</span> Upgrade to Vendor →
                           </Link>
@@ -722,14 +723,14 @@ export default function SettingsPage() {
                   {/* Verified Status (Vendors) */}
                   {profile?.role === 'vendor' && (
                     <div>
-                      <label className="block text-white font-semibold mb-2 text-sm">Verification Status</label>
-                      <div className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3">
+                      <label className="block text-white font-semibold mb-2 text-xs sm:text-sm">Verification Status</label>
+                      <div className="bg-slate-800/50 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3">
                         {profile?.verified ? (
-                          <span className="text-green-400 flex items-center gap-2">
+                          <span className="text-green-400 flex items-center gap-2 text-sm sm:text-base">
                             <span>✅</span> Verified Seller
                           </span>
                         ) : (
-                          <span className="text-yellow-400 flex items-center gap-2">
+                          <span className="text-yellow-400 flex items-center gap-2 text-sm sm:text-base">
                             <span>⏳</span> Pending Verification
                           </span>
                         )}
@@ -739,24 +740,24 @@ export default function SettingsPage() {
 
                   {/* Seller Stats (Vendors) */}
                   {profile?.role === 'vendor' && (
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-white font-semibold mb-2 text-sm">Total Sales</label>
-                        <div className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white">
-                          <span className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                        <label className="block text-white font-semibold mb-2 text-xs sm:text-sm">Total Sales</label>
+                        <div className="bg-slate-800/50 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-white">
+                          <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                             {profile?.total_sales || 0}
                           </span>
                         </div>
                       </div>
                       <div>
-                        <label className="block text-white font-semibold mb-2 text-sm">Average Rating</label>
-                        <div className="bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-white">
+                        <label className="block text-white font-semibold mb-2 text-xs sm:text-sm">Average Rating</label>
+                        <div className="bg-slate-800/50 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-white">
                           {profile?.average_rating ? (
-                            <span className="text-2xl font-bold text-yellow-400">
+                            <span className="text-xl sm:text-2xl font-bold text-yellow-400">
                               {profile.average_rating.toFixed(1)} ★
                             </span>
                           ) : (
-                            <span className="text-gray-400">No ratings yet</span>
+                            <span className="text-gray-400 text-sm sm:text-base">No ratings yet</span>
                           )}
                         </div>
                       </div>
@@ -766,11 +767,11 @@ export default function SettingsPage() {
                   <button
                     onClick={handleUpdateProfile}
                     disabled={saving}
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                    className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 sm:px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 text-sm sm:text-base"
                   >
                     {saving ? (
-                      <span className="flex items-center gap-2">
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                         Saving...
                       </span>
                     ) : (
@@ -782,102 +783,102 @@ export default function SettingsPage() {
 
               {/* Preferences Tab */}
               {activeTab === 'preferences' && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                <div className="space-y-4 sm:space-y-6">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                     <span className="text-purple-400">🔔</span>
-                    Preferences
+                    <span className="text-base sm:text-2xl">Preferences</span>
                   </h2>
 
                   {/* Notification Preferences */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <div className="space-y-3 sm:space-y-4">
+                    <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                       <span>📧</span> Email Notifications
                     </h3>
                     
-                    <div className="space-y-3">
-                      <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
-                        <div>
-                          <p className="text-white font-medium">Order Updates</p>
-                          <p className="text-gray-400 text-sm">Get notified about your order status changes</p>
+                    <div className="space-y-2 sm:space-y-3">
+                      <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium text-sm sm:text-base">Order Updates</p>
+                          <p className="text-gray-400 text-xs sm:text-sm">Get notified about your order status changes</p>
                         </div>
-                        <div className="relative">
+                        <div className="relative flex-shrink-0">
                           <input
                             type="checkbox"
                             checked={preferences.emailOrderUpdates}
                             onChange={(e) => setPreferences({ ...preferences, emailOrderUpdates: e.target.checked })}
                             className="sr-only"
                           />
-                          <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                          <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
                             preferences.emailOrderUpdates ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
                           }`}>
-                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                              preferences.emailOrderUpdates ? 'translate-x-7' : 'translate-x-1'
+                            <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                              preferences.emailOrderUpdates ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
                             }`}></div>
                           </div>
                         </div>
                       </label>
 
-                      <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
-                        <div>
-                          <p className="text-white font-medium">New Messages</p>
-                          <p className="text-gray-400 text-sm">Get notified when you receive new messages</p>
+                      <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium text-sm sm:text-base">New Messages</p>
+                          <p className="text-gray-400 text-xs sm:text-sm">Get notified when you receive new messages</p>
                         </div>
-                        <div className="relative">
+                        <div className="relative flex-shrink-0">
                           <input
                             type="checkbox"
                             checked={preferences.emailMessages}
                             onChange={(e) => setPreferences({ ...preferences, emailMessages: e.target.checked })}
                             className="sr-only"
                           />
-                          <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                          <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
                             preferences.emailMessages ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
                           }`}>
-                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                              preferences.emailMessages ? 'translate-x-7' : 'translate-x-1'
+                            <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                              preferences.emailMessages ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
                             }`}></div>
                           </div>
                         </div>
                       </label>
 
-                      <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
-                        <div>
-                          <p className="text-white font-medium">Marketing & Promotions</p>
-                          <p className="text-gray-400 text-sm">Receive special offers and platform updates</p>
+                      <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium text-sm sm:text-base">Marketing & Promotions</p>
+                          <p className="text-gray-400 text-xs sm:text-sm">Receive special offers and platform updates</p>
                         </div>
-                        <div className="relative">
+                        <div className="relative flex-shrink-0">
                           <input
                             type="checkbox"
                             checked={preferences.emailMarketing}
                             onChange={(e) => setPreferences({ ...preferences, emailMarketing: e.target.checked })}
                             className="sr-only"
                           />
-                          <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                          <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
                             preferences.emailMarketing ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
                           }`}>
-                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                              preferences.emailMarketing ? 'translate-x-7' : 'translate-x-1'
+                            <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                              preferences.emailMarketing ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
                             }`}></div>
                           </div>
                         </div>
                       </label>
 
-                      <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
-                        <div>
-                          <p className="text-white font-medium">Security Alerts</p>
-                          <p className="text-gray-400 text-sm">Important security notifications about your account</p>
+                      <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium text-sm sm:text-base">Security Alerts</p>
+                          <p className="text-gray-400 text-xs sm:text-sm">Important security notifications about your account</p>
                         </div>
-                        <div className="relative">
+                        <div className="relative flex-shrink-0">
                           <input
                             type="checkbox"
                             checked={preferences.emailSecurityAlerts}
                             onChange={(e) => setPreferences({ ...preferences, emailSecurityAlerts: e.target.checked })}
                             className="sr-only"
                           />
-                          <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                          <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
                             preferences.emailSecurityAlerts ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
                           }`}>
-                            <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                              preferences.emailSecurityAlerts ? 'translate-x-7' : 'translate-x-1'
+                            <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                              preferences.emailSecurityAlerts ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
                             }`}></div>
                           </div>
                         </div>
@@ -886,80 +887,80 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Theme Preferences */}
-                  <div className="space-y-4 pt-4 border-t border-white/10">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <div className="space-y-3 sm:space-y-4 pt-4 border-t border-white/10">
+                    <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                       <span>🎨</span> Display Settings
                     </h3>
 
                     <div>
-                      <p className="text-white font-medium mb-3">Theme</p>
-                      <div className="grid grid-cols-2 gap-4">
+                      <p className="text-white font-medium mb-3 text-sm sm:text-base">Theme</p>
+                      <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         <button
                           onClick={() => setPreferences({ ...preferences, theme: 'dark' })}
-                          className={`p-4 rounded-xl border transition-all duration-300 ${
+                          className={`p-3 sm:p-4 rounded-xl border transition-all duration-300 ${
                             preferences.theme === 'dark'
                               ? 'bg-purple-500/20 border-purple-500/50 ring-2 ring-purple-500/30'
                               : 'bg-slate-900/50 border-white/10 hover:border-purple-500/30'
                           }`}
                         >
-                          <div className="text-2xl mb-2">🌙</div>
-                          <p className="text-white font-medium">Dark</p>
+                          <div className="text-xl sm:text-2xl mb-1 sm:mb-2">🌙</div>
+                          <p className="text-white font-medium text-sm sm:text-base">Dark</p>
                           <p className="text-gray-400 text-xs">Default theme</p>
                         </button>
                         <button
                           onClick={() => setPreferences({ ...preferences, theme: 'light' })}
-                          className={`p-4 rounded-xl border transition-all duration-300 ${
+                          className={`p-3 sm:p-4 rounded-xl border transition-all duration-300 ${
                             preferences.theme === 'light'
                               ? 'bg-purple-500/20 border-purple-500/50 ring-2 ring-purple-500/30'
                               : 'bg-slate-900/50 border-white/10 hover:border-purple-500/30'
                           }`}
                         >
-                          <div className="text-2xl mb-2">☀️</div>
-                          <p className="text-white font-medium">Light</p>
+                          <div className="text-xl sm:text-2xl mb-1 sm:mb-2">☀️</div>
+                          <p className="text-white font-medium text-sm sm:text-base">Light</p>
                           <p className="text-gray-400 text-xs">Coming soon</p>
                         </button>
                       </div>
                     </div>
 
-                    <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
-                      <div>
-                        <p className="text-white font-medium">Compact Mode</p>
-                        <p className="text-gray-400 text-sm">Reduce spacing for more content on screen</p>
+                    <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium text-sm sm:text-base">Compact Mode</p>
+                        <p className="text-gray-400 text-xs sm:text-sm">Reduce spacing for more content on screen</p>
                       </div>
-                      <div className="relative">
+                      <div className="relative flex-shrink-0">
                         <input
                           type="checkbox"
                           checked={preferences.compactMode}
                           onChange={(e) => setPreferences({ ...preferences, compactMode: e.target.checked })}
                           className="sr-only"
                         />
-                        <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                        <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
                           preferences.compactMode ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
                         }`}>
-                          <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                            preferences.compactMode ? 'translate-x-7' : 'translate-x-1'
+                          <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                            preferences.compactMode ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
                           }`}></div>
                         </div>
                       </div>
                     </label>
 
-                    <label className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300">
-                      <div>
-                        <p className="text-white font-medium">Show Online Status</p>
-                        <p className="text-gray-400 text-sm">Let others see when you're online</p>
+                    <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium text-sm sm:text-base">Show Online Status</p>
+                        <p className="text-gray-400 text-xs sm:text-sm">Let others see when you're online</p>
                       </div>
-                      <div className="relative">
+                      <div className="relative flex-shrink-0">
                         <input
                           type="checkbox"
                           checked={preferences.showOnlineStatus}
                           onChange={(e) => setPreferences({ ...preferences, showOnlineStatus: e.target.checked })}
                           className="sr-only"
                         />
-                        <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
+                        <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
                           preferences.showOnlineStatus ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
                         }`}>
-                          <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                            preferences.showOnlineStatus ? 'translate-x-7' : 'translate-x-1'
+                          <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
+                            preferences.showOnlineStatus ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
                           }`}></div>
                         </div>
                       </div>
@@ -968,7 +969,7 @@ export default function SettingsPage() {
 
                   {preferencesSuccess && (
                     <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3">
-                      <p className="text-green-400 text-sm flex items-center gap-2">
+                      <p className="text-green-400 text-xs sm:text-sm flex items-center gap-2">
                         <span>✅</span> {preferencesSuccess}
                       </p>
                     </div>
@@ -977,11 +978,11 @@ export default function SettingsPage() {
                   <button
                     onClick={savePreferences}
                     disabled={saving}
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                    className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 sm:px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 text-sm sm:text-base"
                   >
                     {saving ? (
-                      <span className="flex items-center gap-2">
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                         Saving...
                       </span>
                     ) : (
@@ -993,31 +994,31 @@ export default function SettingsPage() {
 
               {/* Security Tab */}
               {activeTab === 'security' && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                <div className="space-y-4 sm:space-y-6">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                     <span className="text-purple-400">🔐</span>
-                    Security Settings
+                    <span className="text-base sm:text-2xl">Security Settings</span>
                   </h2>
 
-                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300">
-                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
+                    <h3 className="text-base sm:text-lg font-semibold text-white mb-4 flex items-center gap-2">
                       <span>🔑</span> Change Password
                     </h3>
                     
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       <div>
-                        <label className="block text-white font-semibold mb-2 text-sm">Current Password</label>
+                        <label className="block text-white font-semibold mb-2 text-xs sm:text-sm">Current Password</label>
                         <input
                           type="password"
                           value={currentPassword}
                           onChange={(e) => setCurrentPassword(e.target.value)}
                           placeholder="Enter current password"
-                          className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition"
+                          className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition text-sm sm:text-base"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-white font-semibold mb-2 text-sm">New Password</label>
+                        <label className="block text-white font-semibold mb-2 text-xs sm:text-sm">New Password</label>
                         <input
                           type="password"
                           value={newPassword}
@@ -1025,13 +1026,13 @@ export default function SettingsPage() {
                           placeholder="Enter new password"
                           minLength={8}
                           maxLength={72}
-                          className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition"
+                          className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition text-sm sm:text-base"
                         />
                         <p className="text-xs text-gray-500 mt-1">At least 8 characters with a number or special character</p>
                       </div>
 
                       <div>
-                        <label className="block text-white font-semibold mb-2 text-sm">Confirm New Password</label>
+                        <label className="block text-white font-semibold mb-2 text-xs sm:text-sm">Confirm New Password</label>
                         <input
                           type="password"
                           value={confirmPassword}
@@ -1039,13 +1040,13 @@ export default function SettingsPage() {
                           placeholder="Confirm new password"
                           minLength={8}
                           maxLength={72}
-                          className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition"
+                          className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-white focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition text-sm sm:text-base"
                         />
                       </div>
 
                       {passwordError && (
                         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
-                          <p className="text-red-400 text-sm flex items-center gap-2">
+                          <p className="text-red-400 text-xs sm:text-sm flex items-center gap-2">
                             <span>❌</span> {passwordError}
                           </p>
                         </div>
@@ -1053,7 +1054,7 @@ export default function SettingsPage() {
 
                       {passwordSuccess && (
                         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3">
-                          <p className="text-green-400 text-sm flex items-center gap-2">
+                          <p className="text-green-400 text-xs sm:text-sm flex items-center gap-2">
                             <span>✅</span> {passwordSuccess}
                           </p>
                         </div>
@@ -1062,11 +1063,11 @@ export default function SettingsPage() {
                       <button
                         onClick={handleChangePassword}
                         disabled={saving}
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                        className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 sm:px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 text-sm sm:text-base"
                       >
                         {saving ? (
-                          <span className="flex items-center gap-2">
-                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          <span className="flex items-center justify-center gap-2">
+                            <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                             Changing...
                           </span>
                         ) : (
@@ -1076,18 +1077,18 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300">
-                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
+                    <h3 className="text-base sm:text-lg font-semibold text-white mb-4 flex items-center gap-2">
                       <span>🖥️</span> Login Sessions
                     </h3>
-                    <p className="text-gray-400 mb-4">You are currently logged in on this device.</p>
-                    <div className="bg-slate-900/50 border border-white/10 rounded-xl p-4">
-                      <div className="flex items-center justify-between">
+                    <p className="text-gray-400 mb-4 text-sm sm:text-base">You are currently logged in on this device.</p>
+                    <div className="bg-slate-900/50 border border-white/10 rounded-xl p-3 sm:p-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                         <div>
-                          <p className="text-white font-semibold">Current Session</p>
-                          <p className="text-sm text-gray-400">Last active: Just now</p>
+                          <p className="text-white font-semibold text-sm sm:text-base">Current Session</p>
+                          <p className="text-xs sm:text-sm text-gray-400">Last active: Just now</p>
                         </div>
-                        <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30">
+                        <span className="px-2 sm:px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold border border-green-500/30">
                           ✓ Active
                         </span>
                       </div>
@@ -1098,70 +1099,70 @@ export default function SettingsPage() {
 
               {/* Account Tab */}
               {activeTab === 'account' && (
-                <div className="space-y-6">
-                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                <div className="space-y-4 sm:space-y-6">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                     <span className="text-purple-400">📊</span>
-                    Account Management
+                    <span className="text-base sm:text-2xl">Account Management</span>
                   </h2>
 
-                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-6 hover:border-purple-500/30 transition-all duration-300">
-                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
+                    <h3 className="text-base sm:text-lg font-semibold text-white mb-4 flex items-center gap-2">
                       <span>ℹ️</span> Account Information
                     </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between py-2 border-b border-white/10">
-                        <span className="text-gray-400">Account ID</span>
-                        <span className="text-white font-mono text-sm bg-slate-900/50 px-2 py-1 rounded">{user?.id?.substring(0, 8)}...</span>
+                    <div className="space-y-2 sm:space-y-3">
+                      <div className="flex flex-col sm:flex-row justify-between py-2 border-b border-white/10 gap-1">
+                        <span className="text-gray-400 text-sm sm:text-base">Account ID</span>
+                        <span className="text-white font-mono text-xs sm:text-sm bg-slate-900/50 px-2 py-1 rounded self-start">{user?.id?.substring(0, 8)}...</span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-white/10">
-                        <span className="text-gray-400">Email</span>
-                        <span className="text-white">{user?.email}</span>
+                      <div className="flex flex-col sm:flex-row justify-between py-2 border-b border-white/10 gap-1">
+                        <span className="text-gray-400 text-sm sm:text-base">Email</span>
+                        <span className="text-white text-sm sm:text-base break-all">{user?.email}</span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-white/10">
-                        <span className="text-gray-400">Account Type</span>
-                        <span className="text-white capitalize">{profile?.role}</span>
+                      <div className="flex flex-col sm:flex-row justify-between py-2 border-b border-white/10 gap-1">
+                        <span className="text-gray-400 text-sm sm:text-base">Account Type</span>
+                        <span className="text-white capitalize text-sm sm:text-base">{profile?.role}</span>
                       </div>
-                      <div className="flex justify-between py-2">
-                        <span className="text-gray-400">Created</span>
-                        <span className="text-white">{new Date(profile?.created_at).toLocaleDateString()}</span>
+                      <div className="flex flex-col sm:flex-row justify-between py-2 gap-1">
+                        <span className="text-gray-400 text-sm sm:text-base">Created</span>
+                        <span className="text-white text-sm sm:text-base">{new Date(profile?.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-6 hover:border-blue-500/30 transition-all duration-300">
-                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <div className="bg-slate-800/50 border border-white/10 rounded-xl p-4 sm:p-6 hover:border-blue-500/30 transition-all duration-300">
+                    <h3 className="text-base sm:text-lg font-semibold text-white mb-4 flex items-center gap-2">
                       <span>📦</span> Export Your Data
                     </h3>
-                    <p className="text-gray-400 mb-4">
+                    <p className="text-gray-400 mb-4 text-sm sm:text-base">
                       Download a copy of your account data including your profile, orders, and messages.
                     </p>
                     <button
                       onClick={() => alert('Data export feature coming soon!')}
-                      className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 border border-blue-500/30 hover:scale-105"
+                      className="w-full sm:w-auto bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 px-4 sm:px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 border border-blue-500/30 hover:scale-105 text-sm sm:text-base"
                     >
                       📥 Request Data Export
                     </button>
                   </div>
 
-                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 sm:p-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
                       <span>⚠️</span> Danger Zone
                     </h3>
-                    <p className="text-gray-400 mb-4">
+                    <p className="text-gray-400 mb-4 text-sm sm:text-base">
                       Once you delete your account, there is no going back. This action is permanent and will remove all your data.
                     </p>
                     
                     {!showDeleteConfirm ? (
                       <button
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 border border-red-500/30"
+                        className="w-full sm:w-auto bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 sm:px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 border border-red-500/30 text-sm sm:text-base"
                       >
                         🗑️ Delete Account
                       </button>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-3 sm:space-y-4">
                         <div>
-                          <label className="block text-red-400 font-semibold mb-2">
+                          <label className="block text-red-400 font-semibold mb-2 text-sm sm:text-base">
                             Type DELETE to confirm
                           </label>
                           <input
@@ -1169,14 +1170,14 @@ export default function SettingsPage() {
                             value={deleteConfirmText}
                             onChange={(e) => setDeleteConfirmText(e.target.value)}
                             placeholder="DELETE"
-                            className="w-full bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-white focus:border-red-500 focus:outline-none placeholder-red-400/50"
+                            className="w-full bg-red-500/10 border border-red-500/30 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-white focus:border-red-500 focus:outline-none placeholder-red-400/50 text-sm sm:text-base"
                           />
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                           <button
                             onClick={handleDeleteAccount}
                             disabled={saving || deleteConfirmText !== 'DELETE'}
-                            className="bg-red-500 hover:bg-red-600 text-white px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50"
+                            className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white px-4 sm:px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 text-sm sm:text-base"
                           >
                             {saving ? 'Deleting...' : '⚠️ Permanently Delete Account'}
                           </button>
@@ -1185,7 +1186,7 @@ export default function SettingsPage() {
                               setShowDeleteConfirm(false)
                               setDeleteConfirmText('')
                             }}
-                            className="bg-gray-500/20 hover:bg-gray-500/30 text-gray-400 px-6 py-2.5 rounded-xl font-semibold transition-all duration-300"
+                            className="w-full sm:w-auto bg-gray-500/20 hover:bg-gray-500/30 text-gray-400 px-4 sm:px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base"
                           >
                             Cancel
                           </button>
@@ -1200,15 +1201,24 @@ export default function SettingsPage() {
         </div>
 
         {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
-          <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
+        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-6 sm:py-8 mt-8 sm:mt-12">
+          <div className="container mx-auto px-3 sm:px-4 text-center text-gray-500 text-xs sm:text-sm">
             <p>&copy; 2024 Nashflare. All rights reserved.</p>
           </div>
         </footer>
       </div>
 
-      {/* Custom CSS for shooting star animation */}
+      {/* Custom CSS */}
       <style jsx>{`
+        /* Hide scrollbar for horizontal tabs on mobile */
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        
         @keyframes shooting {
           0%, 100% { opacity: 0; transform: translateX(0) rotate(-45deg); }
           50% { opacity: 0.3; transform: translateX(100px) rotate(-45deg); }

@@ -32,6 +32,7 @@ export default function CheckoutPage() {
   const [user, setUser] = useState<any>(null)
   const [selectedPayment, setSelectedPayment] = useState('test')
   const [showComingSoon, setShowComingSoon] = useState(false)
+  const [showMobileSummary, setShowMobileSummary] = useState(false)
   
   // Billing form state
   const [billingInfo, setBillingInfo] = useState({
@@ -85,7 +86,7 @@ export default function CheckoutPage() {
       if (listing && listing.status === 'active') {
         setCartItem({
           listing_id: cart.listing_id,
-          quantity: cart.quantity,
+          quantity: 1, // Always 1
           listing: listing
         })
       } else {
@@ -118,7 +119,7 @@ export default function CheckoutPage() {
     try {
       const totalPrice = cartItem.listing.price * cartItem.quantity
 
-      // Create the order - let the database trigger populate listing snapshot fields
+      // Create the order
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -147,7 +148,7 @@ export default function CheckoutPage() {
       localStorage.removeItem('cart')
       window.dispatchEvent(new Event('cart-updated'))
 
-      // Redirect to order page where they can simulate payment
+      // Redirect to order page
       router.push(`/order/${order.id}`)
 
     } catch (error: any) {
@@ -168,9 +169,9 @@ export default function CheckoutPage() {
         <div className="relative z-10 text-center">
           <div className="relative inline-block">
             <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-lg opacity-50 animate-pulse"></div>
-            <div className="relative inline-block animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent"></div>
+            <div className="relative inline-block animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-purple-500 border-t-transparent"></div>
           </div>
-          <p className="text-white mt-6 text-lg">Loading checkout...</p>
+          <p className="text-white mt-4 sm:mt-6 text-base sm:text-lg">Loading checkout...</p>
         </div>
       </div>
     )
@@ -186,6 +187,98 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Mobile Summary Modal */}
+      {showMobileSummary && (
+        <div className="lg:hidden fixed inset-0 z-50 flex items-end">
+          <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowMobileSummary(false)}
+          ></div>
+          <div className="relative w-full bg-slate-900/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-slide-up">
+            {/* Header */}
+            <div className="sticky top-0 bg-slate-900/95 backdrop-blur-xl border-b border-white/10 p-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">Order Summary</h3>
+              <button 
+                onClick={() => setShowMobileSummary(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {/* Item */}
+              <div className="flex gap-3 pb-4 border-b border-white/10">
+                <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                  {cartItem.listing.image_url ? (
+                    <img
+                      src={cartItem.listing.image_url}
+                      alt={cartItem.listing.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-2xl">
+                        {cartItem.listing.category === 'account' ? '🎮' : cartItem.listing.category === 'topup' ? '💰' : '🔑'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-semibold text-sm line-clamp-2">{cartItem.listing.title}</p>
+                  <p className="text-purple-400 text-xs">{cartItem.listing.game}</p>
+                  <p className="text-gray-400 text-xs">Qty: {cartItem.quantity}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-white font-semibold">${(cartItem.listing.price * cartItem.quantity).toFixed(2)}</p>
+                </div>
+              </div>
+
+              {/* Pricing */}
+              <div className="space-y-3">
+                <div className="flex justify-between text-gray-300">
+                  <span>Subtotal</span>
+                  <span className="font-semibold">${subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-gray-300">
+                  <span>Service Fee (5%)</span>
+                  <span className="font-semibold">${serviceFee.toFixed(2)}</span>
+                </div>
+                <div className="border-t border-white/10 pt-3">
+                  <div className="flex justify-between text-white text-xl font-bold">
+                    <span>Total</span>
+                    <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trust Badges */}
+              <div className="space-y-3 pt-4 border-t border-white/10">
+                <div className="flex items-center space-x-3 text-sm text-gray-300">
+                  <span className="text-green-400 text-xl">🔒</span>
+                  <span>SSL Encrypted</span>
+                </div>
+                <div className="flex items-center space-x-3 text-sm text-gray-300">
+                  <span className="text-green-400 text-xl">🛡️</span>
+                  <span>Buyer Protection</span>
+                </div>
+                <div className="flex items-center space-x-3 text-sm text-gray-300">
+                  <span className="text-green-400 text-xl">⚡</span>
+                  <span>Instant Delivery</span>
+                </div>
+                <div className="flex items-center space-x-3 text-sm text-gray-300">
+                  <span className="text-green-400 text-xl">💬</span>
+                  <span>24/7 Support</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Animated Background */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
@@ -202,92 +295,92 @@ export default function CheckoutPage() {
       <div className="relative z-10">
         <Navigation />
 
-        <div className="container mx-auto px-4 pt-24 pb-12">
+        <div className="container mx-auto px-3 sm:px-4 pt-20 sm:pt-24 pb-24 sm:pb-12">
           {/* Page Header */}
-          <div className="mb-8">
-            <Link href="/cart" className="text-purple-400 hover:text-purple-300 transition flex items-center gap-2 mb-4">
+          <div className="mb-6 sm:mb-8">
+            <Link href="/cart" className="text-purple-400 hover:text-purple-300 transition flex items-center gap-2 mb-3 sm:mb-4 text-sm sm:text-base">
               <span>←</span> Back to Cart
             </Link>
-            <div className="inline-block mb-4">
-              <span className="px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-sm font-medium">
+            <div className="inline-block mb-3 sm:mb-4">
+              <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-xs sm:text-sm font-medium">
                 💳 Secure Checkout
               </span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-white">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white">
               <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Checkout</span>
             </h1>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-8">
+          <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {/* Left Column - Forms */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-4 sm:space-y-6">
               {/* Billing Information */}
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
-                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
+                <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                   <span className="text-purple-400">📝</span>
                   Billing Information
                 </h2>
 
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <label className="block text-white font-medium mb-2 text-sm">First Name *</label>
+                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">First Name *</label>
                     <input
                       type="text"
                       value={billingInfo.firstName}
                       onChange={(e) => setBillingInfo({ ...billingInfo, firstName: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
                       placeholder="John"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-white font-medium mb-2 text-sm">Last Name *</label>
+                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">Last Name *</label>
                     <input
                       type="text"
                       value={billingInfo.lastName}
                       onChange={(e) => setBillingInfo({ ...billingInfo, lastName: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
                       placeholder="Doe"
                       required
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-white font-medium mb-2 text-sm">Email *</label>
+                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">Email *</label>
                     <input
                       type="email"
                       value={billingInfo.email}
                       onChange={(e) => setBillingInfo({ ...billingInfo, email: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
                       placeholder="john@example.com"
                       required
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-white font-medium mb-2 text-sm">Address</label>
+                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">Address</label>
                     <input
                       type="text"
                       value={billingInfo.address}
                       onChange={(e) => setBillingInfo({ ...billingInfo, address: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
                       placeholder="123 Main Street"
                     />
                   </div>
                   <div>
-                    <label className="block text-white font-medium mb-2 text-sm">City</label>
+                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">City</label>
                     <input
                       type="text"
                       value={billingInfo.city}
                       onChange={(e) => setBillingInfo({ ...billingInfo, city: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
                       placeholder="New York"
                     />
                   </div>
                   <div>
-                    <label className="block text-white font-medium mb-2 text-sm">Country</label>
+                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">Country</label>
                     <select
                       value={billingInfo.country}
                       onChange={(e) => setBillingInfo({ ...billingInfo, country: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition appearance-none cursor-pointer"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition appearance-none cursor-pointer"
                       style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}
                     >
                       <option value="">Select Country</option>
@@ -302,12 +395,12 @@ export default function CheckoutPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-white font-medium mb-2 text-sm">ZIP / Postal Code</label>
+                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">ZIP / Postal Code</label>
                     <input
                       type="text"
                       value={billingInfo.zipCode}
                       onChange={(e) => setBillingInfo({ ...billingInfo, zipCode: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
                       placeholder="10001"
                     />
                   </div>
@@ -315,15 +408,15 @@ export default function CheckoutPage() {
               </div>
 
               {/* Payment Method Selection */}
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
-                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
+                <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                   <span className="text-purple-400">💳</span>
                   Payment Method
                 </h2>
 
                 <div className="space-y-3">
                   {/* Test/Simulation Mode */}
-                  <label className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
+                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
                     selectedPayment === 'test' 
                       ? 'bg-green-500/20 border-green-500/50' 
                       : 'bg-slate-800/50 border-white/10 hover:border-green-500/30'
@@ -336,27 +429,27 @@ export default function CheckoutPage() {
                       onChange={(e) => setSelectedPayment(e.target.value)}
                       className="sr-only"
                     />
-                    <div className={`w-5 h-5 rounded-full border-2 mr-4 flex items-center justify-center ${
+                    <div className={`w-5 h-5 rounded-full border-2 mr-3 sm:mr-4 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0 ${
                       selectedPayment === 'test' ? 'border-green-500' : 'border-gray-500'
                     }`}>
                       {selectedPayment === 'test' && (
                         <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <p className="text-white font-semibold flex items-center gap-2">
-                        Test Mode
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
+                        <span>Test Mode</span>
                         <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-bold rounded">DEV</span>
                       </p>
-                      <p className="text-gray-400 text-sm">Simulate payment for testing purposes</p>
+                      <p className="text-gray-400 text-xs sm:text-sm">Simulate payment for testing purposes</p>
                     </div>
-                    <div className="flex gap-2">
-                      <span className="text-2xl">🧪</span>
+                    <div className="flex gap-2 ml-2 flex-shrink-0">
+                      <span className="text-xl sm:text-2xl">🧪</span>
                     </div>
                   </label>
 
                   {/* Credit/Debit Card (Coming Soon) */}
-                  <label className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
+                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
                     selectedPayment === 'card' 
                       ? 'bg-purple-500/20 border-purple-500/50' 
                       : 'bg-slate-800/50 border-white/10 hover:border-purple-500/30'
@@ -369,27 +462,27 @@ export default function CheckoutPage() {
                       onChange={(e) => setSelectedPayment(e.target.value)}
                       className="sr-only"
                     />
-                    <div className={`w-5 h-5 rounded-full border-2 mr-4 flex items-center justify-center ${
+                    <div className={`w-5 h-5 rounded-full border-2 mr-3 sm:mr-4 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0 ${
                       selectedPayment === 'card' ? 'border-purple-500' : 'border-gray-500'
                     }`}>
                       {selectedPayment === 'card' && (
                         <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <p className="text-white font-semibold flex items-center gap-2">
-                        Credit / Debit Card
-                        <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">COMING SOON</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
+                        <span>Credit / Debit Card</span>
+                        <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded whitespace-nowrap">COMING SOON</span>
                       </p>
-                      <p className="text-gray-400 text-sm">Visa, Mastercard, American Express</p>
+                      <p className="text-gray-400 text-xs sm:text-sm">Visa, Mastercard, American Express</p>
                     </div>
-                    <div className="flex gap-2">
-                      <span className="text-2xl">💳</span>
+                    <div className="flex gap-2 ml-2 flex-shrink-0">
+                      <span className="text-xl sm:text-2xl">💳</span>
                     </div>
                   </label>
 
                   {/* Cryptocurrency (Coming Soon) */}
-                  <label className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
+                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
                     selectedPayment === 'crypto' 
                       ? 'bg-purple-500/20 border-purple-500/50' 
                       : 'bg-slate-800/50 border-white/10 hover:border-purple-500/30'
@@ -402,31 +495,31 @@ export default function CheckoutPage() {
                       onChange={(e) => setSelectedPayment(e.target.value)}
                       className="sr-only"
                     />
-                    <div className={`w-5 h-5 rounded-full border-2 mr-4 flex items-center justify-center ${
+                    <div className={`w-5 h-5 rounded-full border-2 mr-3 sm:mr-4 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0 ${
                       selectedPayment === 'crypto' ? 'border-purple-500' : 'border-gray-500'
                     }`}>
                       {selectedPayment === 'crypto' && (
                         <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <p className="text-white font-semibold flex items-center gap-2">
-                        Cryptocurrency
-                        <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">COMING SOON</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
+                        <span>Cryptocurrency</span>
+                        <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded whitespace-nowrap">COMING SOON</span>
                       </p>
-                      <p className="text-gray-400 text-sm">Bitcoin, Ethereum, USDT via Coinbase Commerce</p>
+                      <p className="text-gray-400 text-xs sm:text-sm">Bitcoin, Ethereum, USDT via Coinbase Commerce</p>
                     </div>
-                    <div className="flex gap-2">
-                      <span className="text-2xl">₿</span>
+                    <div className="flex gap-2 ml-2 flex-shrink-0">
+                      <span className="text-xl sm:text-2xl">₿</span>
                     </div>
                   </label>
                 </div>
 
                 {/* Info box based on selection */}
                 {selectedPayment === 'test' && (
-                  <div className="mt-6 p-4 bg-green-500/10 rounded-xl border border-green-500/30">
-                    <p className="text-green-300 text-sm flex items-start gap-2">
-                      <span className="text-lg">ℹ️</span>
+                  <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-green-500/10 rounded-xl border border-green-500/30">
+                    <p className="text-green-300 text-xs sm:text-sm flex items-start gap-2">
+                      <span className="text-base sm:text-lg flex-shrink-0">ℹ️</span>
                       <span>
                         <span className="font-semibold">Test Mode Active:</span> Your order will be created and you can simulate the payment on the order details page. 
                         No real payment will be processed.
@@ -436,9 +529,9 @@ export default function CheckoutPage() {
                 )}
 
                 {selectedPayment === 'card' && (
-                  <div className="mt-6 p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
-                    <p className="text-yellow-300 text-sm flex items-start gap-2">
-                      <span className="text-lg">🚧</span>
+                  <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
+                    <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
+                      <span className="text-base sm:text-lg flex-shrink-0">🚧</span>
                       <span>
                         <span className="font-semibold">Coming Soon:</span> Bank card payments are being integrated. 
                         Want to be notified when this goes live? Email us at{' '}
@@ -451,9 +544,9 @@ export default function CheckoutPage() {
                 )}
 
                 {selectedPayment === 'crypto' && (
-                  <div className="mt-6 p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
-                    <p className="text-yellow-300 text-sm flex items-start gap-2">
-                      <span className="text-lg">🚧</span>
+                  <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
+                    <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
+                      <span className="text-base sm:text-lg flex-shrink-0">🚧</span>
                       <span>
                         <span className="font-semibold">Coming Soon:</span> Cryptocurrency payments via Coinbase Commerce are being integrated. 
                         Want to be notified when this goes live? Email us at{' '}
@@ -467,8 +560,8 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Right Column - Order Summary */}
-            <div className="lg:col-span-1">
+            {/* Desktop Right Column - Order Summary */}
+            <div className="hidden lg:block lg:col-span-1">
               <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-all duration-300">
                 <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                   <span className="text-purple-400">📦</span>
@@ -578,9 +671,49 @@ export default function CheckoutPage() {
           </div>
         </div>
 
+        {/* Mobile Fixed Bottom Bar */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <p className="text-xs text-gray-400 mb-0.5">Total</p>
+                <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                  ${total.toFixed(2)}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowMobileSummary(true)}
+                className="bg-white/10 text-white px-4 py-3 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[48px] text-sm whitespace-nowrap"
+              >
+                📋 Summary
+              </button>
+            </div>
+            <button
+              onClick={handlePlaceOrder}
+              disabled={processing || (selectedPayment !== 'test')}
+              className={`w-full py-3 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] ${
+                selectedPayment === 'test'
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg'
+                  : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {processing ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Creating...
+                </span>
+              ) : selectedPayment === 'test' ? (
+                '🚀 Create Test Order'
+              ) : (
+                '⏳ Payment Coming Soon'
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
-          <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
+        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-6 sm:py-8 mt-8 sm:mt-12">
+          <div className="container mx-auto px-3 sm:px-4 text-center text-gray-500 text-xs sm:text-sm">
             <p>&copy; 2024 Nashflare. All rights reserved.</p>
           </div>
         </footer>
@@ -589,16 +722,16 @@ export default function CheckoutPage() {
       {/* Coming Soon Modal */}
       {showComingSoon && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 rounded-2xl max-w-md w-full border border-white/20 shadow-2xl p-8 text-center">
-            <div className="text-6xl mb-6">🚧</div>
-            <h3 className="text-2xl font-bold text-white mb-4">Payment Coming Soon!</h3>
-            <p className="text-gray-300 mb-6">
+          <div className="bg-slate-800 rounded-2xl max-w-md w-full border border-white/20 shadow-2xl p-6 sm:p-8 text-center">
+            <div className="text-5xl sm:text-6xl mb-4 sm:mb-6">🚧</div>
+            <h3 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4">Payment Coming Soon!</h3>
+            <p className="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-base">
               {selectedPayment === 'card' 
                 ? 'Bank card payments are currently being integrated with our payment provider.'
                 : 'Cryptocurrency payments via Coinbase Commerce are currently being integrated.'
               }
             </p>
-            <p className="text-gray-400 text-sm mb-6">
+            <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">
               Want to be notified when this payment method goes live?<br />
               Email us at{' '}
               <a href="mailto:contact@nashflare.com" className="text-purple-400 hover:text-purple-300 underline">
@@ -611,13 +744,13 @@ export default function CheckoutPage() {
                   setShowComingSoon(false)
                   setSelectedPayment('test')
                 }}
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-green-500/50 transition-all"
+                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-green-500/50 transition-all min-h-[48px]"
               >
                 Use Test Mode Instead
               </button>
               <button
                 onClick={() => setShowComingSoon(false)}
-                className="w-full bg-white/10 text-white py-3 rounded-xl font-semibold hover:bg-white/20 transition-all"
+                className="w-full bg-white/10 text-white py-3 rounded-xl font-semibold hover:bg-white/20 transition-all min-h-[48px]"
               >
                 Close
               </button>
@@ -625,6 +758,26 @@ export default function CheckoutPage() {
           </div>
         </div>
       )}
+
+      {/* Custom Styles */}
+      <style jsx global>{`
+        @keyframes slide-up {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
+        }
+        .safe-area-bottom {
+          padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+        }
+      `}</style>
     </div>
   )
 }

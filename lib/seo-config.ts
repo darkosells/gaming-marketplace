@@ -4,9 +4,9 @@
 export const siteConfig = {
   name: 'Nashflare',
   description: 'The #1 trusted gaming marketplace for buying and selling gaming accounts, in-game currency, items, and game keys. Secure transactions with buyer protection.',
-  url: 'https://nashflare.com', // Update when you have your domain
-  ogImage: '/og-image.png', // Create this image (1200x630px recommended)
-  twitterHandle: '@nashflare', // Update with your Twitter handle
+  url: 'https://nashflare.com',
+  ogImage: 'https://nashflare.com/og-image.png',
+  twitterHandle: '@nashflare',
   keywords: [
     'gaming marketplace',
     'buy gaming accounts',
