@@ -1,9 +1,45 @@
-// Sitemap Generator with Game Pages
+// Sitemap Generator with Game Pages and Blog Posts
 // Location: app/sitemap.ts
 
 import { MetadataRoute } from 'next'
 import { siteConfig } from '@/lib/seo-config'
 import { gamesConfig } from '@/lib/games-config'
+
+// Hardcoded blog posts for sitemap
+const blogPosts = [
+  {
+    slug: 'fortnite-account-safety-guide-2024',
+    lastModified: '2024-11-15',
+  },
+  {
+    slug: 'valorant-ranked-guide-climb-to-radiant',
+    lastModified: '2024-11-12',
+  },
+  {
+    slug: 'gta-5-modded-accounts-ultimate-buyers-guide',
+    lastModified: '2024-11-10',
+  },
+  {
+    slug: 'league-of-legends-smurf-accounts-explained',
+    lastModified: '2024-11-08',
+  },
+  {
+    slug: 'roblox-limited-items-investment-guide-2024',
+    lastModified: '2024-11-05',
+  },
+  {
+    slug: 'clash-of-clans-base-building-ultimate-guide',
+    lastModified: '2024-11-03',
+  },
+  {
+    slug: 'gaming-marketplace-safety-avoiding-scams',
+    lastModified: '2024-11-01',
+  },
+  {
+    slug: 'best-gaming-accounts-to-buy-2024',
+    lastModified: '2024-10-28',
+  },
+]
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = siteConfig.url
@@ -20,6 +56,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${baseUrl}/browse`,
       lastModified: new Date(),
       changeFrequency: 'hourly',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/blog`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
       priority: 0.9,
     },
     {
@@ -80,6 +122,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.85,
   }))
 
+  // Blog post pages (HIGH PRIORITY for SEO)
+  const blogPages: MetadataRoute.Sitemap = blogPosts.map((post) => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: new Date(post.lastModified),
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }))
+
   // Category pages (legacy - can keep for backwards compatibility)
   const categories = ['account', 'items', 'currency', 'key']
   const categoryPages: MetadataRoute.Sitemap = categories.map((category) => ({
@@ -137,6 +187,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticPages,
     ...gamePages,      // Dedicated game pages (high priority)
+    ...blogPages,      // Blog posts (high priority for SEO)
     ...categoryPages,  // Category filter pages
     ...listingPages,   // Individual product listings
     ...profilePages,   // Vendor profiles

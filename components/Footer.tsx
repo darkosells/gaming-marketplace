@@ -59,6 +59,11 @@ export default function Footer() {
             <h4 className="text-white font-semibold mb-4">Nashflare</h4>
             <ul className="space-y-2 text-gray-400 text-sm">
               <li>
+                <Link href="/blog" className="hover:text-white transition">
+                  Blog & Guides
+                </Link>
+              </li>
+              <li>
                 <Link href="/how-it-works" className="hover:text-white transition">
                   How It Works
                 </Link>
