@@ -24,3 +24,123 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ============================================ */
+/* iOS Safari Fixes */
+/* ============================================ */
+
+/* Fix iOS Safari gradient text rendering (CRITICAL for price displays) */
+.bg-clip-text {
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* Ensure transparent text works on iOS Safari */
+.text-transparent {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* Fix gradient backgrounds on iOS Safari */
+.bg-gradient-to-r,
+.bg-gradient-to-br,
+.bg-gradient-to-b,
+.bg-gradient-to-t,
+.bg-gradient-to-l {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+/* Prevent iOS Safari from zooming on input focus (CRITICAL) */
+@media screen and (max-width: 767px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="search"],
+  input[type="url"],
+  input[type="date"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Fix iOS Safari 100vh issue */
+.min-h-screen,
+.h-screen {
+  min-height: -webkit-fill-available;
+}
+
+html {
+  height: -webkit-fill-available;
+}
+
+/* Remove iOS Safari tap highlight */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Fix iOS Safari sticky/fixed positioning */
+.sticky,
+.fixed {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Fix iOS Safari backdrop-filter performance */
+.backdrop-blur-xl,
+.backdrop-blur-lg,
+.backdrop-blur-md,
+.backdrop-blur {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* iOS Safari smooth scrolling */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Improve iOS Safari font rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide scrollbar for horizontal scroll containers */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Fix iOS Safari momentum scrolling */
+.overflow-y-auto,
+.overflow-y-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Custom scrollbar styles for desktop */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.5);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.8);
+}
