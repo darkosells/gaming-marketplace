@@ -29,6 +29,14 @@ const categoryGamesMap: { [key: string]: { icon: string; label: string; games: s
   }
 }
 
+// Helper function to convert game name to URL slug
+const gameToSlug = (gameName: string): string => {
+  return gameName
+    .toLowerCase()
+    .replace(/\s+/g, '-')        // Replace spaces with hyphens
+    .replace(/[^a-z0-9-]/g, '')  // Remove special characters
+}
+
 export default function Navigation() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -272,18 +280,20 @@ export default function Navigation() {
   const isActive = (path: string) => pathname === path
 
   const handleCategoryClick = (category: string) => {
-  router.push(`/browse?category=${category}`)
-  setMegaMenuOpen(false)
-  setActiveCategory(null)
-}
+    // Navigate to browse page with category filter
+    router.push(`/browse?category=${category}`)
+    setMegaMenuOpen(false)
+    setActiveCategory(null)
+  }
 
-const handleGameClick = (category: string, game: string) => {
-  // Convert game name to slug for SEO-friendly URLs
-  const gameSlug = game.toLowerCase().replace(/\s+/g, '-')
-  router.push(`/games/${gameSlug}`)
-  setMegaMenuOpen(false)
-  setActiveCategory(null)
-}
+  const handleGameClick = (category: string, game: string) => {
+    // Convert game name to slug and navigate to the SEO-friendly game page
+    // Example: "Fortnite" -> "/games/fortnite?category=account"
+    const gameSlug = gameToSlug(game)
+    router.push(`/games/${gameSlug}?category=${category}`)
+    setMegaMenuOpen(false)
+    setActiveCategory(null)
+  }
 
   const retryAuth = async () => {
     setAuthLoading(true)
@@ -337,108 +347,108 @@ const handleGameClick = (category: string, game: string) => {
             </Link>
             
             {/* Mega Menu Trigger - Available on All Pages */}
-<div 
-  className="relative"
-  onMouseEnter={() => setMegaMenuOpen(true)}
-  onMouseLeave={() => {
-    setMegaMenuOpen(false)
-    setActiveCategory(null)
-  }}
->
-  <button 
-    className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-1 ${
-      megaMenuOpen || isActive('/browse') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'
-    }`}
-  >
-    <span>Browse</span>
-    <svg className={`w-4 h-4 transition-transform duration-200 ${megaMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  </button>
-
-  {/* Mega Menu Dropdown */}
-  {megaMenuOpen && (
-    <>
-      <div className="absolute left-0 top-full h-3 w-full" />
-      <div className="absolute left-1/2 -translate-x-1/2 mt-3 w-[700px] bg-slate-800/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
-        <div className="flex">
-          <div className="w-1/3 bg-slate-900/50 p-4 border-r border-white/10">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">Categories</h3>
-            <div className="space-y-1">
-              {Object.entries(categoryGamesMap).map(([key, value]) => (
-                <button
-                  key={key}
-                  onMouseEnter={() => setActiveCategory(key)}
-                  onClick={() => handleCategoryClick(key)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                    activeCategory === key 
-                      ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white' 
-                      : 'text-gray-300 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xl">{value.icon}</span>
-                    <span className="font-medium">{value.label}</span>
-                  </div>
-                  <svg className={`w-4 h-4 transition-transform ${activeCategory === key ? 'translate-x-1' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              ))}
-            </div>
-            
-            <div className="mt-4 pt-4 border-t border-white/10">
-              <Link 
-                href="/browse" 
-                onClick={() => setMegaMenuOpen(false)}
-                className="flex items-center justify-center space-x-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-200"
+            <div 
+              className="relative"
+              onMouseEnter={() => setMegaMenuOpen(true)}
+              onMouseLeave={() => {
+                setMegaMenuOpen(false)
+                setActiveCategory(null)
+              }}
+            >
+              <button 
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-1 ${
+                  megaMenuOpen || isActive('/browse') || pathname.startsWith('/games/') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
               >
-                <span>View All Listings</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                <span>Browse</span>
+                <svg className={`w-4 h-4 transition-transform duration-200 ${megaMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
-              </Link>
-            </div>
-          </div>
+              </button>
 
-          <div className="w-2/3 p-4">
-            {activeCategory ? (
-              <>
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
-                  {categoryGamesMap[activeCategory].icon} {categoryGamesMap[activeCategory].label} - Games
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {categoryGamesMap[activeCategory].games.map((game) => (
-                    <button
-                      key={game}
-                      onClick={() => handleGameClick(activeCategory, game)}
-                      className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 group text-left"
-                    >
-                      <div className="w-8 h-8 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center group-hover:from-purple-500/30 group-hover:to-pink-500/30 transition-colors">
-                        <span className="text-sm">🎯</span>
+              {/* Mega Menu Dropdown */}
+              {megaMenuOpen && (
+                <>
+                  <div className="absolute left-0 top-full h-3 w-full" />
+                  <div className="absolute left-1/2 -translate-x-1/2 mt-3 w-[700px] bg-slate-800/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
+                    <div className="flex">
+                      <div className="w-1/3 bg-slate-900/50 p-4 border-r border-white/10">
+                        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">Categories</h3>
+                        <div className="space-y-1">
+                          {Object.entries(categoryGamesMap).map(([key, value]) => (
+                            <button
+                              key={key}
+                              onMouseEnter={() => setActiveCategory(key)}
+                              onClick={() => handleCategoryClick(key)}
+                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                                activeCategory === key 
+                                  ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white' 
+                                  : 'text-gray-300 hover:text-white hover:bg-white/5'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-3">
+                                <span className="text-xl">{value.icon}</span>
+                                <span className="font-medium">{value.label}</span>
+                              </div>
+                              <svg className={`w-4 h-4 transition-transform ${activeCategory === key ? 'translate-x-1' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          ))}
+                        </div>
+                        
+                        <div className="mt-4 pt-4 border-t border-white/10">
+                          <Link 
+                            href="/browse" 
+                            onClick={() => setMegaMenuOpen(false)}
+                            className="flex items-center justify-center space-x-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-200"
+                          >
+                            <span>View All Listings</span>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                          </Link>
+                        </div>
                       </div>
-                      <span className="font-medium">{game}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center py-8">
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl flex items-center justify-center mb-4">
-                  <span className="text-3xl">👈</span>
-                </div>
-                <h3 className="text-white font-semibold mb-2">Select a Category</h3>
-                <p className="text-gray-400 text-sm max-w-xs">
-                  Hover over a category on the left to see available games
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
-  )}
-</div>
+
+                      <div className="w-2/3 p-4">
+                        {activeCategory ? (
+                          <>
+                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                              {categoryGamesMap[activeCategory].icon} {categoryGamesMap[activeCategory].label} - Games
+                            </h3>
+                            <div className="grid grid-cols-2 gap-2">
+                              {categoryGamesMap[activeCategory].games.map((game) => (
+                                <button
+                                  key={game}
+                                  onClick={() => handleGameClick(activeCategory, game)}
+                                  className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 group text-left"
+                                >
+                                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center group-hover:from-purple-500/30 group-hover:to-pink-500/30 transition-colors">
+                                    <span className="text-sm">🎯</span>
+                                  </div>
+                                  <span className="font-medium">{game}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="h-full flex flex-col items-center justify-center text-center py-8">
+                            <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl flex items-center justify-center mb-4">
+                              <span className="text-3xl">👈</span>
+                            </div>
+                            <h3 className="text-white font-semibold mb-2">Select a Category</h3>
+                            <p className="text-gray-400 text-sm max-w-xs">
+                              Hover over a category on the left to see available games
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             
             {profile?.role === 'vendor' && (
               <Link href="/sell" className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${isActive('/sell') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'}`}>

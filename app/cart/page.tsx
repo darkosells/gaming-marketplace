@@ -360,7 +360,7 @@ export default function CartPage() {
         {/* Footer */}
         <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
           <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2024 GameVault. All rights reserved.</p>
+            <p>&copy; 2025 Nashflare. All rights reserved.</p>
           </div>
         </footer>
       </div>

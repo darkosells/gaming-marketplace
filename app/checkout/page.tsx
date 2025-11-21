@@ -118,7 +118,7 @@ export default function CheckoutPage() {
     try {
       const totalPrice = cartItem.listing.price * cartItem.quantity
 
-      // Create the order (for test/simulation)
+      // Create the order - let the database trigger populate listing snapshot fields
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -129,16 +129,19 @@ export default function CheckoutPage() {
           quantity: cartItem.quantity,
           status: 'pending',
           payment_status: 'pending',
-          payment_method: selectedPayment,
-          listing_title: cartItem.listing.title,
-          listing_game: cartItem.listing.game,
-          listing_category: cartItem.listing.category,
-          listing_image_url: cartItem.listing.image_url
+          payment_method: selectedPayment
         })
         .select()
         .single()
 
-      if (orderError) throw orderError
+      if (orderError) {
+        console.error('Order creation error:', orderError)
+        throw new Error(orderError.message || 'Failed to create order')
+      }
+
+      if (!order) {
+        throw new Error('Order was not created')
+      }
 
       // Clear cart
       localStorage.removeItem('cart')
@@ -149,7 +152,7 @@ export default function CheckoutPage() {
 
     } catch (error: any) {
       console.error('Error creating order:', error)
-      alert('Failed to create order: ' + error.message)
+      alert('Failed to create order: ' + (error.message || 'Unknown error occurred'))
     } finally {
       setProcessing(false)
     }

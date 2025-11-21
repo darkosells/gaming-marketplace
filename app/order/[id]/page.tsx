@@ -8,6 +8,7 @@ import Navigation from '@/components/Navigation'
 import { sendOrderEmails, sendDeliveredEmail, sendDisputeEmails, getSiteUrl } from '@/lib/email'
 
 const STATUS_CONFIG: Record<string, any> = {
+  pending: { bg: 'bg-gray-500/20', border: 'border-gray-500/30', text: 'text-gray-400', icon: '⏳', label: 'Pending Payment' },
   paid: { bg: 'bg-blue-500/20', border: 'border-blue-500/30', text: 'text-blue-400', icon: '💳', label: 'Paid - Awaiting Delivery' },
   delivered: { bg: 'bg-yellow-500/20', border: 'border-yellow-500/30', text: 'text-yellow-400', icon: '📦', label: 'Delivered - Awaiting Confirmation' },
   completed: { bg: 'bg-green-500/20', border: 'border-green-500/30', text: 'text-green-400', icon: '✅', label: 'Completed' },
@@ -96,7 +97,7 @@ export default function OrderDetailPage() {
         await supabase.from('conversations').update({ last_message: '📦 Delivery sent', last_message_at: new Date().toISOString() }).eq('id', convId)
         await supabase.from('orders').update({ status: 'delivered', delivered_at: new Date().toISOString() }).eq('id', id)
         const be = (await supabase.from('profiles').select('email').eq('id', order.buyer_id).single()).data?.email
-        be && sendDeliveredEmail({ id: order.id, listing_title: order.listing.title, buyer_email: be, seller_username: order.seller.username, site_url: getSiteUrl() }).catch(() => {})
+        be && sendDeliveredEmail({ id: order.id, listing_title: order.listing.title, buyer_email: be, seller_username: order.seller.username, site_url: getSiteUrl() }).catch(e => console.error('Email error:', e))
         toast('success', 'Delivered!', 'Instructions sent to buyer'); setShowDelivery(false); setDeliveryText(''); fetchOrder()
       } catch (e: any) { toast('error', 'Failed', e.message) }
       finally { setActionLoading(false) }
@@ -113,18 +114,19 @@ export default function OrderDetailPage() {
   }, 'info')
 
   const submitDispute = async () => {
-  if (!disputeReason) return toast('error', 'Error', 'Select a reason')
-  if (disputeDesc.length < 20) return toast('error', 'Error', 'Min 20 characters')
-  setActionLoading(true)
-  try {
-    await supabase.from('disputes').insert({ order_id: id, raised_by: user.id, reason: disputeReason, description: disputeDesc, evidence_urls: [], status: 'open' })
-    await supabase.from('orders').update({ status: 'dispute_raised', dispute_reason: disputeReason, dispute_opened_at: new Date().toISOString() }).eq('id', id)
-    const [b, s] = await Promise.all([supabase.from('profiles').select('email').eq('id', order.buyer_id).single(), supabase.from('profiles').select('email').eq('id', order.seller_id).single()])
-    b.data?.email && s.data?.email && sendDisputeEmails({ id: order.id, listing_title: order.listing.title, buyer_email: b.data.email, seller_email: s.data.email, dispute_reason: disputeReason, is_buyer_raising: isBuyer, site_url: getSiteUrl() }).catch(() => {})
-    toast('success', 'Dispute Raised', 'Support will review'); setShowDispute(false); fetchOrder()
-  } catch (e: any) { toast('error', 'Failed', e.message) }
-  finally { setActionLoading(false) }
-}
+    if (!disputeReason) return toast('error', 'Error', 'Select a reason')
+    if (disputeDesc.length < 20) return toast('error', 'Error', 'Min 20 characters')
+    setActionLoading(true)
+    try {
+      await supabase.from('disputes').insert({ order_id: id, raised_by: user.id, reason: disputeReason, description: disputeDesc, evidence_urls: [], status: 'open' })
+      await supabase.from('orders').update({ status: 'dispute_raised', dispute_reason: disputeReason, dispute_opened_at: new Date().toISOString() }).eq('id', id)
+      const [b, s] = await Promise.all([supabase.from('profiles').select('email').eq('id', order.buyer_id).single(), supabase.from('profiles').select('email').eq('id', order.seller_id).single()])
+      const isBuyer = order.buyer_id === user?.id
+      b.data?.email && s.data?.email && sendDisputeEmails({ id: order.id, listing_title: order.listing.title, buyer_email: b.data.email, seller_email: s.data.email, dispute_reason: disputeReason, is_buyer_raising: isBuyer, site_url: getSiteUrl() }).catch(e => console.error('Email error:', e))
+      toast('success', 'Dispute Raised', 'Support will review'); setShowDispute(false); fetchOrder()
+    } catch (e: any) { toast('error', 'Failed', e.message) }
+    finally { setActionLoading(false) }
+  }
 
   const submitReview = async () => {
     if (!rating) return toast('error', 'Error', 'Select rating')
@@ -155,7 +157,7 @@ export default function OrderDetailPage() {
       await supabase.from('orders').update({ payment_status: 'paid', status: 'paid' }).eq('id', id)
       const [b, s] = await Promise.all([supabase.from('profiles').select('email, username').eq('id', order.buyer_id).single(), supabase.from('profiles').select('email, username').eq('id', order.seller_id).single()])
       b.data?.email && s.data?.email && await sendOrderEmails({ id: order.id, listing_title: order.listing.title, quantity: order.quantity, total_amount: order.amount * 1.05, seller_amount: order.amount * 0.95, buyer_email: b.data.email, seller_email: s.data.email, buyer_username: b.data.username, seller_username: s.data.username, site_url: getSiteUrl() })
-      toast('success', 'Paid!', 'Emails sent'); setTimeout(fetchOrder, 1000)
+      toast('success', 'Paid!', 'Order marked as paid'); fetchOrder()
     } catch (e: any) { toast('error', 'Failed', e.message) }
     finally { setActionLoading(false) }
   })
@@ -165,7 +167,7 @@ export default function OrderDetailPage() {
   if (!order) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="text-center"><div className="text-6xl mb-4">📦</div><h1 className="text-3xl font-bold text-white mb-4">Not Found</h1><Link href="/dashboard" className="text-purple-400">← Dashboard</Link></div></div>
 
   const isBuyer = order.buyer_id === user?.id, isSeller = order.seller_id === user?.id, isAdmin = profile?.is_admin
-  const fee = order.amount * 0.05, total = order.amount + fee, sc = STATUS_CONFIG[order.status] || STATUS_CONFIG.paid
+  const fee = order.amount * 0.05, total = order.amount + fee, sc = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending
 
   return (
     <div className="min-h-screen bg-slate-950 relative">
@@ -308,48 +310,172 @@ export default function OrderDetailPage() {
                 </div>
               )}
               <div className="flex justify-between bg-white/5 rounded-lg p-3 border border-white/10"><span className="text-sm text-gray-400">Status</span><span className={`text-sm font-bold px-3 py-1 rounded-full ${order.payment_status === 'paid' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{order.payment_status.toUpperCase()}</span></div>
-              {order.payment_status === 'pending' && isBuyer && <div className="mt-4"><div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mb-3 text-yellow-400 text-xs">⚠️ TEST MODE</div><button onClick={simPay} disabled={actionLoading} className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-3 rounded-xl font-semibold disabled:opacity-50">💳 Simulate Payment</button></div>}
             </div>
           </div>
 
           {/* Actions */}
           <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 mt-6">
             <h3 className="text-xl font-bold text-white mb-4">⚡ Actions</h3>
+
             <div className="space-y-3">
-              {isSeller && order.status === 'paid' && order.listing.delivery_type === 'manual' && <button onClick={() => setShowDelivery(true)} disabled={actionLoading} className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50">📦 Deliver Order</button>}
+              {/* SIMULATE PAYMENT - For Testing Only */}
+              {order.status === 'pending' && order.payment_status === 'pending' && (
+                <div className="bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center">
+                      <span className="text-2xl">⚠️</span>
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-yellow-400">Test Mode</h4>
+                      <p className="text-sm text-gray-300">Simulate payment to continue testing</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={simPay}
+                    disabled={actionLoading}
+                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 hover:shadow-lg hover:shadow-yellow-500/50 transition-all"
+                  >
+                    💳 Simulate Payment
+                  </button>
+                </div>
+              )}
+
+              {/* SELLER ACTION: Deliver Order (Manual Only) */}
+              {isSeller && order.status === 'paid' && order.listing.delivery_type === 'manual' && (
+                <button 
+                  onClick={() => setShowDelivery(true)} 
+                  disabled={actionLoading} 
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 hover:shadow-lg hover:shadow-green-500/50 transition-all"
+                >
+                  📦 Deliver Order
+                </button>
+              )}
+
+              {/* BUYER ACTIONS: Confirm or Dispute */}
               {isBuyer && order.status === 'delivered' && !showDispute && (
                 <div className="grid md:grid-cols-2 gap-3">
-                  <button onClick={confirmReceipt} disabled={actionLoading} className="bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-xl font-bold disabled:opacity-50">✓ Confirm Receipt</button>
-                  <button onClick={() => setShowDispute(true)} className="bg-red-500/20 text-red-400 py-4 rounded-xl font-bold border border-red-500/30">⚠️ Raise Dispute</button>
+                  <button 
+                    onClick={confirmReceipt} 
+                    disabled={actionLoading} 
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-xl font-bold disabled:opacity-50 hover:shadow-lg hover:shadow-green-500/50 transition-all"
+                  >
+                    ✓ Confirm Receipt
+                  </button>
+                  <button 
+                    onClick={() => setShowDispute(true)} 
+                    className="bg-red-500/20 text-red-400 py-4 rounded-xl font-bold border-2 border-red-500/50 hover:bg-red-500/30 transition-all"
+                  >
+                    ⚠️ Raise Dispute
+                  </button>
                 </div>
               )}
+
+              {/* BUYER: Dispute Form */}
               {isBuyer && showDispute && order.status === 'delivered' && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
+                <div className="bg-red-500/10 border-2 border-red-500/30 rounded-xl p-6">
                   <h4 className="text-xl font-bold text-red-400 mb-4">⚠️ Raise Dispute</h4>
-                  <select value={disputeReason} onChange={e => setDisputeReason(e.target.value)} className="w-full bg-slate-800 border border-white/10 rounded-lg px-4 py-3 text-white mb-4 [&>option]:bg-slate-800"><option value="">Select reason...</option>{['Item not received', 'Wrong item', 'Not as described', 'Invalid credentials', 'Code used', 'No response', 'Other'].map(r => <option key={r} value={r}>{r}</option>)}</select>
-                  <textarea value={disputeDesc} onChange={e => setDisputeDesc(e.target.value)} placeholder="Details (min 20 chars)..." rows={4} maxLength={1000} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white mb-2 resize-none" /><p className="text-xs text-gray-400 mb-4">{disputeDesc.length}/1000</p>
-                  <div className="flex gap-3"><button onClick={submitDispute} disabled={actionLoading} className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-3 rounded-xl font-bold disabled:opacity-50">Submit</button><button onClick={() => setShowDispute(false)} className="flex-1 bg-white/5 text-white py-3 rounded-xl font-bold border border-white/10">Cancel</button></div>
+                  <select 
+                    value={disputeReason} 
+                    onChange={e => setDisputeReason(e.target.value)} 
+                    className="w-full bg-slate-800 border border-white/10 rounded-lg px-4 py-3 text-white mb-4 focus:border-red-500/50 focus:outline-none"
+                  >
+                    <option value="">Select reason...</option>
+                    <option value="Item not received">Item not received</option>
+                    <option value="Wrong item">Wrong item</option>
+                    <option value="Not as described">Not as described</option>
+                    <option value="Invalid credentials">Invalid credentials</option>
+                    <option value="Code already used">Code already used</option>
+                    <option value="Seller not responding">Seller not responding</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <textarea 
+                    value={disputeDesc} 
+                    onChange={e => setDisputeDesc(e.target.value)} 
+                    placeholder="Describe the issue in detail (minimum 20 characters)..." 
+                    rows={4} 
+                    maxLength={1000} 
+                    className="w-full bg-slate-800 border border-white/10 rounded-lg px-4 py-3 text-white mb-2 resize-none focus:border-red-500/50 focus:outline-none" 
+                  />
+                  <p className="text-xs text-gray-400 mb-4">{disputeDesc.length}/1000 characters (min 20)</p>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={submitDispute} 
+                      disabled={actionLoading || !disputeReason || disputeDesc.length < 20} 
+                      className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-3 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-red-500/50 transition-all"
+                    >
+                      {actionLoading ? 'Submitting...' : 'Submit Dispute'}
+                    </button>
+                    <button 
+                      onClick={() => {setShowDispute(false); setDisputeReason(''); setDisputeDesc('')}} 
+                      className="flex-1 bg-white/5 text-white py-3 rounded-xl font-bold border border-white/10 hover:bg-white/10 transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
+
+              {/* DISPUTE ACTIVE */}
               {order.status === 'dispute_raised' && dispute && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
-                  <div className="flex items-start gap-3 mb-4"><div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center"><span className="text-2xl">⚠️</span></div><div><p className="text-red-400 font-bold text-lg">Dispute Active</p><p className="text-sm text-gray-400">Opened: {new Date(dispute.created_at).toLocaleString()}</p></div><span className={`px-3 py-1 rounded-full text-xs font-semibold ${dispute.status === 'open' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>{dispute.status.toUpperCase()}</span></div>
-                  <p className="text-sm text-white mb-1"><strong>Reason:</strong> {dispute.reason}</p><p className="text-sm text-gray-300">{dispute.description}</p>
-                  <div className="mt-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3"><p className="text-yellow-400 text-sm">💬 Support is reviewing.</p></div>
+                <div className="bg-red-500/10 border-2 border-red-500/30 rounded-xl p-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-2xl">⚠️</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-red-400 font-bold text-lg">Dispute Active</p>
+                      <p className="text-sm text-gray-400">Opened: {new Date(dispute.created_at).toLocaleString()}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      dispute.status === 'open' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 
+                      'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    }`}>
+                      {dispute.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="mb-4">
+                    <p className="text-sm text-white mb-1"><strong className="text-red-400">Reason:</strong> {dispute.reason}</p>
+                    <p className="text-sm text-gray-300">{dispute.description}</p>
+                  </div>
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                    <p className="text-yellow-400 text-sm">💬 Support team is reviewing this dispute. You will be notified of any updates.</p>
+                  </div>
                 </div>
               )}
-              {isBuyer && order.status === 'completed' && !hasReviewed && <button onClick={() => setShowReview(true)} className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg">⭐ Leave Review</button>}
-              {isBuyer && order.status === 'completed' && hasReviewed && <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-center"><p className="text-green-400">✓ Review submitted. Thanks!</p></div>}
+
+              {/* BUYER: Leave Review */}
+              {isBuyer && order.status === 'completed' && !hasReviewed && (
+                <button 
+                  onClick={() => setShowReview(true)} 
+                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-yellow-500/50 transition-all"
+                >
+                  ⭐ Leave Review
+                </button>
+              )}
+
+              {/* BUYER: Review Submitted */}
+              {isBuyer && order.status === 'completed' && hasReviewed && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center">
+                  <p className="text-green-400 font-semibold">✓ Thank you! Your review has been submitted.</p>
+                </div>
+              )}
+
+              {/* WAITING MESSAGES */}
+              {isBuyer && order.status === 'paid' && (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-center">
+                  <p className="text-blue-400 font-semibold">⏳ Waiting for seller to deliver the item...</p>
+                </div>
+              )}
             </div>
           </div>
-
+        
           {/* Timeline */}
           <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 mt-6">
             <h3 className="text-xl font-bold text-white mb-6">📋 Timeline</h3>
             <div className="space-y-0">
               {[
                 { show: true, icon: '🛒', color: 'blue', title: 'Created', time: order.created_at, sub: `By ${order.buyer.username}` },
-                { show: order.payment_status === 'paid', icon: '💳', color: 'green', title: 'Paid', time: null, sub: 'Payment received' },
+                { show: order.payment_status === 'paid', icon: '💳', color: 'green', title: 'Paid', time: order.paid_at || order.created_at, sub: 'Payment received' },
                 { show: !!order.delivered_at, icon: '📦', color: 'yellow', title: 'Delivered', time: order.delivered_at, sub: `By ${order.seller.username}` },
                 { show: !!order.dispute_opened_at, icon: '⚠️', color: 'red', title: 'Disputed', time: order.dispute_opened_at, sub: order.dispute_reason },
                 ...adminActions.map(a => ({ show: true, icon: '👑', color: 'orange', title: a.action_type.replace(/_/g, ' '), time: a.created_at, sub: `Admin: ${a.admin?.username || 'Unknown'}` })),
