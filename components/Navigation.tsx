@@ -312,10 +312,10 @@ export default function Navigation() {
     }`}>
       <div className="container mx-auto px-3 sm:px-4">
         <div className="flex items-center justify-between h-14 sm:h-16 lg:h-20">
-          {/* Logo */}
+          {/* Logo - Icon only on mobile, full logo on desktop */}
           <Link href="/" className="flex items-center space-x-2 sm:space-x-3 group flex-shrink-0">
-            <div className="relative">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-slate-900/50 backdrop-blur-sm rounded-xl flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-purple-500/30 p-0.5">
+            <div className="relative flex-shrink-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-slate-900/50 backdrop-blur-sm rounded-xl flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-purple-500/30 p-0.5">
                 <img 
                   src="/logo6.svg" 
                   alt="Nashflare Logo" 
@@ -324,11 +324,12 @@ export default function Navigation() {
               </div>
               <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
             </div>
-            <div className="flex flex-col min-w-0">
+            {/* Hide text on mobile (< 640px), show on sm and up */}
+            <div className="hidden sm:flex flex-col flex-shrink-0">
               <span className="text-base sm:text-xl lg:text-2xl font-black text-white tracking-tight whitespace-nowrap">
                 Nash<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">flare</span>
               </span>
-              <span className="hidden sm:block text-[9px] lg:text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-1">Marketplace</span>
+              <span className="text-[9px] lg:text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-1 whitespace-nowrap">Marketplace</span>
             </div>
           </Link>
 
