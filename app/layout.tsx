@@ -3,6 +3,7 @@
 
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import Script from 'next/script'
 import './globals.css'
 import { siteConfig, generateOrganizationSchema, generateWebsiteSchema } from '@/lib/seo-config'
 
@@ -60,10 +61,10 @@ export const metadata: Metadata = {
     creator: siteConfig.twitterHandle,
   },
   verification: {
-    // Add these when you set up Google Search Console and Bing Webmaster Tools
-    // google: 'your-google-verification-code',
-    // yandex: 'your-yandex-verification-code',
-    // bing: 'your-bing-verification-code',
+    // google: 'your-google-verification-code', // Add when you verify with Google Search Console
+    other: {
+      'msvalidate.01': '9B16E8BF9611C0A64728AFBF0704F4C3', // Bing Webmaster Tools verification
+    },
   },
   category: 'gaming',
 }
@@ -108,6 +109,20 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://your-project.supabase.co" />
       </head>
       <body className={`${inter.className} bg-slate-950 text-white antialiased`}>
+        {/* Google Analytics */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-DGY6KK5E3Q"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-DGY6KK5E3Q');
+          `}
+        </Script>
+
         {children}
       </body>
     </html>
