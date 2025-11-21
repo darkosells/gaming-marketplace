@@ -33,8 +33,8 @@ const categoryGamesMap: { [key: string]: { icon: string; label: string; games: s
 const gameToSlug = (gameName: string): string => {
   return gameName
     .toLowerCase()
-    .replace(/\s+/g, '-')        // Replace spaces with hyphens
-    .replace(/[^a-z0-9-]/g, '')  // Remove special characters
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
 }
 
 export default function Navigation() {
@@ -44,6 +44,8 @@ export default function Navigation() {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false)
+  const [mobileActiveCategory, setMobileActiveCategory] = useState<string | null>(null)
   const [scrolled, setScrolled] = useState(false)
   const [megaMenuOpen, setMegaMenuOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
@@ -62,26 +64,22 @@ export default function Navigation() {
   useEffect(() => {
     mountedRef.current = true
     
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
       if (!mountedRef.current) return
       
-      // Mark that we've received auth state
       authInitializedRef.current = true
       
-      // Handle SIGNED_OUT event explicitly
       if (event === 'SIGNED_OUT') {
         setUser(null)
         setProfile(null)
-        setAuthError(false) // Don't treat logout as an error
+        setAuthError(false)
         setAuthLoading(false)
-        return // Exit early, don't try to fetch anything
+        return
       }
       
       if (session?.user) {
         setUser(session.user)
         setAuthError(false)
-        // Fetch profile when auth state changes
         fetchProfile(session.user.id)
       } else {
         setUser(null)
@@ -90,17 +88,14 @@ export default function Navigation() {
       setAuthLoading(false)
     })
 
-    // Then check initial auth state with timeout
     const initAuth = async () => {
       try {
-        // Create a timeout promise
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Auth timeout')), 5000)
         )
         
         const authPromise = supabase.auth.getUser()
         
-        // Race the auth check against timeout
         const { data: { user: authUser }, error } = await Promise.race([
           authPromise,
           timeoutPromise
@@ -109,13 +104,11 @@ export default function Navigation() {
         if (!mountedRef.current) return
         
         if (error) {
-          // Check if this is an AuthSessionMissingError (happens after logout)
           if (error.name === 'AuthSessionMissingError' || error.message?.includes('session')) {
-            // This is expected after logout, not a real error
             console.log('No active session (user logged out)')
             setUser(null)
             setProfile(null)
-            setAuthError(false) // Don't treat as error
+            setAuthError(false)
             setAuthLoading(false)
             return
           }
@@ -128,7 +121,6 @@ export default function Navigation() {
         if (authUser) {
           setUser(authUser)
           setAuthError(false)
-          // Fetch profile with its own timeout
           await fetchProfile(authUser.id)
         }
         
@@ -137,12 +129,11 @@ export default function Navigation() {
         console.error('Error initializing auth:', error)
         if (!mountedRef.current) return
         
-        // Check if this is a session missing error (expected after logout)
         if (error.name === 'AuthSessionMissingError' || error.message?.includes('session')) {
           console.log('No active session (user logged out)')
           setUser(null)
           setProfile(null)
-          setAuthError(false) // Don't treat as error
+          setAuthError(false)
           setAuthLoading(false)
           return
         }
@@ -182,7 +173,6 @@ export default function Navigation() {
     }
   }, [])
 
-  // Separate effect for fetching unread count when user changes
   useEffect(() => {
     if (user) {
       fetchUnreadCount()
@@ -195,7 +185,7 @@ export default function Navigation() {
 
       return () => { supabase.removeChannel(channel) }
     }
-  }, [user?.id]) // Only re-run when user ID changes
+  }, [user?.id])
 
   const fetchProfile = async (userId: string) => {
     if (!mountedRef.current) return
@@ -255,16 +245,15 @@ export default function Navigation() {
   }
 
   const handleLogout = async () => {
-    // Clear local state FIRST to prevent any fetches after signout
     setUser(null)
     setProfile(null)
     setUserMenuOpen(false)
-    setAuthError(false) // Clear any auth errors
+    setMobileMenuOpen(false)
+    setAuthError(false)
     
     try {
       await supabase.auth.signOut()
     } catch (error) {
-      // Ignore errors during signout - session is already gone
       console.log('Signout complete')
     }
     
@@ -280,19 +269,22 @@ export default function Navigation() {
   const isActive = (path: string) => pathname === path
 
   const handleCategoryClick = (category: string) => {
-    // Navigate to browse page with category filter
     router.push(`/browse?category=${category}`)
     setMegaMenuOpen(false)
     setActiveCategory(null)
+    setMobileMenuOpen(false)
+    setMobileCategoriesOpen(false)
+    setMobileActiveCategory(null)
   }
 
   const handleGameClick = (category: string, game: string) => {
-    // Convert game name to slug and navigate to the SEO-friendly game page
-    // Example: "Fortnite" -> "/games/fortnite?category=account"
     const gameSlug = gameToSlug(game)
     router.push(`/games/${gameSlug}?category=${category}`)
     setMegaMenuOpen(false)
     setActiveCategory(null)
+    setMobileMenuOpen(false)
+    setMobileCategoriesOpen(false)
+    setMobileActiveCategory(null)
   }
 
   const retryAuth = async () => {
@@ -318,12 +310,12 @@ export default function Navigation() {
         ? 'bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-purple-500/10 border-b border-white/10' 
         : 'bg-black/30 backdrop-blur-lg border-b border-white/10'
     }`}>
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16 lg:h-20">
+      <div className="container mx-auto px-3 sm:px-4">
+        <div className="flex items-center justify-between h-14 sm:h-16 lg:h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3 group">
+          <Link href="/" className="flex items-center space-x-2 sm:space-x-3 group flex-shrink-0">
             <div className="relative">
-              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-slate-900/50 backdrop-blur-sm rounded-xl flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-purple-500/30 p-0.5">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-slate-900/50 backdrop-blur-sm rounded-xl flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-purple-500/30 p-0.5">
                 <img 
                   src="/logo6.svg" 
                   alt="Nashflare Logo" 
@@ -332,11 +324,11 @@ export default function Navigation() {
               </div>
               <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
             </div>
-            <div className="flex flex-col">
-              <span className="text-xl lg:text-2xl font-black text-white tracking-tight">
+            <div className="flex flex-col min-w-0">
+              <span className="text-base sm:text-xl lg:text-2xl font-black text-white tracking-tight whitespace-nowrap">
                 Nash<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">flare</span>
               </span>
-              <span className="hidden sm:block text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-1">Marketplace</span>
+              <span className="hidden sm:block text-[9px] lg:text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-1">Marketplace</span>
             </div>
           </Link>
 
@@ -346,7 +338,7 @@ export default function Navigation() {
               Home
             </Link>
             
-            {/* Mega Menu Trigger - Available on All Pages */}
+            {/* Desktop Mega Menu */}
             <div 
               className="relative"
               onMouseEnter={() => setMegaMenuOpen(true)}
@@ -366,7 +358,6 @@ export default function Navigation() {
                 </svg>
               </button>
 
-              {/* Mega Menu Dropdown */}
               {megaMenuOpen && (
                 <>
                   <div className="absolute left-0 top-full h-3 w-full" />
@@ -458,37 +449,36 @@ export default function Navigation() {
           </div>
 
           {/* Right Side Actions */}
-          <div className="flex items-center space-x-2 lg:space-x-3">
-            {/* Show user controls immediately if we have user data, even if still loading profile */}
+          <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-3">
             {!authLoading && user && (
               <>
-                {/* Messages */}
-                <Link href="/messages" className="relative p-2.5 lg:p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-300 hover:text-white transition-all duration-200 group">
-                  <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* Messages - Touch-friendly on mobile */}
+                <Link href="/messages" className="relative p-2 sm:p-2.5 lg:p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-300 hover:text-white transition-all duration-200 group min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  <svg className="w-5 h-5 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                   {unreadMessageCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold animate-pulse">
+                    <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white text-[10px] sm:text-xs w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center font-bold animate-pulse">
                       {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
                     </span>
                   )}
                 </Link>
 
-                {/* Cart */}
-                <Link href="/cart" className="relative p-2.5 lg:p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-300 hover:text-white transition-all duration-200 group">
-                  <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {/* Cart - Touch-friendly on mobile */}
+                <Link href="/cart" className="relative p-2 sm:p-2.5 lg:p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-300 hover:text-white transition-all duration-200 group min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  <svg className="w-5 h-5 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                   {cartItemCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold animate-pulse">
+                    <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white text-[10px] sm:text-xs w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center font-bold animate-pulse">
                       {cartItemCount}
                     </span>
                   )}
                 </Link>
 
-                {/* User Menu */}
+                {/* User Menu - Desktop */}
                 <div 
-                  className="relative"
+                  className="hidden lg:block relative"
                   onMouseEnter={() => setUserMenuOpen(true)}
                   onMouseLeave={() => setUserMenuOpen(false)}
                 >
@@ -611,36 +601,65 @@ export default function Navigation() {
             )}
 
             {!authLoading && !user && (
-              <div className="flex items-center space-x-2">
-                <Link href="/login" className="px-4 py-2 text-gray-300 hover:text-white font-medium transition-colors">
-                  Sign In
-                </Link>
-                <Link href="/signup" className="px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-full shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105">
-                  Get Started
-                </Link>
-              </div>
+              <>
+                {/* Desktop Auth Buttons */}
+                <div className="hidden md:flex items-center space-x-2 lg:space-x-3">
+                  <Link 
+                    href="/login" 
+                    className="px-4 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base text-gray-300 hover:text-white font-medium transition-colors rounded-lg hover:bg-white/5"
+                  >
+                    Sign In
+                  </Link>
+                  <Link 
+                    href="/signup" 
+                    className="px-4 lg:px-6 py-2 lg:py-2.5 text-sm lg:text-base bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-full shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 whitespace-nowrap"
+                  >
+                    Get Started
+                  </Link>
+                </div>
+
+                {/* Mobile Auth Buttons - Compact Icons */}
+                <div className="flex md:hidden items-center space-x-2">
+                  <Link 
+                    href="/login" 
+                    className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-300 hover:text-white transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    title="Sign In"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                  </Link>
+                  <Link 
+                    href="/signup" 
+                    className="px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-sm font-semibold rounded-full shadow-lg shadow-purple-500/30 transition-all duration-300 min-h-[44px] flex items-center whitespace-nowrap"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              </>
             )}
 
-            {/* Loading state for auth - with retry option */}
             {authLoading && (
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-white/10 rounded-full animate-pulse"></div>
-                <div className="hidden md:block w-20 h-4 bg-white/10 rounded animate-pulse"></div>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-white/10 rounded-full animate-pulse"></div>
+                <div className="hidden md:block w-16 sm:w-20 h-3 sm:h-4 bg-white/10 rounded animate-pulse"></div>
               </div>
             )}
 
-            {/* Error state - show retry button */}
             {!authLoading && authError && !user && (
               <button
                 onClick={retryAuth}
-                className="px-4 py-2 bg-orange-500/20 text-orange-400 rounded-lg text-sm font-medium hover:bg-orange-500/30 transition-colors border border-orange-500/30"
+                className="px-3 py-1.5 sm:px-4 sm:py-2 bg-orange-500/20 text-orange-400 rounded-lg text-xs sm:text-sm font-medium hover:bg-orange-500/30 transition-colors border border-orange-500/30"
               >
-                Retry Login
+                Retry
               </button>
             )}
 
-            {/* Mobile Menu Button */}
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 text-gray-300 hover:text-white">
+            {/* Mobile Menu Button - Always visible on mobile */}
+            <button 
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+              className="lg:hidden p-2 text-gray-300 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {mobileMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -652,14 +671,205 @@ export default function Navigation() {
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Enhanced Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="lg:hidden py-4 border-t border-white/10">
-            <div className="flex flex-col space-y-2">
-              <Link href="/" onClick={() => setMobileMenuOpen(false)} className={`px-4 py-3 rounded-lg font-medium ${isActive('/') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'}`}>Home</Link>
-              <Link href="/browse" onClick={() => setMobileMenuOpen(false)} className={`px-4 py-3 rounded-lg font-medium ${isActive('/browse') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'}`}>Browse</Link>
+          <div className="lg:hidden py-4 border-t border-white/10 max-h-[calc(100vh-4rem)] overflow-y-auto">
+            <div className="flex flex-col space-y-1">
+              {/* Home */}
+              <Link 
+                href="/" 
+                onClick={() => setMobileMenuOpen(false)} 
+                className={`px-4 py-3 rounded-lg font-medium transition-all min-h-[48px] flex items-center ${
+                  isActive('/') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span>Home</span>
+              </Link>
+
+              {/* Browse with Dropdown */}
+              <div>
+                <button
+                  onClick={() => setMobileCategoriesOpen(!mobileCategoriesOpen)}
+                  className={`w-full px-4 py-3 rounded-lg font-medium transition-all min-h-[48px] flex items-center justify-between ${
+                    mobileCategoriesOpen || isActive('/browse') || pathname.startsWith('/games/') 
+                      ? 'text-white bg-white/10' 
+                      : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span>Browse</span>
+                  <svg 
+                    className={`w-5 h-5 transition-transform duration-200 ${mobileCategoriesOpen ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Mobile Categories Dropdown */}
+                {mobileCategoriesOpen && (
+                  <div className="mt-1 ml-4 space-y-1 border-l-2 border-purple-500/30 pl-4">
+                    {Object.entries(categoryGamesMap).map(([key, value]) => (
+                      <div key={key}>
+                        <button
+                          onClick={() => setMobileActiveCategory(mobileActiveCategory === key ? null : key)}
+                          className="w-full px-3 py-2.5 rounded-lg font-medium transition-all min-h-[44px] flex items-center justify-between text-left text-gray-300 hover:text-white hover:bg-white/5"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">{value.icon}</span>
+                            <span>{value.label}</span>
+                          </div>
+                          <svg 
+                            className={`w-4 h-4 transition-transform ${mobileActiveCategory === key ? 'rotate-180' : ''}`} 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {/* Mobile Games List */}
+                        {mobileActiveCategory === key && (
+                          <div className="mt-1 space-y-1 pl-4">
+                            {value.games.map((game) => (
+                              <button
+                                key={game}
+                                onClick={() => handleGameClick(key, game)}
+                                className="w-full px-3 py-2 rounded-lg text-sm text-left text-gray-400 hover:text-white hover:bg-white/5 transition-all min-h-[40px] flex items-center"
+                              >
+                                <span>🎯 {game}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* View All Button */}
+                    <Link
+                      href="/browse"
+                      onClick={() => {
+                        setMobileMenuOpen(false)
+                        setMobileCategoriesOpen(false)
+                      }}
+                      className="block w-full px-3 py-2.5 mt-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-center rounded-lg font-medium min-h-[44px] flex items-center justify-center"
+                    >
+                      View All Listings
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Sell (for vendors) */}
               {profile?.role === 'vendor' && (
-                <Link href="/sell" onClick={() => setMobileMenuOpen(false)} className={`px-4 py-3 rounded-lg font-medium ${isActive('/sell') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'}`}>Sell</Link>
+                <Link 
+                  href="/sell" 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className={`px-4 py-3 rounded-lg font-medium transition-all min-h-[48px] flex items-center ${
+                    isActive('/sell') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span>Sell</span>
+                </Link>
+              )}
+
+              {/* User Section for Mobile */}
+              {user && profile && (
+                <div className="pt-3 mt-3 border-t border-white/10 space-y-1">
+                  {/* User Info */}
+                  <div className="px-4 py-3 bg-white/5 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center overflow-hidden">
+                        {profile?.avatar_url ? (
+                          <img 
+                            src={profile.avatar_url} 
+                            alt={profile.username} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-white font-bold text-sm">
+                            {profile?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-semibold text-sm truncate">{profile?.username || user?.email?.split('@')[0] || 'User'}</p>
+                        <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mobile Menu Links */}
+                  {!profile?.is_admin && (
+                    <Link 
+                      href={getDashboardUrl()} 
+                      onClick={() => setMobileMenuOpen(false)} 
+                      className="flex items-center space-x-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[48px]"
+                    >
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      </svg>
+                      <span>Dashboard</span>
+                    </Link>
+                  )}
+
+                  <Link 
+                    href="/settings" 
+                    onClick={() => setMobileMenuOpen(false)} 
+                    className="flex items-center space-x-3 px-4 py-3 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[48px]"
+                  >
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>Settings</span>
+                  </Link>
+
+                  {profile?.is_admin && (
+                    <Link 
+                      href="/admin" 
+                      onClick={() => setMobileMenuOpen(false)} 
+                      className="flex items-center space-x-3 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors min-h-[48px]"
+                    >
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      <span>Admin Panel</span>
+                    </Link>
+                  )}
+
+                  <button 
+                    onClick={handleLogout} 
+                    className="flex items-center space-x-3 w-full px-4 py-3 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors min-h-[48px]"
+                  >
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Mobile Auth Buttons - Show when not logged in */}
+              {!user && (
+                <div className="pt-3 mt-3 border-t border-white/10 space-y-2">
+                  <Link 
+                    href="/login" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block w-full px-4 py-3 text-center text-gray-300 hover:text-white hover:bg-white/10 rounded-lg font-medium transition-colors min-h-[48px] flex items-center justify-center"
+                  >
+                    Sign In
+                  </Link>
+                  <Link 
+                    href="/signup" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block w-full px-4 py-3 text-center bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-semibold shadow-lg transition-all min-h-[48px] flex items-center justify-center"
+                  >
+                    Get Started
+                  </Link>
+                </div>
               )}
             </div>
           </div>
