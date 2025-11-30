@@ -6,25 +6,33 @@ import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
 // Category to Games mapping for mega menu
-const categoryGamesMap: { [key: string]: { icon: string; label: string; games: string[] } } = {
+const categoryGamesMap: { [key: string]: { icon: string; label: string; description: string; gradient: string; games: string[] } } = {
   account: {
     icon: '🎮',
     label: 'Accounts',
+    description: 'Ready-to-play gaming accounts',
+    gradient: 'from-purple-500 to-violet-600',
     games: ['GTA 5', 'Fortnite', 'Roblox', 'Valorant', 'League of Legends', 'Clash Royale', 'Clash of Clans', 'Steam']
   },
   items: {
     icon: '🎒',
     label: 'Items',
+    description: 'Rare in-game items & collectibles',
+    gradient: 'from-pink-500 to-rose-600',
     games: ['Steal a Brainrot', 'Grow a Garden', 'Adopt me', 'Blox Fruits', 'Plants vs Brainrots']
   },
   currency: {
     icon: '💰',
     label: 'Currency',
+    description: 'In-game money & credits',
+    gradient: 'from-amber-500 to-orange-600',
     games: ['Roblox', 'Fortnite']
   },
   key: {
     icon: '🔑',
     label: 'Game Keys',
+    description: 'Activation codes & licenses',
+    gradient: 'from-blue-500 to-cyan-600',
     games: ['Steam', 'Playstation', 'Xbox']
   }
 }
@@ -44,7 +52,6 @@ function TestingBanner() {
 
   useEffect(() => {
     setIsMounted(true)
-    // Check if user has dismissed the banner before
     const dismissed = localStorage.getItem('testing-banner-dismissed')
     if (dismissed) {
       setIsVisible(false)
@@ -56,14 +63,12 @@ function TestingBanner() {
     localStorage.setItem('testing-banner-dismissed', 'true')
   }
 
-  // Don't render until mounted (prevents hydration mismatch)
   if (!isMounted || !isVisible) return null
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 backdrop-blur-lg border-b border-white/20 shadow-xl">
       <div className="container mx-auto px-3 sm:px-4">
         <div className="flex items-center justify-between gap-3 sm:gap-4 py-2 sm:py-2.5">
-          {/* Icon & Message */}
           <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
             <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm animate-pulse">
               <span className="text-base sm:text-xl">⚠️</span>
@@ -77,8 +82,6 @@ function TestingBanner() {
               </span>
             </div>
           </div>
-
-          {/* Dismiss Button - Touch-friendly */}
           <button
             onClick={handleDismiss}
             className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 backdrop-blur-sm group min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0"
@@ -96,8 +99,6 @@ function TestingBanner() {
           </button>
         </div>
       </div>
-
-      {/* Animated gradient border */}
       <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-white/40 to-transparent animate-pulse" />
     </div>
   )
@@ -110,23 +111,20 @@ export default function Navigation() {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false)
   const [mobileActiveCategory, setMobileActiveCategory] = useState<string | null>(null)
   const [scrolled, setScrolled] = useState(false)
-  const [megaMenuOpen, setMegaMenuOpen] = useState(false)
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [activeMegaMenu, setActiveMegaMenu] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authError, setAuthError] = useState(false)
   const [bannerVisible, setBannerVisible] = useState(true)
   
   const mountedRef = useRef(true)
   const authInitializedRef = useRef(false)
+  const megaMenuTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
-
-  const isHomepage = pathname === '/'
 
   // Check banner visibility on mount
   useEffect(() => {
@@ -178,7 +176,6 @@ export default function Navigation() {
         
         if (error) {
           if (error.name === 'AuthSessionMissingError' || error.message?.includes('session')) {
-            console.log('No active session (user logged out)')
             setUser(null)
             setProfile(null)
             setAuthError(false)
@@ -203,7 +200,6 @@ export default function Navigation() {
         if (!mountedRef.current) return
         
         if (error.name === 'AuthSessionMissingError' || error.message?.includes('session')) {
-          console.log('No active session (user logged out)')
           setUser(null)
           setProfile(null)
           setAuthError(false)
@@ -243,6 +239,9 @@ export default function Navigation() {
       window.removeEventListener('messages-read', handleMessagesRead)
       window.removeEventListener('scroll', handleScroll)
       window.removeEventListener('avatar-updated', handleAvatarUpdate)
+      if (megaMenuTimeoutRef.current) {
+        clearTimeout(megaMenuTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -340,24 +339,36 @@ export default function Navigation() {
   }
 
   const isActive = (path: string) => pathname === path
+  const isCategoryActive = (category: string) => {
+    return pathname === '/browse' && typeof window !== 'undefined' && window.location.search.includes(`category=${category}`)
+  }
 
   const handleCategoryClick = (category: string) => {
     router.push(`/browse?category=${category}`)
-    setMegaMenuOpen(false)
-    setActiveCategory(null)
+    setActiveMegaMenu(null)
     setMobileMenuOpen(false)
-    setMobileCategoriesOpen(false)
     setMobileActiveCategory(null)
   }
 
   const handleGameClick = (category: string, game: string) => {
     const gameSlug = gameToSlug(game)
     router.push(`/games/${gameSlug}?category=${category}`)
-    setMegaMenuOpen(false)
-    setActiveCategory(null)
+    setActiveMegaMenu(null)
     setMobileMenuOpen(false)
-    setMobileCategoriesOpen(false)
     setMobileActiveCategory(null)
+  }
+
+  const handleMegaMenuEnter = (category: string) => {
+    if (megaMenuTimeoutRef.current) {
+      clearTimeout(megaMenuTimeoutRef.current)
+    }
+    setActiveMegaMenu(category)
+  }
+
+  const handleMegaMenuLeave = () => {
+    megaMenuTimeoutRef.current = setTimeout(() => {
+      setActiveMegaMenu(null)
+    }, 150)
   }
 
   const retryAuth = async () => {
@@ -377,15 +388,12 @@ export default function Navigation() {
     }
   }
 
-  // Calculate top position based on banner visibility
   const navTopClass = bannerVisible ? 'top-11 sm:top-12' : 'top-0'
 
   return (
     <>
-      {/* Testing Banner */}
       <TestingBanner />
       
-      {/* Navigation Bar - Positioned below banner when visible */}
       <nav className={`fixed ${navTopClass} left-0 right-0 z-50 transition-all duration-300 ${
         scrolled 
           ? 'bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-purple-500/10 border-b border-white/10' 
@@ -393,7 +401,7 @@ export default function Navigation() {
       }`}>
         <div className="container mx-auto px-3 sm:px-4">
           <div className="flex items-center justify-between h-14 sm:h-16 lg:h-20">
-            {/* Logo - Icon only on mobile, full logo on desktop */}
+            {/* Logo */}
             <Link href="/" className="flex items-center space-x-2 sm:space-x-3 group flex-shrink-0">
               <div className="relative flex-shrink-0">
                 <div className="w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-slate-900/50 backdrop-blur-sm rounded-xl flex items-center justify-center transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg shadow-purple-500/30 p-0.5">
@@ -405,7 +413,6 @@ export default function Navigation() {
                 </div>
                 <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
               </div>
-              {/* Hide text on mobile (< 640px), show on sm and up */}
               <div className="hidden sm:flex flex-col flex-shrink-0">
                 <span className="text-base sm:text-xl lg:text-2xl font-black text-white tracking-tight whitespace-nowrap">
                   Nash<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">flare</span>
@@ -414,117 +421,103 @@ export default function Navigation() {
               </div>
             </Link>
 
-            {/* Desktop Navigation */}
+            {/* Desktop Navigation - Category-based */}
             <div className="hidden lg:flex items-center space-x-1">
-              <Link href="/" className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${isActive('/') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'}`}>
-                Home
-              </Link>
-              
-              {/* Desktop Mega Menu */}
-              <div 
-                className="relative"
-                onMouseEnter={() => setMegaMenuOpen(true)}
-                onMouseLeave={() => {
-                  setMegaMenuOpen(false)
-                  setActiveCategory(null)
-                }}
-              >
-                <button 
-                  className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-1 ${
-                    megaMenuOpen || isActive('/browse') || pathname.startsWith('/games/') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'
-                  }`}
+              {/* Category Mega Menus */}
+              {Object.entries(categoryGamesMap).map(([key, category]) => (
+                <div 
+                  key={key}
+                  className="relative"
+                  onMouseEnter={() => handleMegaMenuEnter(key)}
+                  onMouseLeave={handleMegaMenuLeave}
                 >
-                  <span>Browse</span>
-                  <svg className={`w-4 h-4 transition-transform duration-200 ${megaMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                  <button 
+                    onClick={() => handleCategoryClick(key)}
+                    className={`px-3 xl:px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center space-x-1.5 text-sm xl:text-base ${
+                      activeMegaMenu === key || isCategoryActive(key)
+                        ? 'text-white bg-white/10' 
+                        : 'text-gray-300 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <span className="text-base xl:text-lg">{category.icon}</span>
+                    <span>{category.label}</span>
+                    <svg 
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${activeMegaMenu === key ? 'rotate-180' : ''}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
 
-                {megaMenuOpen && (
-                  <>
-                    <div className="absolute left-0 top-full h-3 w-full" />
-                    <div className="absolute left-1/2 -translate-x-1/2 mt-3 w-[700px] bg-slate-800/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
-                      <div className="flex">
-                        <div className="w-1/3 bg-slate-900/50 p-4 border-r border-white/10">
-                          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">Categories</h3>
-                          <div className="space-y-1">
-                            {Object.entries(categoryGamesMap).map(([key, value]) => (
+                  {/* Mega Menu Dropdown */}
+                  {activeMegaMenu === key && (
+                    <>
+                      {/* Bridge element to prevent menu closing */}
+                      <div className="absolute left-0 top-full h-3 w-full" />
+                      
+                      <div className="absolute left-1/2 -translate-x-1/2 mt-3 w-[400px] bg-slate-800/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
+                        {/* Header */}
+                        <div className={`p-4 bg-gradient-to-r ${category.gradient} bg-opacity-10`}>
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-12 h-12 bg-gradient-to-br ${category.gradient} rounded-xl flex items-center justify-center text-2xl shadow-lg`}>
+                              {category.icon}
+                            </div>
+                            <div>
+                              <h3 className="text-white font-bold text-lg">{category.label}</h3>
+                              <p className="text-gray-300 text-sm">{category.description}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Games Grid */}
+                        <div className="p-4">
+                          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                            Available Games
+                          </h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            {category.games.map((game) => (
                               <button
-                                key={key}
-                                onMouseEnter={() => setActiveCategory(key)}
-                                onClick={() => handleCategoryClick(key)}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                                  activeCategory === key 
-                                    ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white' 
-                                    : 'text-gray-300 hover:text-white hover:bg-white/5'
-                                }`}
+                                key={game}
+                                onClick={() => handleGameClick(key, game)}
+                                className="flex items-center space-x-2 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 group text-left"
                               >
-                                <div className="flex items-center space-x-3">
-                                  <span className="text-xl">{value.icon}</span>
-                                  <span className="font-medium">{value.label}</span>
+                                <div className={`w-8 h-8 bg-gradient-to-br ${category.gradient} bg-opacity-20 rounded-lg flex items-center justify-center group-hover:bg-opacity-30 transition-colors`}>
+                                  <span className="text-sm">🎯</span>
                                 </div>
-                                <svg className={`w-4 h-4 transition-transform ${activeCategory === key ? 'translate-x-1' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
+                                <span className="font-medium text-sm">{game}</span>
                               </button>
                             ))}
                           </div>
-                          
-                          <div className="mt-4 pt-4 border-t border-white/10">
-                            <Link 
-                              href="/browse" 
-                              onClick={() => setMegaMenuOpen(false)}
-                              className="flex items-center justify-center space-x-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-200"
-                            >
-                              <span>View All Listings</span>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                              </svg>
-                            </Link>
-                          </div>
                         </div>
 
-                        <div className="w-2/3 p-4">
-                          {activeCategory ? (
-                            <>
-                              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
-                                {categoryGamesMap[activeCategory].icon} {categoryGamesMap[activeCategory].label} - Games
-                              </h3>
-                              <div className="grid grid-cols-2 gap-2">
-                                {categoryGamesMap[activeCategory].games.map((game) => (
-                                  <button
-                                    key={game}
-                                    onClick={() => handleGameClick(activeCategory, game)}
-                                    className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 group text-left"
-                                  >
-                                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-lg flex items-center justify-center group-hover:from-purple-500/30 group-hover:to-pink-500/30 transition-colors">
-                                      <span className="text-sm">🎯</span>
-                                    </div>
-                                    <span className="font-medium">{game}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            </>
-                          ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-center py-8">
-                              <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl flex items-center justify-center mb-4">
-                                <span className="text-3xl">👈</span>
-                              </div>
-                              <h3 className="text-white font-semibold mb-2">Select a Category</h3>
-                              <p className="text-gray-400 text-sm max-w-xs">
-                                Hover over a category on the left to see available games
-                              </p>
-                            </div>
-                          )}
+                        {/* Footer */}
+                        <div className="p-4 bg-slate-900/50 border-t border-white/10">
+                          <button
+                            onClick={() => handleCategoryClick(key)}
+                            className={`w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-gradient-to-r ${category.gradient} text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200`}
+                          >
+                            <span>View All {category.label}</span>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
+              ))}
               
+              {/* Sell Link (for vendors) */}
               {profile?.role === 'vendor' && (
-                <Link href="/sell" className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${isActive('/sell') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'}`}>
+                <Link 
+                  href="/sell" 
+                  className={`px-3 xl:px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm xl:text-base ${
+                    isActive('/sell') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
                   Sell
                 </Link>
               )}
@@ -534,7 +527,7 @@ export default function Navigation() {
             <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-3">
               {!authLoading && user && (
                 <>
-                  {/* Messages - Touch-friendly on mobile */}
+                  {/* Messages */}
                   <Link href="/messages" className="relative p-2 sm:p-2.5 lg:p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-300 hover:text-white transition-all duration-200 group min-w-[44px] min-h-[44px] flex items-center justify-center">
                     <svg className="w-5 h-5 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -546,7 +539,7 @@ export default function Navigation() {
                     )}
                   </Link>
 
-                  {/* Cart - Touch-friendly on mobile */}
+                  {/* Cart */}
                   <Link href="/cart" className="relative p-2 sm:p-2.5 lg:p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-300 hover:text-white transition-all duration-200 group min-w-[44px] min-h-[44px] flex items-center justify-center">
                     <svg className="w-5 h-5 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -581,7 +574,7 @@ export default function Navigation() {
                           </span>
                         )}
                       </div>
-                      <span className="text-white font-medium hidden md:block text-sm lg:text-base">
+                      <span className="text-white font-medium hidden xl:block text-sm lg:text-base max-w-[100px] truncate">
                         {profile?.username || user?.email?.split('@')[0] || 'User'}
                       </span>
                       <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -700,7 +693,7 @@ export default function Navigation() {
                     </Link>
                   </div>
 
-                  {/* Mobile Auth Buttons - Compact Icons */}
+                  {/* Mobile Auth Buttons */}
                   <div className="flex md:hidden items-center space-x-2">
                     <Link 
                       href="/login" 
@@ -737,7 +730,7 @@ export default function Navigation() {
                 </button>
               )}
 
-              {/* Mobile Menu Button - Always visible on mobile */}
+              {/* Mobile Menu Button */}
               <button 
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
                 className="lg:hidden p-2 text-gray-300 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -753,96 +746,63 @@ export default function Navigation() {
             </div>
           </div>
 
-          {/* Enhanced Mobile Menu */}
+          {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div className="lg:hidden py-4 border-t border-white/10 max-h-[calc(100vh-4rem)] overflow-y-auto">
               <div className="flex flex-col space-y-1">
-                {/* Home */}
-                <Link 
-                  href="/" 
-                  onClick={() => setMobileMenuOpen(false)} 
-                  className={`px-4 py-3 rounded-lg font-medium transition-all min-h-[48px] flex items-center ${
-                    isActive('/') ? 'text-white bg-white/10' : 'text-gray-300 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <span>Home</span>
-                </Link>
-
-                {/* Browse with Dropdown */}
-                <div>
-                  <button
-                    onClick={() => setMobileCategoriesOpen(!mobileCategoriesOpen)}
-                    className={`w-full px-4 py-3 rounded-lg font-medium transition-all min-h-[48px] flex items-center justify-between ${
-                      mobileCategoriesOpen || isActive('/browse') || pathname.startsWith('/games/') 
-                        ? 'text-white bg-white/10' 
-                        : 'text-gray-300 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    <span>Browse</span>
-                    <svg 
-                      className={`w-5 h-5 transition-transform duration-200 ${mobileCategoriesOpen ? 'rotate-180' : ''}`} 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
+                {/* Category Accordions */}
+                {Object.entries(categoryGamesMap).map(([key, category]) => (
+                  <div key={key}>
+                    <button
+                      onClick={() => setMobileActiveCategory(mobileActiveCategory === key ? null : key)}
+                      className={`w-full px-4 py-3 rounded-lg font-medium transition-all min-h-[48px] flex items-center justify-between ${
+                        mobileActiveCategory === key
+                          ? 'text-white bg-white/10' 
+                          : 'text-gray-300 hover:text-white hover:bg-white/5'
+                      }`}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-
-                  {/* Mobile Categories Dropdown */}
-                  {mobileCategoriesOpen && (
-                    <div className="mt-1 ml-4 space-y-1 border-l-2 border-purple-500/30 pl-4">
-                      {Object.entries(categoryGamesMap).map(([key, value]) => (
-                        <div key={key}>
-                          <button
-                            onClick={() => setMobileActiveCategory(mobileActiveCategory === key ? null : key)}
-                            className="w-full px-3 py-2.5 rounded-lg font-medium transition-all min-h-[44px] flex items-center justify-between text-left text-gray-300 hover:text-white hover:bg-white/5"
-                          >
-                            <div className="flex items-center space-x-2">
-                              <span className="text-lg">{value.icon}</span>
-                              <span>{value.label}</span>
-                            </div>
-                            <svg 
-                              className={`w-4 h-4 transition-transform ${mobileActiveCategory === key ? 'rotate-180' : ''}`} 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-
-                          {/* Mobile Games List */}
-                          {mobileActiveCategory === key && (
-                            <div className="mt-1 space-y-1 pl-4">
-                              {value.games.map((game) => (
-                                <button
-                                  key={game}
-                                  onClick={() => handleGameClick(key, game)}
-                                  className="w-full px-3 py-2 rounded-lg text-sm text-left text-gray-400 hover:text-white hover:bg-white/5 transition-all min-h-[40px] flex items-center"
-                                >
-                                  <span>🎯 {game}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-
-                      {/* View All Button */}
-                      <Link
-                        href="/browse"
-                        onClick={() => {
-                          setMobileMenuOpen(false)
-                          setMobileCategoriesOpen(false)
-                        }}
-                        className="block w-full px-3 py-2.5 mt-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-center rounded-lg font-medium min-h-[44px] flex items-center justify-center"
+                      <div className="flex items-center space-x-3">
+                        <span className="text-xl">{category.icon}</span>
+                        <span>{category.label}</span>
+                      </div>
+                      <svg 
+                        className={`w-5 h-5 transition-transform duration-200 ${mobileActiveCategory === key ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
                       >
-                        View All Listings
-                      </Link>
-                    </div>
-                  )}
-                </div>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Expanded Games */}
+                    {mobileActiveCategory === key && (
+                      <div className="mt-1 ml-4 space-y-1 border-l-2 border-purple-500/30 pl-4">
+                        <p className="px-3 py-2 text-xs text-gray-500 uppercase tracking-wider">
+                          {category.description}
+                        </p>
+                        {category.games.map((game) => (
+                          <button
+                            key={game}
+                            onClick={() => handleGameClick(key, game)}
+                            className="w-full px-3 py-2.5 rounded-lg text-sm text-left text-gray-400 hover:text-white hover:bg-white/5 transition-all min-h-[44px] flex items-center"
+                          >
+                            <span>🎯 {game}</span>
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => handleCategoryClick(key)}
+                          className={`w-full flex items-center justify-center space-x-2 px-3 py-2.5 mt-2 bg-gradient-to-r ${category.gradient} text-white rounded-lg font-medium min-h-[44px]`}
+                        >
+                          <span>View All {category.label}</span>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
 
                 {/* Sell (for vendors) */}
                 {profile?.role === 'vendor' && (
@@ -934,7 +894,7 @@ export default function Navigation() {
                   </div>
                 )}
 
-                {/* Mobile Auth Buttons - Show when not logged in */}
+                {/* Mobile Auth Buttons */}
                 {!user && (
                   <div className="pt-3 mt-3 border-t border-white/10 space-y-2">
                     <Link 
