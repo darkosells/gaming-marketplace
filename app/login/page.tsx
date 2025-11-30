@@ -103,9 +103,9 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
-      {/* Animated Background */}
-      <div className="fixed inset-0 z-0">
+    <>
+      {/* Fixed Background Layer - Covers entire viewport */}
+      <div className="fixed inset-0 bg-slate-950 z-0">
         {/* Gradient Mesh */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
         
@@ -126,161 +126,163 @@ function LoginContent() {
         <div className="absolute bottom-40 right-[20%] w-2 h-2 bg-indigo-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.8s', animationDelay: '2.5s' }}></div>
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 max-w-md w-full">
-        {/* Logo */}
-        <Link href="/" className="flex items-center justify-center space-x-3 mb-8 group">
-          <div className="relative">
-            <Image
-              src="/logo6.svg"
-              alt="Nashflare"
-              width={48}
-              height={48}
-              className="transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300"
-              priority
-            />
-            <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-2xl font-black text-white tracking-tight">
-              Nash<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">flare</span>
-            </span>
-            <span className="text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-1">Marketplace</span>
-          </div>
-        </Link>
-
-        <div className="text-center mb-8">
-          <div className="inline-block mb-4">
-            <span className="px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-sm font-medium">
-              🎮 Welcome Back
-            </span>
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-            Sign In to <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Nashflare</span>
-          </h1>
-          <p className="text-gray-400">Access your gaming marketplace</p>
-        </div>
-
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
-          <form onSubmit={handleLogin} className="space-y-5">
-            {success && (
-              <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4">
-                <p className="text-green-200 text-sm flex items-center gap-2">
-                  <span>✓</span> {success}
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4">
-                <p className="text-red-200 text-sm flex items-center gap-2">
-                  <span>❌</span> {error}
-                </p>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-white font-semibold mb-2 text-sm">Email</label>
-              <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
-                  required
-                  maxLength={100}
-                />
-              </div>
+      {/* Content Layer */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full">
+          {/* Logo */}
+          <Link href="/" className="flex items-center justify-center space-x-3 mb-8 group">
+            <div className="relative">
+              <Image
+                src="/logo6.svg"
+                alt="Nashflare"
+                width={48}
+                height={48}
+                className="transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300"
+                priority
+              />
+              <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
             </div>
-
-            <div>
-              <label className="block text-white font-semibold mb-2 text-sm">Password</label>
-              <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
-                  required
-                  maxLength={72}
-                />
-              </div>
+            <div className="flex flex-col">
+              <span className="text-2xl font-black text-white tracking-tight">
+                Nash<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">flare</span>
+              </span>
+              <span className="text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-1">Marketplace</span>
             </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center text-gray-400 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 rounded border-white/10 bg-slate-800 text-purple-500 focus:ring-purple-500/50 focus:ring-2"
-                />
-                <span className="ml-2 group-hover:text-white transition">Remember me</span>
-              </label>
-              <Link href="/forgot-password" className="text-purple-400 hover:text-purple-300 transition">
-                Forgot password?
-              </Link>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  Signing in...
-                </span>
-              ) : (
-                'Sign In'
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-gray-400">
-              Don't have an account?{' '}
-              <Link href="/signup" className="text-purple-400 hover:text-purple-300 font-semibold transition">
-                Sign up
-              </Link>
-            </p>
-          </div>
-        </div>
-
-        {/* Back to Home */}
-        <div className="text-center mt-6">
-          <Link href="/" className="text-gray-400 hover:text-purple-400 transition flex items-center justify-center gap-2">
-            <span>←</span> Back to Home
           </Link>
-        </div>
 
-        {/* Trust indicators */}
-        <div className="mt-8 flex items-center justify-center gap-6 text-xs text-gray-500">
-          <div className="flex items-center gap-1">
-            <span className="text-green-400">🔒</span>
-            <span>Secure</span>
+          <div className="text-center mb-8">
+            <div className="inline-block mb-4">
+              <span className="px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-sm font-medium">
+                🎮 Welcome Back
+              </span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+              Sign In to <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Nashflare</span>
+            </h1>
+            <p className="text-gray-400">Access your gaming marketplace</p>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-blue-400">✓</span>
-            <span>Verified</span>
+
+          <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
+            <form onSubmit={handleLogin} className="space-y-5">
+              {success && (
+                <div className="bg-green-500/20 border border-green-500/50 rounded-xl p-4">
+                  <p className="text-green-200 text-sm flex items-center gap-2">
+                    <span>✓</span> {success}
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4">
+                  <p className="text-red-200 text-sm flex items-center gap-2">
+                    <span>❌</span> {error}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-white font-semibold mb-2 text-sm">Email</label>
+                <div className="relative group">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+                    required
+                    maxLength={100}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-white font-semibold mb-2 text-sm">Password</label>
+                <div className="relative group">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+                    required
+                    maxLength={72}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <label className="flex items-center text-gray-400 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-white/10 bg-slate-800 text-purple-500 focus:ring-purple-500/50 focus:ring-2"
+                  />
+                  <span className="ml-2 group-hover:text-white transition">Remember me</span>
+                </label>
+                <Link href="/forgot-password" className="text-purple-400 hover:text-purple-300 transition">
+                  Forgot password?
+                </Link>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Signing in...
+                  </span>
+                ) : (
+                  'Sign In'
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <p className="text-gray-400">
+                Don't have an account?{' '}
+                <Link href="/signup" className="text-purple-400 hover:text-purple-300 font-semibold transition">
+                  Sign up
+                </Link>
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-purple-400">⚡</span>
-            <span>Fast</span>
+
+          {/* Back to Home */}
+          <div className="text-center mt-6">
+            <Link href="/" className="text-gray-400 hover:text-purple-400 transition flex items-center justify-center gap-2">
+              <span>←</span> Back to Home
+            </Link>
+          </div>
+
+          {/* Trust indicators */}
+          <div className="mt-8 flex items-center justify-center gap-6 text-xs text-gray-500">
+            <div className="flex items-center gap-1">
+              <span className="text-green-400">🔒</span>
+              <span>Secure</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-blue-400">✓</span>
+              <span>Verified</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-purple-400">⚡</span>
+              <span>Fast</span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="fixed inset-0 bg-slate-950 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div>
       </div>
     }>

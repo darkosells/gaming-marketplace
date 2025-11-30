@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { sendVerificationEmail, generateVerificationCode, getSiteUrl } from '@/lib/email'
+import { sendVerificationEmail, generateVerificationCode } from '@/lib/email'
 import Image from 'next/image'
 
 export default function SignupPage() {
@@ -111,6 +111,17 @@ export default function SignupPage() {
 
       if (profileError) throw profileError
 
+      // Step 2b: Update profile with email (RPC doesn't include it)
+      const { error: emailError } = await supabase
+        .from('profiles')
+        .update({ email: email.toLowerCase() })
+        .eq('id', authData.user.id)
+
+      if (emailError) {
+        console.error('Failed to save email to profile:', emailError)
+        // Don't throw - profile was created, email is secondary
+      }
+
       // Step 3: Generate and store verification code
       const verificationCode = generateVerificationCode()
       const expiresAt = new Date()
@@ -158,9 +169,9 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
-      {/* Animated Background */}
-      <div className="fixed inset-0 z-0">
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4 py-12">
+      {/* Fixed Background that covers entire viewport */}
+      <div className="fixed inset-0 z-0 bg-slate-950">
         {/* Gradient Mesh */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
         
