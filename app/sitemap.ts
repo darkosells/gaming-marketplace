@@ -1,4 +1,4 @@
-// Sitemap Generator with Game Pages and Blog Posts
+// Sitemap Generator with Game Pages, Blog Posts, and Dynamic Content
 // Location: app/sitemap.ts
 
 import { MetadataRoute } from 'next'
@@ -6,6 +6,7 @@ import { siteConfig } from '@/lib/seo-config'
 import { gamesConfig } from '@/lib/games-config'
 
 // Hardcoded blog posts for sitemap
+// TODO: Consider moving to database or CMS for easier management
 const blogPosts = [
   {
     slug: 'fortnite-account-safety-guide-2024',
@@ -41,88 +42,127 @@ const blogPosts = [
   },
 ]
 
+// Product categories with their slugs
+const categories = [
+  { slug: 'account', name: 'Gaming Accounts' },
+  { slug: 'items', name: 'In-Game Items' },
+  { slug: 'currency', name: 'Game Currency' },
+  { slug: 'key', name: 'Game Keys' },
+]
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = siteConfig.url
+  const now = new Date()
 
-  // Static pages
+  // ============================================
+  // STATIC PAGES (Highest Priority)
+  // ============================================
   const staticPages: MetadataRoute.Sitemap = [
     {
       url: baseUrl,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'daily',
       priority: 1.0,
     },
     {
       url: `${baseUrl}/browse`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'hourly',
-      priority: 0.9,
+      priority: 0.95,
     },
     {
       url: `${baseUrl}/blog`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'daily',
       priority: 0.9,
     },
     {
       url: `${baseUrl}/games`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.9,
     },
     {
       url: `${baseUrl}/signup`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.8,
     },
     {
       url: `${baseUrl}/login`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.7,
     },
     {
+      url: `${baseUrl}/how-it-works`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/contact`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    // Legal pages (low priority but important to include)
+    {
       url: `${baseUrl}/terms`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'yearly',
       priority: 0.3,
     },
     {
       url: `${baseUrl}/privacy`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'yearly',
       priority: 0.3,
     },
     {
       url: `${baseUrl}/cookies`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'yearly',
       priority: 0.3,
     },
-    {
-      url: `${baseUrl}/how-it-works`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/contact`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
   ]
 
-  // Dedicated game pages (HIGH PRIORITY for SEO)
+  // ============================================
+  // GAME PAGES (High Priority - Core SEO Pages)
+  // ============================================
   const gamePages: MetadataRoute.Sitemap = gamesConfig.map((game) => ({
     url: `${baseUrl}/games/${game.slug}`,
-    lastModified: new Date(),
+    lastModified: now,
+    changeFrequency: 'daily',
+    priority: 0.9,
+  }))
+
+  // ============================================
+  // CATEGORY PAGES (High Priority)
+  // ============================================
+  const categoryPages: MetadataRoute.Sitemap = categories.map((category) => ({
+    url: `${baseUrl}/browse?category=${category.slug}`,
+    lastModified: now,
     changeFrequency: 'daily',
     priority: 0.85,
   }))
 
-  // Blog post pages (HIGH PRIORITY for SEO)
+  // Category + Game combination pages (e.g., /browse?category=account&game=fortnite)
+  const categoryGamePages: MetadataRoute.Sitemap = []
+  for (const category of categories) {
+    for (const game of gamesConfig.slice(0, 10)) { // Top 10 games only to avoid bloat
+      categoryGamePages.push({
+        url: `${baseUrl}/browse?category=${category.slug}&game=${game.slug}`,
+        lastModified: now,
+        changeFrequency: 'daily',
+        priority: 0.75,
+      })
+    }
+  }
+
+  // ============================================
+  // BLOG PAGES (High Priority for SEO)
+  // ============================================
   const blogPages: MetadataRoute.Sitemap = blogPosts.map((post) => ({
     url: `${baseUrl}/blog/${post.slug}`,
     lastModified: new Date(post.lastModified),
@@ -130,16 +170,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }))
 
-  // Category pages (legacy - can keep for backwards compatibility)
-  const categories = ['account', 'items', 'currency', 'key']
-  const categoryPages: MetadataRoute.Sitemap = categories.map((category) => ({
-    url: `${baseUrl}/browse?category=${category}`,
-    lastModified: new Date(),
-    changeFrequency: 'daily',
-    priority: 0.7,
-  }))
-
-  // Dynamic pages from database
+  // ============================================
+  // DYNAMIC DATABASE PAGES
+  // ============================================
   let listingPages: MetadataRoute.Sitemap = []
   let profilePages: MetadataRoute.Sitemap = []
 
@@ -147,10 +180,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { createClient } = await import('@/lib/supabase-server')
     const supabase = createClient()
 
-    // Fetch all active listings
+    // Fetch all active listings (limit to most recent 10,000 for performance)
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, updated_at')
+      .select('id, updated_at, game')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(10000)
@@ -164,12 +197,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }))
     }
 
-    // Fetch verified vendor profiles
+    // Fetch verified vendor profiles (public profiles)
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, updated_at')
+      .select('id, updated_at, username')
       .eq('role', 'vendor')
       .eq('verified', true)
+      .not('username', 'is', null)
       .limit(1000)
 
     if (!profilesError && profiles) {
@@ -181,15 +215,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }))
     }
   } catch (error) {
+    // Log error but don't fail sitemap generation
     console.error('Sitemap database query error:', error)
   }
 
+  // ============================================
+  // COMBINE ALL PAGES
+  // ============================================
+  // Order matters for some crawlers - most important pages first
   return [
-    ...staticPages,
-    ...gamePages,      // Dedicated game pages (high priority)
-    ...blogPages,      // Blog posts (high priority for SEO)
-    ...categoryPages,  // Category filter pages
-    ...listingPages,   // Individual product listings
-    ...profilePages,   // Vendor profiles
+    ...staticPages,         // Core static pages
+    ...gamePages,           // Dedicated game pages (high priority)
+    ...categoryPages,       // Category browse pages
+    ...blogPages,           // Blog posts (high priority for SEO)
+    ...categoryGamePages,   // Category + Game combinations
+    ...listingPages,        // Individual product listings
+    ...profilePages,        // Verified vendor profiles
   ]
 }
+
+// ============================================
+// SITEMAP INDEX (Optional - for very large sites)
+// ============================================
+// If your sitemap grows beyond 50,000 URLs or 50MB, you'll need to split it
+// into multiple sitemaps with an index. Uncomment and modify if needed:
+//
+// export async function generateSitemaps() {
+//   // Return an array of sitemap IDs
+//   return [{ id: 0 }, { id: 1 }, { id: 2 }]
+// }
+//
+// Then modify the main function to accept an id parameter:
+// export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap>

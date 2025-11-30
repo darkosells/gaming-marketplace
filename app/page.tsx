@@ -1,48 +1,81 @@
-// Homepage with SEO Metadata
-// Location: app/page.tsx
-// This file exports metadata and imports the client component
-
-import type { Metadata } from 'next'
-import { siteConfig } from '@/lib/seo-config'
+import { Metadata } from 'next'
 import HomePageClient from './HomePageClient'
 
+// SEO Metadata for Homepage
 export const metadata: Metadata = {
-  title: 'Buy & Sell Gaming Accounts, Currency & Keys',
-  description: 'The #1 trusted gaming marketplace. Buy and sell gaming accounts, in-game currency, items, and game keys for Fortnite, Valorant, GTA 5, Roblox, and more. Secure transactions with 48-hour buyer protection.',
+  title: 'Nashflare - Buy & Sell Gaming Accounts, Currency & Game Keys',
+  description: 'The trusted gaming marketplace for buying and selling gaming accounts, in-game currency like V-Bucks & Robux, rare items, and game keys. Secure transactions with buyer protection.',
   keywords: [
-    ...siteConfig.keywords,
     'gaming marketplace',
-    'buy fortnite account',
-    'sell valorant account',
-    'gta 5 modded accounts',
-    'roblox robux',
-    'game key deals',
+    'buy gaming accounts',
+    'sell gaming accounts',
+    'fortnite accounts',
+    'gta 5 accounts',
+    'valorant accounts',
+    'roblox accounts',
+    'v-bucks',
+    'robux',
+    'game keys',
+    'steam keys',
+    'playstation keys',
+    'xbox keys',
+    'in-game currency',
+    'gaming items',
+    'secure gaming marketplace',
+    'buy game accounts',
+    'sell game accounts'
   ],
+  authors: [{ name: 'Nashflare' }],
+  creator: 'Nashflare',
+  publisher: 'Nashflare',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
   openGraph: {
-    title: `${siteConfig.name} - #1 Gaming Marketplace for Accounts, Currency & Keys`,
-    description: 'Buy and sell gaming accounts, currency, and keys with complete security. Join thousands of gamers trading safely on Nashflare.',
-    url: siteConfig.url,
-    siteName: siteConfig.name,
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://nashflare.com',
+    siteName: 'Nashflare',
+    title: 'Nashflare - Buy & Sell Gaming Accounts, Currency & Game Keys',
+    description: 'The trusted gaming marketplace for buying and selling gaming accounts, in-game currency, rare items, and game keys. Secure transactions with buyer protection.',
     images: [
       {
-        url: siteConfig.ogImage,
+        url: 'https://nashflare.com/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Nashflare Gaming Marketplace - Buy & Sell Gaming Assets Securely',
+        alt: 'Nashflare - Gaming Marketplace',
       },
     ],
-    locale: siteConfig.locale,
-    type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${siteConfig.name} - Gaming Marketplace`,
-    description: 'Buy and sell gaming accounts, currency, and keys securely. 48-hour buyer protection included.',
-    images: [siteConfig.ogImage],
-    creator: siteConfig.twitterHandle,
+    title: 'Nashflare - Buy & Sell Gaming Accounts, Currency & Game Keys',
+    description: 'The trusted gaming marketplace for buying and selling gaming accounts, in-game currency, rare items, and game keys.',
+    images: ['https://nashflare.com/og-image.png'],
+    // Add your Twitter handle when you have one
+    // creator: '@nashflare',
+    // site: '@nashflare',
   },
   alternates: {
-    canonical: siteConfig.url,
+    canonical: 'https://nashflare.com',
+  },
+  category: 'Gaming',
+  classification: 'Gaming Marketplace',
+  other: {
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'apple-mobile-web-app-title': 'Nashflare',
+    'application-name': 'Nashflare',
+    'msapplication-TileColor': '#0f172a',
+    'theme-color': '#0f172a',
   },
 }
 

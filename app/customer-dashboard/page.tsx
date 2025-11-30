@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 
 export default function CustomerDashboardPage() {
   const [user, setUser] = useState<any>(null)
@@ -328,7 +329,7 @@ export default function CustomerDashboardPage() {
                       <p className="text-white text-sm sm:text-base">{verificationStatus.rejection_reason}</p>
                     </div>
                     <p className="text-gray-400 text-sm sm:text-base">Your application has been permanently rejected. Contact support if you believe this was an error.</p>
-                    <a href="mailto:support@gamevault.com" className="inline-block mt-4 text-purple-400 hover:text-purple-300 underline transition text-sm sm:text-base">
+                    <a href="mailto:support@nashflare.com" className="inline-block mt-4 text-purple-400 hover:text-purple-300 underline transition text-sm sm:text-base">
                       Contact Support
                     </a>
                   </div>
@@ -519,7 +520,7 @@ export default function CustomerDashboardPage() {
                       <span className="text-2xl sm:text-3xl">🚀</span>
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Want to Sell on GameVault?</h3>
+                      <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Want to Sell on Nashflare?</h3>
                       <p className="text-gray-300 text-sm sm:text-base">
                         {verificationStatus?.can_resubmit 
                           ? 'Fix the issues and resubmit your application to become a vendor.' 
@@ -539,12 +540,7 @@ export default function CustomerDashboardPage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-6 sm:py-8 mt-8 sm:mt-12">
-          <div className="container mx-auto px-3 sm:px-4 text-center text-gray-500 text-xs sm:text-sm">
-            <p>&copy; 2025 Nashflare. All rights reserved.</p>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   )
