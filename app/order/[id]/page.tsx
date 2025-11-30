@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 import { sendOrderEmails, sendDeliveredEmail, sendDisputeEmails, getSiteUrl } from '@/lib/email'
 
 const STATUS_CONFIG: Record<string, any> = {
@@ -27,6 +28,10 @@ export default function OrderDetailPage() {
   const [showDelivery, setShowDelivery] = useState(false), [deliveryText, setDeliveryText] = useState('')
   const [showReview, setShowReview] = useState(false), [rating, setRating] = useState(0), [hoverRating, setHoverRating] = useState(0), [reviewText, setReviewText] = useState(''), [hasReviewed, setHasReviewed] = useState(false)
   const [showDispute, setShowDispute] = useState(false), [disputeReason, setDisputeReason] = useState(''), [disputeDesc, setDisputeDesc] = useState('')
+  const [copiedOrderId, setCopiedOrderId] = useState(false)
+  const [deliveryInfo, setDeliveryInfo] = useState<string | null>(null)
+  const [showDeliveryInfo, setShowDeliveryInfo] = useState(false)
+  const [copiedDelivery, setCopiedDelivery] = useState(false)
 
   const toast = (type: string, title: string, msg: string) => {
     const t = { id: Date.now().toString(), type, title, msg }
@@ -35,6 +40,29 @@ export default function OrderDetailPage() {
   }
 
   const confirm = (title: string, msg: string, onOk: () => void, type = 'warning') => setModal({ show: true, title, msg, onOk, type })
+
+  const copyOrderId = async () => {
+    try {
+      await navigator.clipboard.writeText(order.id)
+      setCopiedOrderId(true)
+      toast('success', 'Copied!', 'Order ID copied to clipboard')
+      setTimeout(() => setCopiedOrderId(false), 2000)
+    } catch {
+      toast('error', 'Failed', 'Could not copy to clipboard')
+    }
+  }
+
+  const copyDeliveryInfo = async () => {
+    if (!deliveryInfo) return
+    try {
+      await navigator.clipboard.writeText(deliveryInfo)
+      setCopiedDelivery(true)
+      toast('success', 'Copied!', 'Delivery information copied to clipboard')
+      setTimeout(() => setCopiedDelivery(false), 2000)
+    } catch {
+      toast('error', 'Failed', 'Could not copy to clipboard')
+    }
+  }
 
   useEffect(() => { mounted.current = true; checkAuth(); return () => { mounted.current = false } }, [])
   useEffect(() => { user && profile && fetchOrder() }, [user, profile])
@@ -76,10 +104,189 @@ export default function OrderDetailPage() {
       await Promise.allSettled([
         d.status === 'dispute_raised' && supabase.from('disputes').select('*').eq('order_id', id).order('created_at', { ascending: false }).limit(1).single().then(r => r.data && setDispute(r.data)),
         d.status === 'completed' && d.buyer_id === user?.id && supabase.from('reviews').select('id').eq('order_id', id).single().then(r => r.data && setHasReviewed(true)),
-        (profile?.is_admin || d.dispute_opened_at) && supabase.from('admin_actions').select('*, admin:profiles!admin_actions_admin_id_fkey(username)').eq('target_type', 'order').eq('target_id', id).order('created_at', { ascending: false }).then(r => !r.error && setAdminActions(r.data || []))
+        (profile?.is_admin || d.dispute_opened_at) && supabase.from('admin_actions').select('*, admin:profiles!admin_actions_admin_id_fkey(username)').eq('target_type', 'order').eq('target_id', id).order('created_at', { ascending: false }).then(r => !r.error && setAdminActions(r.data || [])),
+        // Fetch delivery information for buyers (or admins) after delivery
+        (d.buyer_id === user?.id || profile?.is_admin) && (d.status === 'delivered' || d.status === 'completed' || d.status === 'dispute_raised') && fetchDeliveryInfo(d.id)
       ])
     } catch { mounted.current && setError('Failed to load order') }
     finally { mounted.current && setLoading(false) }
+  }
+
+  const fetchDeliveryInfo = async (orderId: string) => {
+    try {
+      // First check if delivery_content is stored directly on order (for automatic delivery)
+      if (order?.delivery_content) {
+        setDeliveryInfo(order.delivery_content)
+        return
+      }
+
+      // Find the conversation for this order - try multiple approaches
+      let convId: string | null = null
+      
+      // Try 1: Direct order_id match
+      const { data: conv1 } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('order_id', orderId)
+        .single()
+      
+      if (conv1) {
+        convId = conv1.id
+      } else if (order) {
+        // Try 2: Match by listing, buyer, seller
+        const { data: conv2 } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('listing_id', order.listing_id)
+          .eq('buyer_id', order.buyer_id)
+          .eq('seller_id', order.seller_id)
+          .single()
+        if (conv2) convId = conv2.id
+      }
+      
+      if (!convId) {
+        console.log('No conversation found for order:', orderId)
+        return
+      }
+
+      console.log('Found conversation:', convId)
+
+      // Get recent messages from this conversation
+      const { data: messages, error: msgError } = await supabase
+        .from('messages')
+        .select('content, created_at, message_type, sender_id')
+        .eq('conversation_id', convId)
+        .order('created_at', { ascending: false })
+        .limit(30)
+
+      if (msgError) {
+        console.error('Error fetching messages:', msgError)
+        return
+      }
+
+      console.log('Found messages:', messages?.length)
+
+      if (messages && messages.length > 0) {
+        // Find delivery message - look for various patterns
+        const deliveryMsg = messages.find((m: any) => {
+          const content = m.content || ''
+          return (
+            content.includes('DELIVERY INFORMATION') || 
+            content.includes('DELIVERY INFO') ||
+            content.includes('📦 DELIVERY') ||
+            content.includes('automatically delivered') ||
+            content.includes('Account Details:') ||
+            content.includes('Game Key:') ||
+            content.includes('Top-Up Information:') ||
+            content.includes('Delivery Information:') ||
+            (m.message_type === 'system' && content.includes('delivered'))
+          )
+        })
+        
+        if (deliveryMsg) {
+          const content = deliveryMsg.content
+          console.log('Found delivery message:', content.substring(0, 100) + '...')
+          
+          // Try to extract delivery content using multiple patterns
+          let extracted: string | null = null
+          
+          // Pattern 1: Manual delivery format - emoji + DELIVERY INFORMATION
+          const p1 = content.match(/📦 DELIVERY INFORMATION\s*\n\n([\s\S]*?)\n\n━━━/)
+          if (p1 && p1[1]) extracted = p1[1].trim()
+          
+          // Pattern 2: Manual delivery without emoji
+          if (!extracted) {
+            const p2 = content.match(/DELIVERY INFORMATION\s*\n\n([\s\S]*?)\n\n━━━/)
+            if (p2 && p2[1]) extracted = p2[1].trim()
+          }
+          
+          // Pattern 3: Automatic delivery format - "📋 Category:\n━━━━━━\nCONTENT\n━━━━━━"
+          if (!extracted) {
+            const p3 = content.match(/📋[^\n]*:\s*\n━+\s*\n([\s\S]*?)\n━+/)
+            if (p3 && p3[1]) extracted = p3[1].trim()
+          }
+          
+          // Pattern 4: Just between separator lines (━━━)
+          if (!extracted) {
+            const separatorMatches = content.match(/━{5,}\s*\n([\s\S]*?)\n━{5,}/)
+            if (separatorMatches && separatorMatches[1]) {
+              extracted = separatorMatches[1].trim()
+            }
+          }
+          
+          // Pattern 5: DELIVERY INFO variant
+          if (!extracted) {
+            const p5 = content.match(/DELIVERY INFO\s*\n[━─═]+\s*\n([\s\S]*?)\n[━─═]+/)
+            if (p5 && p5[1]) extracted = p5[1].trim()
+          }
+          
+          // Pattern 6: Simple - everything between header and checkmark
+          if (!extracted) {
+            const p6 = content.match(/DELIVERY[^\n]*\n\n([\s\S]*?)\n\n✅/)
+            if (p6 && p6[1]) extracted = p6[1].trim()
+          }
+          
+          // Pattern 7: Line-by-line extraction for edge cases
+          if (!extracted) {
+            const lines = content.split('\n')
+            
+            // Find start of delivery content (after separator line)
+            let startIdx = -1
+            let endIdx = -1
+            
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i]
+              // Look for separator line (━━━━)
+              if (line.match(/^━{5,}$/)) {
+                if (startIdx === -1) {
+                  // First separator - content starts after
+                  startIdx = i + 1
+                } else {
+                  // Second separator - content ends before
+                  endIdx = i
+                  break
+                }
+              }
+            }
+            
+            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+              const deliveryLines = lines.slice(startIdx, endIdx).join('\n').trim()
+              if (deliveryLines) extracted = deliveryLines
+            }
+          }
+          
+          // Pattern 8: Last resort - if it's a system message from seller around delivery time
+          if (!extracted && deliveryMsg.message_type === 'system') {
+            // Try to get everything that looks like credentials
+            const credMatch = content.match(/(?:Username|Email|Password|Code|Key|Account)[\s:]+[^\n]+/gi)
+            if (credMatch && credMatch.length > 0) {
+              extracted = credMatch.join('\n')
+            }
+          }
+          
+          if (extracted) {
+            console.log('Successfully extracted delivery info:', extracted.substring(0, 50) + '...')
+            setDeliveryInfo(extracted)
+          } else {
+            console.log('Could not parse delivery content, trying full extraction')
+            // Last fallback: extract everything between first and second separator
+            const allSeparators = [...content.matchAll(/━{5,}/g)]
+            if (allSeparators.length >= 2) {
+              const start = (allSeparators[0].index || 0) + allSeparators[0][0].length
+              const end = allSeparators[1].index || content.length
+              const betweenSeparators = content.substring(start, end).trim()
+              if (betweenSeparators && betweenSeparators.length > 0) {
+                setDeliveryInfo(betweenSeparators)
+              }
+            }
+          }
+        } else {
+          console.log('No delivery message found in conversation')
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching delivery info:', err)
+    }
   }
 
   const deliver = () => {
@@ -258,7 +465,31 @@ export default function OrderDetailPage() {
             <Link href={isAdmin && !isBuyer && !isSeller ? '/admin' : isBuyer ? '/customer-dashboard' : '/dashboard'} className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 mb-4"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>Back</Link>
             <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div><span className="px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-sm">📋 Order #{order.id.substring(0, 8)}</span><h1 className="text-3xl font-bold mt-3"><span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Order Details</span></h1></div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-sm font-mono">📋 Order #{order.id}</span>
+                    <button
+                      onClick={copyOrderId}
+                      className={`p-2 rounded-lg border transition-all duration-200 ${
+                        copiedOrderId 
+                          ? 'bg-green-500/20 border-green-500/30 text-green-400' 
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+                      }`}
+                      title="Copy full Order ID"
+                    >
+                      {copiedOrderId ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  <h1 className="text-3xl font-bold mt-3"><span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Order Details</span></h1>
+                </div>
                 <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border ${sc.bg} ${sc.border}`}><span className="text-xl">{sc.icon}</span><span className={`font-semibold ${sc.text}`}>{sc.label}</span></div>
               </div>
             </div>
@@ -268,6 +499,127 @@ export default function OrderDetailPage() {
           {order.status === 'delivered' && timeRemaining && isBuyer && (
             <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-2 border-yellow-500/50 rounded-2xl p-6 mb-6 animate-pulse">
               <div className="flex items-center gap-4"><div className="w-16 h-16 bg-yellow-500/20 rounded-xl flex items-center justify-center"><span className="text-4xl">⏱️</span></div><div><h3 className="text-xl font-bold text-yellow-400">Action Required</h3><p className="text-2xl font-mono font-bold text-white">{timeRemaining}</p><p className="text-gray-300 text-sm">Confirm or dispute. Auto-completes after 48h.</p></div></div>
+            </div>
+          )}
+
+          {/* DELIVERY INFORMATION DISPLAY - For Buyers */}
+          {(isBuyer || isAdmin) && (order.status === 'delivered' || order.status === 'completed' || order.status === 'dispute_raised') && (
+            <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-2 border-green-500/50 rounded-2xl p-6 mb-6">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🔑</span>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-green-400">Delivery Information</h3>
+                    <p className="text-sm text-gray-400">Your credentials/codes from the seller</p>
+                  </div>
+                </div>
+                {deliveryInfo && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowDeliveryInfo(!showDeliveryInfo)}
+                      className={`px-4 py-2 rounded-lg border transition-all duration-200 text-sm font-medium ${
+                        showDeliveryInfo
+                          ? 'bg-green-500/20 border-green-500/30 text-green-400'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {showDeliveryInfo ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                          Hide
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Show
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={copyDeliveryInfo}
+                      className={`px-4 py-2 rounded-lg border transition-all duration-200 text-sm font-medium ${
+                        copiedDelivery
+                          ? 'bg-green-500/20 border-green-500/30 text-green-400'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+                      }`}
+                      title="Copy delivery information"
+                    >
+                      {copiedDelivery ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Copied!
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {deliveryInfo ? (
+                <>
+                  {showDeliveryInfo ? (
+                    <div className="bg-slate-900/80 border border-green-500/20 rounded-xl p-4">
+                      <pre className="text-white font-mono text-sm whitespace-pre-wrap break-all leading-relaxed select-all">
+                        {deliveryInfo}
+                      </pre>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-900/80 border border-white/10 rounded-xl p-4">
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span className="text-sm">Click "Show" to reveal your delivery information</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="bg-slate-900/80 border border-yellow-500/20 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-yellow-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm">Delivery info is available in your messages. Click below to view.</span>
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={openChat}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white py-2.5 px-4 rounded-xl font-medium border border-white/10 transition-all flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  View in Messages
+                </button>
+                {order.status === 'delivered' && isBuyer && (
+                  <p className="text-xs text-yellow-400 flex items-center gap-1 sm:ml-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Remember to confirm receipt or raise a dispute!
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -489,7 +841,7 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </div>
-        <footer className="bg-slate-950/80 border-t border-white/5 py-8 mt-12 text-center text-gray-500 text-sm">© 2024 Nashflare</footer>
+        <Footer />
       </div>
     </div>
   )

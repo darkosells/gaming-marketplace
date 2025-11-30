@@ -243,47 +243,74 @@ export default function CreateListingPage() {
     }
 
     try {
+      console.log('=== STARTING LISTING CREATION ===')
+      console.log('User ID:', user.id)
+      
+      const insertData = {
+        seller_id: user.id,
+        category,
+        game,
+        title,
+        description,
+        price: parseFloat(price),
+        platform,
+        stock: parseInt(stock),
+        image_url: imageUrls[0] || null,
+        image_urls: imageUrls,
+        status: 'active',
+        delivery_type: deliveryType,
+        tags: selectedTags.length > 0 ? selectedTags : null
+      }
+      
+      console.log('Data to insert:', insertData)
+
       const { data: listingData, error: listingError } = await supabase
         .from('listings')
-        .insert([
-          {
-            seller_id: user.id,
-            category,
-            game,
-            title,
-            description,
-            price: parseFloat(price),
-            platform,
-            stock: parseInt(stock),
-            image_url: imageUrls[0] || null,
-            image_urls: imageUrls,
-            status: 'active',
-            delivery_type: deliveryType === 'automatic' ? 'instant' : 'manual',
-            tags: selectedTags.length > 0 ? selectedTags : null
-          }
-        ])
+        .insert([insertData])
         .select()
         .single()
 
-      if (listingError) throw listingError
+      console.log('=== SUPABASE RESPONSE ===')
+      console.log('Data:', listingData)
+      console.log('Error:', listingError)
+      
+      if (listingError) {
+        console.error('=== LISTING ERROR DETAILS ===')
+        console.error('Message:', listingError.message)
+        console.error('Details:', listingError.details)
+        console.error('Hint:', listingError.hint)
+        console.error('Code:', listingError.code)
+        throw new Error(listingError.message || 'Database error occurred')
+      }
 
       if (deliveryType === 'automatic' && listingData) {
+        console.log('=== INSERTING DELIVERY CODES ===')
         const codeInserts = deliveryCodes.map(code => ({
           listing_id: listingData.id,
           code_text: code.trim(),
           is_used: false
         }))
+        
+        console.log('Delivery codes to insert:', codeInserts)
 
         const { error: codesError } = await supabase
           .from('delivery_codes')
           .insert(codeInserts)
 
         if (codesError) {
+          console.error('=== DELIVERY CODES ERROR ===')
+          console.error('Message:', codesError.message)
+          console.error('Details:', codesError.details)
           await supabase.from('listings').delete().eq('id', listingData.id)
           throw new Error('Failed to save delivery codes: ' + codesError.message)
         }
+        
+        console.log('Delivery codes inserted successfully')
       }
 
+      console.log('=== LISTING CREATED SUCCESSFULLY ===')
+      console.log('Listing ID:', listingData?.id)
+      
       setCreatedListingId(listingData?.id || null)
       setSuccess(true)
       
@@ -296,8 +323,15 @@ export default function CreateListingPage() {
       }, 2000)
 
     } catch (error: any) {
-      console.error('Create listing error:', error)
-      setError(error.message || 'Failed to create listing')
+      console.error('=== CATCH BLOCK ERROR ===')
+      console.error('Full error object:', error)
+      console.error('Error type:', typeof error)
+      console.error('Error constructor:', error?.constructor?.name)
+      console.error('Error message:', error?.message)
+      console.error('Error stack:', error?.stack)
+      
+      const errorMessage = error?.message || 'Failed to create listing. Check browser console for details.'
+      setError(errorMessage)
     } finally {
       setSubmitting(false)
     }
