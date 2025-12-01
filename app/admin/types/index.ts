@@ -80,6 +80,7 @@ export interface AdminConversation {
   listing?: {
     title: string
     image_url?: string
+    game?: string
   }
 }
 
