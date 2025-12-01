@@ -147,18 +147,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.85,
   }))
 
-  // Category + Game combination pages (e.g., /browse?category=account&game=fortnite)
-  const categoryGamePages: MetadataRoute.Sitemap = []
-  for (const category of categories) {
-    for (const game of gamesConfig.slice(0, 10)) { // Top 10 games only to avoid bloat
-      categoryGamePages.push({
-        url: `${baseUrl}/browse?category=${category.slug}&game=${game.slug}`,
-        lastModified: now,
-        changeFrequency: 'daily',
-        priority: 0.75,
-      })
-    }
-  }
+  // NOTE: Category + Game combination pages removed
+  // URLs with multiple query parameters (& symbol) can cause XML parsing issues
+  // Instead, use dedicated game pages at /games/[slug] which are cleaner for SEO
 
   // ============================================
   // BLOG PAGES (High Priority for SEO)
@@ -228,7 +219,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...gamePages,           // Dedicated game pages (high priority)
     ...categoryPages,       // Category browse pages
     ...blogPages,           // Blog posts (high priority for SEO)
-    ...categoryGamePages,   // Category + Game combinations
     ...listingPages,        // Individual product listings
     ...profilePages,        // Verified vendor profiles
   ]
