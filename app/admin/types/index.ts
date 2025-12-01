@@ -132,6 +132,13 @@ export interface AdminVerification {
   status: 'pending' | 'approved' | 'rejected'
   full_name?: string
   date_of_birth?: string
+  phone_number?: string
+  street_address?: string
+  city?: string
+  state_province?: string
+  postal_code?: string
+  country?: string
+  id_type?: string
   id_front_url?: string
   id_back_url?: string
   rejection_reason?: string

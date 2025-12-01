@@ -32,7 +32,7 @@ export function AgreementModal({
           <h2 className="text-2xl font-bold text-white mb-2">Sensitive Document Access</h2>
           <p className="text-gray-300">
             Viewing documents for{' '}
-            <strong className="text-white">{verification.user?.username}</strong>
+            <strong className="text-white">{verification.user?.username || 'Unknown'}</strong>
           </p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6 text-sm text-gray-300">
@@ -108,24 +108,26 @@ export function VerificationDetailsModal({
           <div className="bg-white/5 border border-white/10 rounded-xl p-4">
             <h3 className="text-lg font-semibold text-white mb-4">Personal Info</h3>
             <p className="text-gray-400 text-xs">Name</p>
-            <p className="text-white mb-2">{verification.full_name}</p>
+            <p className="text-white mb-2">{verification.full_name || 'N/A'}</p>
             <p className="text-gray-400 text-xs">DOB</p>
             <p className="text-white mb-2">
-              {new Date(verification.date_of_birth).toLocaleDateString()}
+              {verification.date_of_birth 
+                ? new Date(verification.date_of_birth).toLocaleDateString() 
+                : 'N/A'}
             </p>
             <p className="text-gray-400 text-xs">Phone</p>
-            <p className="text-white mb-2">{verification.phone_number}</p>
+            <p className="text-white mb-2">{verification.phone_number || 'N/A'}</p>
             <p className="text-gray-400 text-xs">Username</p>
-            <p className="text-purple-400 font-semibold">{verification.user?.username}</p>
+            <p className="text-purple-400 font-semibold">{verification.user?.username || 'N/A'}</p>
           </div>
           <div className="bg-white/5 border border-white/10 rounded-xl p-4">
             <h3 className="text-lg font-semibold text-white mb-4">Address</h3>
-            <p className="text-white mb-2">{verification.street_address}</p>
+            <p className="text-white mb-2">{verification.street_address || 'N/A'}</p>
             <p className="text-white mb-2">
-              {verification.city}, {verification.state_province}
+              {[verification.city, verification.state_province].filter(Boolean).join(', ') || 'N/A'}
             </p>
             <p className="text-white">
-              {verification.postal_code}, {verification.country}
+              {[verification.postal_code, verification.country].filter(Boolean).join(', ') || 'N/A'}
             </p>
           </div>
           {!verification.documents_cleared && verification.id_front_url && (
@@ -134,7 +136,7 @@ export function VerificationDetailsModal({
                 ID Documents <span className="text-xs text-red-400">(One-time view)</span>
               </h3>
               <p className="text-gray-400 text-xs mb-2">
-                Type: {verification.id_type?.replace('_', ' ')}
+                Type: {verification.id_type?.replace('_', ' ') || 'N/A'}
               </p>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -585,7 +587,7 @@ export function FraudReviewModal({
         <div className="mb-6 space-y-4">
           <div>
             <p className="text-gray-400 text-sm">User</p>
-            <p className="text-white font-bold">{flag.user?.username}</p>
+            <p className="text-white font-bold">{flag.user?.username || 'Unknown'}</p>
           </div>
           <div>
             <p className="text-gray-400 text-sm">Flag Type</p>
