@@ -34,7 +34,7 @@ export default function TermsOfService() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Terms of Service</h1>
-            <p className="text-gray-400">Last updated November 16, 2025</p>
+            <p className="text-gray-400">Last updated November 30, 2025</p>
           </div>
 
           {/* Main Content Card */}
@@ -74,6 +74,7 @@ export default function TermsOfService() {
                     <li><a href="#buyer-protection" className="text-purple-400 hover:text-purple-300 transition">BUYER PROTECTION AND ESCROW</a></li>
                     <li><a href="#seller-obligations" className="text-purple-400 hover:text-purple-300 transition">SELLER OBLIGATIONS</a></li>
                     <li><a href="#prohibited-items" className="text-purple-400 hover:text-purple-300 transition">PROHIBITED ITEMS AND ACTIVITIES</a></li>
+                    <li><a href="#fraud-prevention" className="text-purple-400 hover:text-purple-300 transition">FRAUD PREVENTION AND ACCOUNT SECURITY</a></li>
                     <li><a href="#disputes" className="text-purple-400 hover:text-purple-300 transition">INTERNAL DISPUTE RESOLUTION</a></li>
                     <li><a href="#account-risks" className="text-purple-400 hover:text-purple-300 transition">ACCOUNT TRANSFER RISKS AND DISCLAIMERS</a></li>
                     <li><a href="#ip" className="text-purple-400 hover:text-purple-300 transition">INTELLECTUAL PROPERTY RIGHTS</a></li>
@@ -112,7 +113,7 @@ export default function TermsOfService() {
                 </p>
               </section>
 
-              {/* Section 2 - NEW: Marketplace Rules */}
+              {/* Section 2 - Marketplace Rules */}
               <section id="marketplace" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">2. MARKETPLACE RULES AND FEES</h2>
                 <div className="bg-purple-900/20 border border-purple-500/20 rounded-xl p-6 mb-4">
@@ -136,7 +137,7 @@ export default function TermsOfService() {
                 </p>
               </section>
 
-              {/* Section 3 - NEW: Buyer Protection */}
+              {/* Section 3 - Buyer Protection */}
               <section id="buyer-protection" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">3. BUYER PROTECTION AND ESCROW</h2>
                 <div className="bg-green-900/20 border border-green-500/20 rounded-xl p-6 mb-4">
@@ -167,13 +168,13 @@ export default function TermsOfService() {
                 <ul className="list-disc list-inside space-y-2 text-gray-300">
                   <li>Buyer&apos;s remorse or change of mind after successful delivery</li>
                   <li>Issues arising after the 48-hour protection period</li>
-                  <li>Account bans or suspensions by game publishers after transfer (see Section 7)</li>
+                  <li>Account bans or suspensions by game publishers after transfer (see Section 8)</li>
                   <li>Loss of items due to buyer&apos;s actions after receiving the account</li>
                   <li>Disputes opened after confirming satisfactory delivery</li>
                 </ul>
               </section>
 
-              {/* Section 4 - NEW: Seller Obligations */}
+              {/* Section 4 - Seller Obligations */}
               <section id="seller-obligations" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">4. SELLER OBLIGATIONS</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
@@ -205,7 +206,7 @@ export default function TermsOfService() {
                 </ul>
               </section>
 
-              {/* Section 5 - NEW: Prohibited Items */}
+              {/* Section 5 - Prohibited Items */}
               <section id="prohibited-items" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">5. PROHIBITED ITEMS AND ACTIVITIES</h2>
                 <div className="bg-red-900/20 border border-red-500/20 rounded-xl p-6 mb-4">
@@ -225,9 +226,79 @@ export default function TermsOfService() {
                 </ul>
               </section>
 
-              {/* Section 6 - NEW: Internal Disputes */}
+              {/* NEW Section 6 - Fraud Prevention and Account Security */}
+              <section id="fraud-prevention" className="mb-10">
+                <h2 className="text-2xl font-bold text-white mb-4">6. FRAUD PREVENTION AND ACCOUNT SECURITY</h2>
+                <div className="bg-red-900/20 border border-red-500/20 rounded-xl p-6 mb-4">
+                  <h3 className="text-xl font-semibold text-white mb-3">🛡️ Automated Security Monitoring</h3>
+                  <p className="text-gray-300 leading-relaxed">
+                    To protect our users and maintain marketplace integrity, we employ automated systems to detect and prevent fraudulent activity. By using our Services, you consent to this security monitoring.
+                  </p>
+                </div>
+
+                <h3 className="text-xl font-semibold text-white mb-3">What We Monitor</h3>
+                <p className="text-gray-300 leading-relaxed mb-4">
+                  Our fraud detection systems analyze the following to identify suspicious activity:
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-gray-300 mb-4">
+                  <li>Login patterns and locations (IP addresses, geographic locations)</li>
+                  <li>Device characteristics and fingerprints</li>
+                  <li>Transaction velocity and patterns</li>
+                  <li>Multiple accounts from the same device or IP address</li>
+                  <li>Dispute ratios and patterns</li>
+                  <li>Payment failure patterns</li>
+                  <li>VPN, proxy, and Tor usage</li>
+                </ul>
+
+                <h3 className="text-xl font-semibold text-white mb-3">Multi-Account Policy</h3>
+                <div className="bg-yellow-900/20 border border-yellow-500/20 rounded-xl p-6 mb-4">
+                  <p className="text-gray-300 leading-relaxed mb-3">
+                    <strong className="text-white">Each user may only operate ONE account on Nashflare.</strong> Operating multiple accounts is strictly prohibited and will result in enforcement action.
+                  </p>
+                  <p className="text-gray-300 leading-relaxed">
+                    Multiple accounts are detected through:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-gray-300 mt-2">
+                    <li>Shared IP addresses</li>
+                    <li>Matching device fingerprints</li>
+                    <li>Similar account patterns</li>
+                    <li>Linked payment methods</li>
+                  </ul>
+                </div>
+
+                <h3 className="text-xl font-semibold text-white mb-3">Prohibited Security-Related Activities</h3>
+                <ul className="list-disc list-inside space-y-2 text-gray-300 mb-4">
+                  <li>Creating multiple accounts for any purpose</li>
+                  <li>Using multiple accounts to manipulate reviews or ratings</li>
+                  <li>Creating new accounts to circumvent bans or restrictions</li>
+                  <li>Using accounts to artificially inflate sales numbers</li>
+                  <li>Engaging in &quot;self-buying&quot; or shill transactions</li>
+                  <li>Sharing accounts with other users</li>
+                  <li>Attempting to mask your identity or device to evade detection</li>
+                </ul>
+
+                <h3 className="text-xl font-semibold text-white mb-3">Consequences of Violations</h3>
+                <p className="text-gray-300 leading-relaxed mb-4">
+                  Accounts flagged for fraudulent activity or policy violations may face the following consequences:
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-gray-300 mb-4">
+                  <li><strong className="text-white">Warning:</strong> For minor first-time violations</li>
+                  <li><strong className="text-white">Temporary Suspension:</strong> Account frozen pending investigation</li>
+                  <li><strong className="text-white">Permanent Ban:</strong> All associated accounts terminated</li>
+                  <li><strong className="text-white">Fund Withholding:</strong> Balances held pending investigation (up to 180 days)</li>
+                  <li><strong className="text-white">Fund Forfeiture:</strong> Balances forfeited in cases of confirmed fraud</li>
+                  <li><strong className="text-white">Legal Action:</strong> Referral to law enforcement for illegal activity</li>
+                </ul>
+
+                <h3 className="text-xl font-semibold text-white mb-3">Appeals Process</h3>
+                <p className="text-gray-300 leading-relaxed">
+                  If you believe your account was incorrectly flagged or suspended, you may appeal by contacting <a href="mailto:contact@nashflare.com" className="text-purple-400 hover:text-purple-300">contact@nashflare.com</a> with the subject line &quot;Account Appeal.&quot; Appeals are reviewed within 5-7 business days. Decisions on appeals are final.
+                </p>
+              </section>
+
+              {/* Section 7 - Internal Disputes */}
               <section id="disputes" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">6. INTERNAL DISPUTE RESOLUTION</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">7. INTERNAL DISPUTE RESOLUTION</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   Nashflare provides an internal dispute resolution system to handle conflicts between buyers and sellers.
                 </p>
@@ -248,9 +319,9 @@ export default function TermsOfService() {
                 </ul>
               </section>
 
-              {/* Section 7 - NEW: Account Risks */}
+              {/* Section 8 - Account Risks */}
               <section id="account-risks" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">7. ACCOUNT TRANSFER RISKS AND DISCLAIMERS</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">8. ACCOUNT TRANSFER RISKS AND DISCLAIMERS</h2>
                 <div className="bg-yellow-900/20 border border-yellow-500/20 rounded-xl p-6 mb-4">
                   <h3 className="text-xl font-semibold text-white mb-3">⚠️ Important Warning</h3>
                   <p className="text-gray-300 leading-relaxed">
@@ -276,17 +347,17 @@ export default function TermsOfService() {
                 </ul>
               </section>
 
-              {/* Section 8 */}
+              {/* Section 9 */}
               <section id="ip" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">8. INTELLECTUAL PROPERTY RIGHTS</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">9. INTELLECTUAL PROPERTY RIGHTS</h2>
                 <p className="text-gray-300 leading-relaxed">
                   We are the owner or the licensee of all intellectual property rights in our Services, including all source code, databases, functionality, software, website designs, audio, video, text, photographs, and graphics in the Services (collectively, the &quot;Content&quot;), as well as the trademarks, service marks, and logos contained therein (the &quot;Marks&quot;). Our Content and Marks are protected by copyright and trademark laws.
                 </p>
               </section>
 
-              {/* Section 9 */}
+              {/* Section 10 */}
               <section id="representations" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">9. USER REPRESENTATIONS</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">10. USER REPRESENTATIONS</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   By using the Services, you represent and warrant that:
                 </p>
@@ -299,20 +370,22 @@ export default function TermsOfService() {
                   <li>Your use of the Services will not violate any applicable law or regulation</li>
                   <li>You have the legal right to sell any items you list on the platform</li>
                   <li>You understand and accept the risks associated with digital gaming product transactions</li>
+                  <li>You will only operate one account on the platform</li>
+                  <li>You consent to our fraud prevention and security monitoring measures</li>
                 </ul>
               </section>
 
-              {/* Section 10 */}
+              {/* Section 11 */}
               <section id="registration" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">10. USER REGISTRATION</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">11. USER REGISTRATION</h2>
                 <p className="text-gray-300 leading-relaxed">
-                  You may be required to register to use the Services. You agree to keep your password confidential and will be responsible for all use of your account and password. We reserve the right to remove, reclaim, or change a username you select if we determine, in our sole discretion, that such username is inappropriate, obscene, or otherwise objectionable.
+                  You may be required to register to use the Services. You agree to keep your password confidential and will be responsible for all use of your account and password. We reserve the right to remove, reclaim, or change a username you select if we determine, in our sole discretion, that such username is inappropriate, obscene, or otherwise objectionable. You agree to maintain only one account and not to create additional accounts for any reason.
                 </p>
               </section>
 
-              {/* Section 11 */}
+              {/* Section 12 */}
               <section id="purchases" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">11. PURCHASES AND PAYMENT</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">12. PURCHASES AND PAYMENT</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   We accept the following forms of payment through our payment processor, Stripe:
                 </p>
@@ -327,9 +400,9 @@ export default function TermsOfService() {
                 </p>
               </section>
 
-              {/* Section 12 - UPDATED */}
+              {/* Section 13 */}
               <section id="refunds" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">12. REFUNDS AND BUYER PROTECTION POLICY</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">13. REFUNDS AND BUYER PROTECTION POLICY</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   Due to the digital nature of products sold on Nashflare, <strong className="text-white">all sales are generally final</strong>. However, buyers are protected under our 48-hour buyer protection policy:
                 </p>
@@ -343,9 +416,9 @@ export default function TermsOfService() {
                 </p>
               </section>
 
-              {/* Section 13 */}
+              {/* Section 14 */}
               <section id="prohibited" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">13. PROHIBITED PLATFORM ACTIVITIES</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">14. PROHIBITED PLATFORM ACTIVITIES</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   As a user of the Services, you agree not to:
                 </p>
@@ -361,20 +434,23 @@ export default function TermsOfService() {
                   <li>Harass, intimidate, or threaten any of our employees or agents</li>
                   <li>Attempt to bypass any measures designed to prevent or restrict access</li>
                   <li>Sell or otherwise transfer your profile</li>
+                  <li>Create or operate multiple accounts</li>
+                  <li>Attempt to evade fraud detection systems</li>
+                  <li>Use VPNs or proxies to mask fraudulent activity</li>
                 </ul>
               </section>
 
-              {/* Section 14 */}
+              {/* Section 15 */}
               <section id="ugc" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">14. USER GENERATED CONTRIBUTIONS</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">15. USER GENERATED CONTRIBUTIONS</h2>
                 <p className="text-gray-300 leading-relaxed">
                   The Services may provide you with the opportunity to create, submit, post, or display content and materials (&quot;Contributions&quot;). Contributions may be viewable by other users and may be treated as non-confidential and non-proprietary. By posting Contributions, you grant us an unrestricted, worldwide license to use, copy, reproduce, disclose, and distribute such Contributions.
                 </p>
               </section>
 
-              {/* Section 15 */}
+              {/* Section 16 */}
               <section id="reviews" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">15. GUIDELINES FOR REVIEWS</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">16. GUIDELINES FOR REVIEWS</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   When posting a review, you must:
                 </p>
@@ -385,44 +461,45 @@ export default function TermsOfService() {
                   <li>Not include references to illegal activity</li>
                   <li>Not post false or misleading statements</li>
                   <li>Not organize campaigns to manipulate reviews</li>
+                  <li>Not use multiple accounts to post fake reviews</li>
                 </ul>
               </section>
 
-              {/* Section 16 */}
-              <section id="privacy" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">16. PRIVACY POLICY</h2>
-                <p className="text-gray-300 leading-relaxed">
-                  We care about data privacy and security. Please review our Privacy Policy: <Link href="/privacy" className="text-purple-400 hover:text-purple-300 transition">https://www.nashflare.com/privacy</Link>. By using the Services, you agree to be bound by our Privacy Policy, which is incorporated into these Legal Terms.
-                </p>
-              </section>
-
               {/* Section 17 */}
-              <section id="term" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">17. TERM AND TERMINATION</h2>
+              <section id="privacy" className="mb-10">
+                <h2 className="text-2xl font-bold text-white mb-4">17. PRIVACY POLICY</h2>
                 <p className="text-gray-300 leading-relaxed">
-                  These Legal Terms shall remain in full force and effect while you use the Services. WE RESERVE THE RIGHT TO, IN OUR SOLE DISCRETION AND WITHOUT NOTICE OR LIABILITY, DENY ACCESS TO AND USE OF THE SERVICES TO ANY PERSON FOR ANY REASON. If we terminate or suspend your account for any reason, you are prohibited from registering and creating a new account under your name, a fake or borrowed name, or the name of any third party.
+                  We care about data privacy and security. Please review our Privacy Policy: <Link href="/privacy" className="text-purple-400 hover:text-purple-300 transition">https://www.nashflare.com/privacy</Link>. By using the Services, you agree to be bound by our Privacy Policy, which is incorporated into these Legal Terms. This includes our collection of security-related data for fraud prevention purposes.
                 </p>
               </section>
 
               {/* Section 18 */}
+              <section id="term" className="mb-10">
+                <h2 className="text-2xl font-bold text-white mb-4">18. TERM AND TERMINATION</h2>
+                <p className="text-gray-300 leading-relaxed">
+                  These Legal Terms shall remain in full force and effect while you use the Services. WE RESERVE THE RIGHT TO, IN OUR SOLE DISCRETION AND WITHOUT NOTICE OR LIABILITY, DENY ACCESS TO AND USE OF THE SERVICES TO ANY PERSON FOR ANY REASON, INCLUDING FOR VIOLATION OF OUR FRAUD PREVENTION POLICIES OR MULTI-ACCOUNT POLICY. If we terminate or suspend your account for any reason, you are prohibited from registering and creating a new account under your name, a fake or borrowed name, or the name of any third party.
+                </p>
+              </section>
+
+              {/* Section 19 */}
               <section id="modifications" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">18. MODIFICATIONS AND INTERRUPTIONS</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">19. MODIFICATIONS AND INTERRUPTIONS</h2>
                 <p className="text-gray-300 leading-relaxed">
                   We reserve the right to change, modify, or remove the contents of the Services at any time or for any reason at our sole discretion without notice. We cannot guarantee the Services will be available at all times. We may experience hardware, software, or other problems or need to perform maintenance related to the Services, resulting in interruptions, delays, or errors.
                 </p>
               </section>
 
-              {/* Section 19 */}
+              {/* Section 20 */}
               <section id="governing" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">19. GOVERNING LAW</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">20. GOVERNING LAW</h2>
                 <p className="text-gray-300 leading-relaxed">
                   These Legal Terms and your use of the Services are governed by and construed in accordance with the laws of the State of Florida applicable to agreements made and to be entirely performed within the State of Florida, without regard to its conflict of law principles.
                 </p>
               </section>
 
-              {/* Section 20 - UPDATED with filled blanks */}
+              {/* Section 21 */}
               <section id="legal-dispute" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">20. LEGAL DISPUTE RESOLUTION</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">21. LEGAL DISPUTE RESOLUTION</h2>
                 <h3 className="text-xl font-semibold text-white mb-3">Informal Negotiations</h3>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   The Parties agree to first attempt to negotiate any Dispute informally for at least <strong className="text-white">thirty (30) days</strong> before initiating arbitration.
@@ -437,9 +514,9 @@ export default function TermsOfService() {
                 </p>
               </section>
 
-              {/* Section 21 */}
+              {/* Section 22 */}
               <section id="disclaimer" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">21. DISCLAIMER</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">22. DISCLAIMER</h2>
                 <div className="bg-red-900/20 border border-red-500/20 rounded-xl p-6">
                   <p className="text-gray-300 leading-relaxed">
                     THE SERVICES ARE PROVIDED ON AN AS-IS AND AS-AVAILABLE BASIS. YOU AGREE THAT YOUR USE OF THE SERVICES WILL BE AT YOUR SOLE RISK. TO THE FULLEST EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED. WE MAKE NO WARRANTIES ABOUT THE ACCURACY OR COMPLETENESS OF THE SERVICES&apos; CONTENT AND WE WILL ASSUME NO LIABILITY FOR ANY ERRORS, MISTAKES, OR INACCURACIES OF CONTENT AND MATERIALS.
@@ -447,9 +524,9 @@ export default function TermsOfService() {
                 </div>
               </section>
 
-              {/* Section 22 */}
+              {/* Section 23 */}
               <section id="liability" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">22. LIMITATIONS OF LIABILITY</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">23. LIMITATIONS OF LIABILITY</h2>
                 <div className="bg-red-900/20 border border-red-500/20 rounded-xl p-6">
                   <p className="text-gray-300 leading-relaxed">
                     IN NO EVENT WILL WE OR OUR DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE TO YOU OR ANY THIRD PARTY FOR ANY DIRECT, INDIRECT, CONSEQUENTIAL, EXEMPLARY, INCIDENTAL, SPECIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFIT, LOST REVENUE, LOSS OF DATA, OR OTHER DAMAGES ARISING FROM YOUR USE OF THE SERVICES. OUR LIABILITY WILL BE LIMITED TO THE AMOUNT PAID BY YOU TO US DURING THE SIX (6) MONTH PERIOD PRIOR TO ANY CAUSE OF ACTION ARISING.
@@ -457,49 +534,49 @@ export default function TermsOfService() {
                 </div>
               </section>
 
-              {/* Section 23 */}
+              {/* Section 24 */}
               <section id="indemnification" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">23. INDEMNIFICATION</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">24. INDEMNIFICATION</h2>
                 <p className="text-gray-300 leading-relaxed">
                   You agree to defend, indemnify, and hold us harmless, including our subsidiaries, affiliates, and all of our respective officers, agents, partners, and employees, from and against any loss, damage, liability, claim, or demand, including reasonable attorneys&apos; fees and expenses, made by any third party due to or arising out of: your Contributions, use of the Services, breach of these Legal Terms, your violation of the rights of a third party, or any harmful act toward any other user.
                 </p>
               </section>
 
-              {/* Section 24 */}
-              <section id="userdata" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">24. USER DATA</h2>
-                <p className="text-gray-300 leading-relaxed">
-                  We will maintain certain data that you transmit to the Services for the purpose of managing the performance of the Services. Although we perform regular routine backups of data, you are solely responsible for all data that you transmit or that relates to any activity you have undertaken using the Services.
-                </p>
-              </section>
-
               {/* Section 25 */}
-              <section id="electronic" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">25. ELECTRONIC COMMUNICATIONS</h2>
+              <section id="userdata" className="mb-10">
+                <h2 className="text-2xl font-bold text-white mb-4">25. USER DATA</h2>
                 <p className="text-gray-300 leading-relaxed">
-                  Visiting the Services, sending us emails, and completing online forms constitute electronic communications. You consent to receive electronic communications, and you agree that all agreements, notices, disclosures, and other communications we provide to you electronically satisfy any legal requirement that such communication be in writing.
+                  We will maintain certain data that you transmit to the Services for the purpose of managing the performance of the Services. Although we perform regular routine backups of data, you are solely responsible for all data that you transmit or that relates to any activity you have undertaken using the Services. This includes security-related data collected for fraud prevention purposes as described in our Privacy Policy.
                 </p>
               </section>
 
               {/* Section 26 */}
+              <section id="electronic" className="mb-10">
+                <h2 className="text-2xl font-bold text-white mb-4">26. ELECTRONIC COMMUNICATIONS</h2>
+                <p className="text-gray-300 leading-relaxed">
+                  Visiting the Services, sending us emails, and completing online forms constitute electronic communications. You consent to receive electronic communications, and you agree that all agreements, notices, disclosures, and other communications we provide to you electronically satisfy any legal requirement that such communication be in writing. This includes notifications about account security, fraud alerts, and policy violations.
+                </p>
+              </section>
+
+              {/* Section 27 */}
               <section id="california" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">26. CALIFORNIA USERS AND RESIDENTS</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">27. CALIFORNIA USERS AND RESIDENTS</h2>
                 <p className="text-gray-300 leading-relaxed">
                   If any complaint with us is not satisfactorily resolved, you can contact the Complaint Assistance Unit of the Division of Consumer Services of the California Department of Consumer Affairs in writing at 1625 North Market Blvd., Suite N 112, Sacramento, California 95834 or by telephone at (800) 952-5210 or (916) 445-1254.
                 </p>
               </section>
 
-              {/* Section 27 */}
+              {/* Section 28 */}
               <section id="miscellaneous" className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">27. MISCELLANEOUS</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">28. MISCELLANEOUS</h2>
                 <p className="text-gray-300 leading-relaxed">
                   These Legal Terms and any policies or operating rules posted by us on the Services constitute the entire agreement and understanding between you and us. Our failure to exercise or enforce any right or provision of these Legal Terms shall not operate as a waiver of such right or provision. If any provision or part of a provision of these Legal Terms is determined to be unlawful, void, or unenforceable, that provision is deemed severable from these Legal Terms and does not affect the validity and enforceability of any remaining provisions.
                 </p>
               </section>
 
-              {/* Section 28 */}
+              {/* Section 29 */}
               <section id="contact" className="mb-6">
-                <h2 className="text-2xl font-bold text-white mb-4">28. CONTACT US</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">29. CONTACT US</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   In order to resolve a complaint regarding the Services or to receive further information regarding use of the Services, please contact us at:
                 </p>

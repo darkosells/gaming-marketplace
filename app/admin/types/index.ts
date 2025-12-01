@@ -52,6 +52,15 @@ export interface AdminUser {
   created_at: string
   verified?: boolean
   vendor_since?: string
+  // Risk & fraud detection fields
+  risk_score?: number
+  risk_level?: 'low' | 'medium' | 'high' | 'critical'
+  is_high_risk?: boolean
+  fraud_flags_count?: number
+  last_fraud_check?: string
+  signup_ip?: string
+  last_ip?: string
+  account_flags?: string[]
 }
 
 export interface AdminListing {

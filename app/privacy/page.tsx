@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Privacy Policy</h1>
-            <p className="text-gray-400">Last updated November 16, 2025</p>
+            <p className="text-gray-400">Last updated November 30, 2025</p>
           </div>
 
           {/* Main Content Card */}
@@ -108,7 +108,7 @@ export default function PrivacyPolicy() {
                 </div>
               </section>
 
-              {/* Section 1 - UPDATED */}
+              {/* Section 1 - WHAT INFORMATION DO WE COLLECT */}
               <section id="collect" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">1. WHAT INFORMATION DO WE COLLECT?</h2>
                 <h3 className="text-xl font-semibold text-white mb-3">Personal information you disclose to us</h3>
@@ -161,6 +161,29 @@ export default function PrivacyPolicy() {
                   </p>
                 </div>
 
+                {/* NEW: Security & Fraud Prevention Data */}
+                <div className="bg-red-900/20 border border-red-500/20 rounded-xl p-6 mb-4">
+                  <h4 className="text-lg font-semibold text-white mb-3">🛡️ Security &amp; Fraud Prevention Data</h4>
+                  <p className="text-gray-300 leading-relaxed mb-3">
+                    To protect our users and prevent fraudulent activity on our platform, we automatically collect the following information:
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-gray-300">
+                    <li><strong className="text-white">IP Address:</strong> Collected at signup and each login to detect suspicious activity and approximate geographic location</li>
+                    <li><strong className="text-white">Approximate Location:</strong> Country, region, and city derived from your IP address (we do not use GPS or precise location)</li>
+                    <li><strong className="text-white">Device Information:</strong> Browser type and version, operating system, screen resolution, language preferences, and timezone</li>
+                    <li><strong className="text-white">Device Fingerprint:</strong> A non-personally-identifiable hash generated from your browser and device characteristics, used to detect multiple accounts or unauthorized access</li>
+                    <li><strong className="text-white">Session Data:</strong> Login timestamps, session duration, and pages visited</li>
+                    <li><strong className="text-white">Referral Source:</strong> The website or link that directed you to our platform</li>
+                    <li><strong className="text-white">Network Indicators:</strong> Detection of VPN, proxy, or Tor usage for security purposes</li>
+                  </ul>
+                  <p className="text-gray-300 leading-relaxed mt-4">
+                    <strong className="text-white">Purpose:</strong> This data is used solely for fraud prevention, detecting unauthorized account access, identifying suspicious patterns, protecting our marketplace from abuse, and ensuring compliance with our Terms of Service. We do not sell this information or use it for advertising purposes.
+                  </p>
+                  <p className="text-gray-300 leading-relaxed mt-2">
+                    <strong className="text-white">Legal Basis:</strong> We collect this data under our legitimate interest in preventing fraud and protecting our users (GDPR Article 6(1)(f)).
+                  </p>
+                </div>
+
                 <p className="text-gray-300 leading-relaxed mb-4">
                   <strong className="text-white">Sensitive Information.</strong> We do not process sensitive personal information such as racial or ethnic origins, sexual orientation, or religious beliefs. However, government-issued IDs collected for vendor verification are handled with additional security measures.
                 </p>
@@ -178,7 +201,7 @@ export default function PrivacyPolicy() {
                 </p>
               </section>
 
-              {/* Section 2 */}
+              {/* Section 2 - HOW DO WE PROCESS YOUR INFORMATION */}
               <section id="process" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">2. HOW DO WE PROCESS YOUR INFORMATION?</h2>
                 <p className="text-gray-400 italic mb-4">In Short: We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law.</p>
@@ -198,10 +221,15 @@ export default function PrivacyPolicy() {
                   <li><strong className="text-white">To process vendor withdrawals</strong> and manage platform commission fees.</li>
                   <li><strong className="text-white">To identify usage trends</strong> and improve our Services.</li>
                   <li><strong className="text-white">To save or protect an individual&apos;s vital interest.</strong></li>
+                  {/* NEW: Fraud prevention processing */}
+                  <li><strong className="text-white">To prevent fraud and abuse</strong> by analyzing login patterns, detecting multiple accounts from the same device or IP address, and identifying suspicious behavioral patterns.</li>
+                  <li><strong className="text-white">To calculate risk assessments</strong> for accounts based on behavioral patterns to protect buyers and sellers from fraudulent transactions.</li>
+                  <li><strong className="text-white">To detect related accounts</strong> that may share the same IP address or device fingerprint to prevent marketplace manipulation, fake reviews, and ban evasion.</li>
+                  <li><strong className="text-white">To monitor for unauthorized access</strong> by detecting unusual login locations or devices that may indicate account compromise.</li>
                 </ul>
               </section>
 
-              {/* Section 3 - UPDATED */}
+              {/* Section 3 - WHEN AND WITH WHOM DO WE SHARE */}
               <section id="share" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">3. WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?</h2>
                 <p className="text-gray-400 italic mb-4">In Short: We may share information in specific situations described in this section and/or with the following third parties.</p>
@@ -217,7 +245,7 @@ export default function PrivacyPolicy() {
                   <ul className="list-disc list-inside space-y-2 text-gray-300">
                     <li><strong className="text-white">Visible to Buyers:</strong> Seller username, profile avatar, seller rating, total sales, verification status, member since date</li>
                     <li><strong className="text-white">Visible to Sellers:</strong> Buyer username, order details, delivery address (if applicable)</li>
-                    <li><strong className="text-white">NOT Shared:</strong> Email addresses, phone numbers, real names (unless voluntarily shared in messages), payment details</li>
+                    <li><strong className="text-white">NOT Shared:</strong> Email addresses, phone numbers, real names (unless voluntarily shared in messages), payment details, IP addresses, device information</li>
                   </ul>
                 </div>
 
@@ -226,10 +254,11 @@ export default function PrivacyPolicy() {
                   <li><strong className="text-white">Other Users.</strong> When you share personal information through messages or otherwise interact with public areas of the Services, such information may be viewed by other users and may be publicly made available outside the Services.</li>
                   <li><strong className="text-white">Third-Party Service Providers.</strong> We share data with service providers who assist us in operating our platform (see Section 4).</li>
                   <li><strong className="text-white">Legal Requirements.</strong> We may disclose information where required to do so by law or in response to valid requests by public authorities.</li>
+                  <li><strong className="text-white">Fraud Prevention.</strong> We may share information with law enforcement or other parties when we believe in good faith that disclosure is necessary to prevent fraud, investigate violations of our Terms of Service, or protect the rights and safety of our users.</li>
                 </ul>
               </section>
 
-              {/* Section 4 - NEW */}
+              {/* Section 4 - THIRD-PARTY SERVICES */}
               <section id="third-party" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">4. THIRD-PARTY SERVICES WE USE</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
@@ -287,10 +316,25 @@ export default function PrivacyPolicy() {
                       View Vercel Privacy Policy →
                     </a>
                   </div>
+
+                  <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5">
+                    <h4 className="text-lg font-semibold text-white mb-2">IP Geolocation Services</h4>
+                    <p className="text-gray-300 text-sm mb-2">
+                      We use IP geolocation services to determine approximate location from IP addresses for fraud prevention:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-300 text-sm mb-2">
+                      <li>Country, region, and city detection</li>
+                      <li>Timezone identification</li>
+                      <li>VPN/proxy detection</li>
+                    </ul>
+                    <p className="text-gray-300 text-sm">
+                      <strong className="text-white">Note:</strong> This data is used solely for security purposes and is not shared with third parties.
+                    </p>
+                  </div>
                 </div>
               </section>
 
-              {/* Section 5 */}
+              {/* Section 5 - COOKIES */}
               <section id="cookies" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">5. DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?</h2>
                 <p className="text-gray-400 italic mb-4">In Short: We primarily use localStorage rather than traditional cookies.</p>
@@ -307,7 +351,7 @@ export default function PrivacyPolicy() {
                 </p>
               </section>
 
-              {/* Section 6 - UPDATED with specific retention periods */}
+              {/* Section 6 - DATA RETENTION */}
               <section id="retain" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">6. HOW LONG DO WE KEEP YOUR INFORMATION?</h2>
                 <p className="text-gray-400 italic mb-4">In Short: We keep your information for as long as necessary to fulfill the purposes outlined in this Privacy Notice unless otherwise required by law.</p>
@@ -336,6 +380,22 @@ export default function PrivacyPolicy() {
                     <li>
                       <strong className="text-white">Server Logs:</strong> <strong>90 days</strong> (rolling deletion)
                     </li>
+                    {/* NEW: Security data retention */}
+                    <li>
+                      <strong className="text-white">Login/Session History:</strong> <strong>12 months</strong> (rolling deletion)
+                    </li>
+                    <li>
+                      <strong className="text-white">IP Addresses:</strong> <strong>12 months</strong> after collection
+                    </li>
+                    <li>
+                      <strong className="text-white">Device Fingerprints:</strong> <strong>12 months</strong> after last login
+                    </li>
+                    <li>
+                      <strong className="text-white">Fraud Flags &amp; Risk Assessments:</strong> <strong>5 years</strong> after account deletion (legal compliance)
+                    </li>
+                    <li>
+                      <strong className="text-white">Related Account Records:</strong> <strong>5 years</strong> after detection
+                    </li>
                   </ul>
                 </div>
 
@@ -344,7 +404,7 @@ export default function PrivacyPolicy() {
                 </p>
               </section>
 
-              {/* Section 7 */}
+              {/* Section 7 - SECURITY */}
               <section id="safe" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">7. HOW DO WE KEEP YOUR INFORMATION SAFE?</h2>
                 <p className="text-gray-400 italic mb-4">In Short: We aim to protect your personal information through a system of organizational and technical security measures.</p>
@@ -358,13 +418,15 @@ export default function PrivacyPolicy() {
                   <li><strong className="text-white">HTTPS Encryption:</strong> All data in transit is encrypted using TLS</li>
                   <li><strong className="text-white">Payment Security:</strong> PCI DSS compliant payment processing through Stripe</li>
                   <li><strong className="text-white">Access Controls:</strong> Administrative access is limited and logged</li>
+                  <li><strong className="text-white">Fraud Detection:</strong> Automated systems monitor for suspicious activity patterns</li>
+                  <li><strong className="text-white">Audit Logging:</strong> Administrative actions are logged for accountability</li>
                 </ul>
                 <p className="text-gray-300 leading-relaxed">
                   However, despite our safeguards and efforts to secure your information, no electronic transmission over the Internet or information storage technology can be guaranteed to be 100% secure, so we cannot promise or guarantee that hackers, cybercriminals, or other unauthorized third parties will not be able to defeat our security and improperly collect, access, steal, or modify your information.
                 </p>
               </section>
 
-              {/* Section 8 */}
+              {/* Section 8 - MINORS */}
               <section id="minors" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">8. DO WE COLLECT INFORMATION FROM MINORS?</h2>
                 <p className="text-gray-400 italic mb-4">In Short: We do not knowingly collect data from or market to children under 18 years of age.</p>
@@ -373,7 +435,7 @@ export default function PrivacyPolicy() {
                 </p>
               </section>
 
-              {/* Section 9 */}
+              {/* Section 9 - PRIVACY RIGHTS */}
               <section id="rights" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">9. WHAT ARE YOUR PRIVACY RIGHTS?</h2>
                 <p className="text-gray-400 italic mb-4">In Short: You may review, change, or terminate your account at any time.</p>
@@ -388,12 +450,27 @@ export default function PrivacyPolicy() {
                 <p className="text-gray-300 leading-relaxed mb-4">
                   Upon your request to terminate your account, we will deactivate or delete your account and information from our active databases. However, we may retain some information in our files to prevent fraud, troubleshoot problems, assist with any investigations, enforce our legal terms and/or comply with applicable legal requirements (see Section 6 for retention periods).
                 </p>
+
+                <h3 className="text-xl font-semibold text-white mb-3">Security Data Rights</h3>
+                <p className="text-gray-300 leading-relaxed mb-4">
+                  You may request access to the security data we have collected about you, including:
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-gray-300 mb-4">
+                  <li>Your login history and associated IP addresses</li>
+                  <li>Device fingerprints associated with your account</li>
+                  <li>Any fraud flags or risk assessments on your account</li>
+                  <li>Related account detections</li>
+                </ul>
+                <p className="text-gray-300 leading-relaxed mb-4">
+                  To request this information, contact us at <a href="mailto:contact@nashflare.com" className="text-purple-400 hover:text-purple-300">contact@nashflare.com</a>.
+                </p>
+
                 <p className="text-gray-300 leading-relaxed">
                   <strong className="text-white">Cookies and similar technologies:</strong> You can set your browser to remove cookies and localStorage data. If you choose to remove this data, you may be logged out and your cart will be cleared.
                 </p>
               </section>
 
-              {/* Section 10 */}
+              {/* Section 10 - DNT */}
               <section id="dnt" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">10. CONTROLS FOR DO-NOT-TRACK FEATURES</h2>
                 <p className="text-gray-300 leading-relaxed">
@@ -401,7 +478,7 @@ export default function PrivacyPolicy() {
                 </p>
               </section>
 
-              {/* Section 11 */}
+              {/* Section 11 - US RESIDENTS */}
               <section id="us" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">11. DO UNITED STATES RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS?</h2>
                 <p className="text-gray-400 italic mb-4">In Short: If you are a resident of California, Colorado, Connecticut, Delaware, Florida, Indiana, Iowa, Kentucky, Minnesota, Montana, Nebraska, New Hampshire, New Jersey, Oregon, Tennessee, Texas, Utah, or Virginia, you may have specific rights regarding your personal information.</p>
@@ -426,7 +503,7 @@ export default function PrivacyPolicy() {
                 </p>
               </section>
 
-              {/* Section 12 */}
+              {/* Section 12 - UPDATES */}
               <section id="updates" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">12. DO WE MAKE UPDATES TO THIS NOTICE?</h2>
                 <p className="text-gray-400 italic mb-4">In Short: Yes, we will update this notice as necessary to stay compliant with relevant laws.</p>
@@ -435,7 +512,7 @@ export default function PrivacyPolicy() {
                 </p>
               </section>
 
-              {/* Section 13 */}
+              {/* Section 13 - CONTACT */}
               <section id="contact" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">13. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
@@ -450,7 +527,7 @@ export default function PrivacyPolicy() {
                 </div>
               </section>
 
-              {/* Section 14 */}
+              {/* Section 14 - REVIEW/UPDATE/DELETE */}
               <section id="review" className="mb-6">
                 <h2 className="text-2xl font-bold text-white mb-4">14. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?</h2>
                 <p className="text-gray-300 leading-relaxed">

@@ -37,7 +37,7 @@ export default function CookiePolicy() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Cookie Policy</h1>
-            <p className="text-gray-400">Last updated November 26, 2024</p>
+            <p className="text-gray-400">Last updated November 30, 2025</p>
           </div>
 
           {/* Main Content Card */}
@@ -73,7 +73,7 @@ export default function CookiePolicy() {
               <section className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">What We Store and Why</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
-                  We use local storage for the following essential purposes:
+                  We use local storage and server-side storage for the following purposes:
                 </p>
 
                 {/* Auth Storage */}
@@ -118,7 +118,7 @@ export default function CookiePolicy() {
                 </div>
 
                 {/* Preferences Storage */}
-                <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5">
+                <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5 mb-6">
                   <h3 className="text-xl font-semibold text-white mb-3">3. User Preferences</h3>
                   <div className="space-y-3">
                     <p className="text-gray-300">
@@ -132,6 +132,39 @@ export default function CookiePolicy() {
                     </p>
                     <p className="text-gray-300">
                       <strong className="text-purple-400">Type:</strong> Functional - Enhances user experience.
+                    </p>
+                  </div>
+                </div>
+
+                {/* NEW: Security & Fraud Prevention Data */}
+                <div className="bg-red-900/20 rounded-xl p-6 border border-red-500/30 mb-6">
+                  <h3 className="text-xl font-semibold text-white mb-3">4. 🛡️ Security &amp; Fraud Prevention Data</h3>
+                  <div className="space-y-3">
+                    <p className="text-gray-300">
+                      <strong className="text-purple-400">Purpose:</strong> To protect our platform and users from fraud, unauthorized access, and abuse, we collect and store certain security-related information on our servers.
+                    </p>
+                    <p className="text-gray-300">
+                      <strong className="text-purple-400">Data Collected:</strong>
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                      <li><strong className="text-white">IP Address:</strong> Your public IP address at signup and each login</li>
+                      <li><strong className="text-white">Device Fingerprint:</strong> A non-personally-identifiable hash generated from your browser characteristics (screen size, timezone, language, etc.)</li>
+                      <li><strong className="text-white">Approximate Location:</strong> Country and city derived from your IP address</li>
+                      <li><strong className="text-white">Login Timestamps:</strong> When you sign in to your account</li>
+                      <li><strong className="text-white">Browser/Device Info:</strong> Browser name, operating system, device type</li>
+                      <li><strong className="text-white">Network Indicators:</strong> VPN, proxy, or Tor detection</li>
+                    </ul>
+                    <p className="text-gray-300 mt-3">
+                      <strong className="text-purple-400">Storage Location:</strong> This data is stored on our servers (Supabase), <strong>not</strong> in your browser&apos;s local storage or cookies.
+                    </p>
+                    <p className="text-gray-300">
+                      <strong className="text-purple-400">Duration:</strong> 12 months from collection date (see our <Link href="/privacy" className="text-purple-400 hover:text-purple-300">Privacy Policy</Link> for full retention periods).
+                    </p>
+                    <p className="text-gray-300">
+                      <strong className="text-purple-400">Type:</strong> <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-sm">Strictly Necessary</span> - Required for platform security and fraud prevention.
+                    </p>
+                    <p className="text-gray-300 mt-3">
+                      <strong className="text-purple-400">What is a Device Fingerprint?</strong> A device fingerprint is a unique identifier created by combining non-personal browser characteristics (like screen resolution, timezone, and language settings) into a hash. It does not contain your name, email, or other personal information. It helps us detect when the same device is used to create multiple accounts or when an unauthorized person tries to access your account from a new device.
                     </p>
                   </div>
                 </div>
@@ -163,6 +196,13 @@ export default function CookiePolicy() {
                     <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
                       View Stripe Privacy Policy →
                     </a>
+                  </div>
+
+                  <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5">
+                    <h3 className="text-lg font-semibold text-white mb-2">IP Geolocation Services</h3>
+                    <p className="text-gray-300 text-sm mb-2">
+                      We use IP geolocation APIs to determine your approximate location from your IP address. This is used for fraud detection (e.g., detecting logins from unusual locations). No cookies are stored by these services.
+                    </p>
                   </div>
                 </div>
               </section>
@@ -203,6 +243,16 @@ export default function CookiePolicy() {
                   </div>
 
                   <div>
+                    <h3 className="text-xl font-semibold text-white mb-3">Security Data</h3>
+                    <p className="text-gray-300 leading-relaxed mb-4">
+                      Security and fraud prevention data (IP addresses, device fingerprints, login history) is stored on our servers, not in your browser. This data cannot be cleared through browser settings. To request deletion of this data, please contact us at <a href="mailto:contact@nashflare.com" className="text-purple-400 hover:text-purple-300">contact@nashflare.com</a>.
+                    </p>
+                    <p className="text-gray-300 leading-relaxed">
+                      <strong className="text-white">Note:</strong> Some security data may be retained for legal compliance even after your request, as outlined in our <Link href="/privacy" className="text-purple-400 hover:text-purple-300">Privacy Policy</Link>.
+                    </p>
+                  </div>
+
+                  <div>
                     <h3 className="text-xl font-semibold text-white mb-3">Impact of Disabling Storage</h3>
                     <p className="text-gray-300 leading-relaxed">
                       Please note that if you disable cookies or clear local storage, you may experience the following:
@@ -236,6 +286,17 @@ export default function CookiePolicy() {
                         </td>
                         <td className="border border-white/10 p-4 text-gray-300">
                           Authentication, security, and core site functionality
+                        </td>
+                        <td className="border border-white/10 p-4 text-gray-300">
+                          <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-sm">Yes</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-white/10 p-4 text-gray-300">
+                          <strong className="text-white">Security</strong>
+                        </td>
+                        <td className="border border-white/10 p-4 text-gray-300">
+                          Fraud prevention, risk assessment, abuse detection, multi-account detection
                         </td>
                         <td className="border border-white/10 p-4 text-gray-300">
                           <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-sm">Yes</span>
@@ -311,7 +372,7 @@ export default function CookiePolicy() {
       <footer className="relative z-10 bg-slate-950/80 border-t border-white/5 py-8 mt-12">
         <div className="container mx-auto px-4 text-center">
           <p className="text-gray-500 text-sm">
-            &copy; 2024 Nashflare. All rights reserved.
+            © 2025 Nashflare. All rights reserved.
           </p>
           <div className="flex justify-center space-x-6 mt-4">
             <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition">Terms of Service</Link>

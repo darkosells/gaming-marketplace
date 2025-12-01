@@ -614,6 +614,7 @@ export default function AdminDashboard() {
                 selectedItems={selectedItems}
                 isExporting={isExporting}
                 canExportData={canExportData}
+                currentAdminId={user?.id || ''}
                 onSelectItem={handleSelectItem}
                 onSelectAll={handleSelectAll}
                 onBanUser={actions.handleBanUser}
