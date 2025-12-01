@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import type { Profile, Listing, Order, Withdrawal, InventoryStats } from '../types'
@@ -10,13 +10,9 @@ export function useVendorData() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Data states
   const [myListings, setMyListings] = useState<Listing[]>([])
   const [myOrders, setMyOrders] = useState<Order[]>([])
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
-
-  // Inventory stats
   const [inventoryStats, setInventoryStats] = useState<InventoryStats>({
     lowStock: [],
     outOfStock: [],
@@ -33,7 +29,6 @@ export function useVendorData() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Fetch my listings
   const fetchMyListings = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -54,7 +49,6 @@ export function useVendorData() {
     }
   }, [supabase])
 
-  // Fetch my orders
   const fetchMyOrders = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -72,7 +66,7 @@ export function useVendorData() {
         console.error('Fetch orders error:', error)
         return
       }
-
+      
       const mappedOrders = (data || []).map(order => ({
         ...order,
         listing: {
@@ -89,7 +83,6 @@ export function useVendorData() {
     }
   }, [supabase])
 
-  // Fetch withdrawals
   const fetchWithdrawals = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -109,8 +102,9 @@ export function useVendorData() {
     }
   }, [supabase])
 
-  // Calculate inventory stats
   const calculateInventoryStats = useCallback(() => {
+    if (myListings.length === 0) return
+
     const lowStock = myListings.filter(l => l.stock > 0 && l.stock < 5 && l.status === 'active')
     const outOfStock = myListings.filter(l => l.stock === 0 || l.status === 'out_of_stock')
     const overstocked = myListings.filter(l => l.stock > 50 && l.status === 'active')
@@ -146,7 +140,6 @@ export function useVendorData() {
     })
   }, [myListings, myOrders])
 
-  // Check user and load all data
   const checkUser = useCallback(async () => {
     try {
       const authPromise = supabase.auth.getUser()
@@ -213,19 +206,15 @@ export function useVendorData() {
     }
   }, [supabase, router, fetchMyListings, fetchMyOrders, fetchWithdrawals])
 
-  // Initial load
   useEffect(() => {
     checkUser()
-  }, [])
+  }, [checkUser])
 
-  // Calculate inventory stats when data changes
   useEffect(() => {
-    if (myListings.length > 0) {
-      calculateInventoryStats()
-    }
+    calculateInventoryStats()
   }, [myListings, myOrders, calculateInventoryStats])
 
-  // Computed values
+  // Derived values
   const activeListings = myListings.filter(l => l.status === 'active')
   const completedOrders = myOrders.filter(o => o.status === 'completed')
   const grossRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(o.amount), 0)
@@ -241,29 +230,18 @@ export function useVendorData() {
     o.status === 'dispute_raised'
   )
   const pendingEarnings = pendingOrders.reduce((sum, o) => sum + (parseFloat(o.amount) * 0.95), 0)
-
-  // Get unique games from listings
   const uniqueGames = Array.from(new Set(myListings.map(l => l.game))).sort()
-
-  // Get unique games from orders
-  const uniqueOrderGames = Array.from(
-    new Set(myOrders.map(o => o.listing?.game || o.listing_game).filter(Boolean))
-  ).sort() as string[]
+  const uniqueOrderGames = Array.from(new Set(myOrders.map(o => o.listing?.game || o.listing_game).filter((g): g is string => Boolean(g)))).sort()
 
   return {
-    // Auth & Profile
     user,
     profile,
     loading,
     error,
-    
-    // Data
     myListings,
     myOrders,
     withdrawals,
     inventoryStats,
-    
-    // Computed values
     activeListings,
     completedOrders,
     grossRevenue,
@@ -275,13 +253,9 @@ export function useVendorData() {
     pendingEarnings,
     uniqueGames,
     uniqueOrderGames,
-    
-    // Actions
     fetchMyListings,
     fetchMyOrders,
     fetchWithdrawals,
-    
-    // Supabase client for actions
     supabase
   }
 }

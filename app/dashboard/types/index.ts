@@ -1,5 +1,9 @@
 // Vendor Dashboard Types
 
+export type VendorTab = 'listings' | 'orders' | 'balance' | 'inventory' | 'guide'
+export type InventoryFilter = 'all' | 'low' | 'out' | 'over'
+export type InventorySort = 'stock' | 'value' | 'usage'
+
 export interface Profile {
   id: string
   username: string
@@ -62,8 +66,10 @@ export interface Withdrawal {
   fee_total: number
   net_amount: number
   status: 'pending' | 'processing' | 'completed' | 'rejected'
+  reference_number: string
+  rejection_reason?: string
+  processed_at?: string
   created_at: string
-  updated_at: string
 }
 
 export interface InventoryStats {
@@ -86,11 +92,8 @@ export interface WithdrawalFees {
   netAmount: number
 }
 
-// Tab types
-export type VendorTab = 'listings' | 'orders' | 'balance' | 'inventory'
-
-// Filter types for listings
-export interface ListingFilters {
+// Filter state types
+export interface ListingFilterState {
   searchQuery: string
   filterGame: string
   filterCategory: string
@@ -100,69 +103,31 @@ export interface ListingFilters {
   filterPriceMax: string
   filterDateRange: string
   sortBy: string
+  showFilters: boolean
 }
 
-// Filter types for orders
-export interface OrderFilters {
-  searchQuery: string
-  filterStatus: string
-  filterGame: string
-  filterDeliveryType: string
-  filterPriceMin: string
-  filterPriceMax: string
-  filterDateFrom: string
-  filterDateTo: string
-  sortBy: string
+export interface OrderFilterState {
+  orderSearchQuery: string
+  orderFilterStatus: string
+  orderFilterGame: string
+  orderFilterDeliveryType: string
+  orderFilterPriceMin: string
+  orderFilterPriceMax: string
+  orderFilterDateFrom: string
+  orderFilterDateTo: string
+  orderSortBy: string
+  showOrderFilters: boolean
 }
 
 // Bulk action types
-export type BulkActionType = 'status' | 'category' | 'price' | 'delete' | 'export' | ''
-
-// Inventory filter types
-export type InventoryFilter = 'all' | 'low' | 'out' | 'over'
-export type InventorySort = 'stock' | 'value' | 'usage'
-
-// Constants
-export const LISTING_CATEGORIES = [
-  { value: 'account', label: 'Accounts' },
-  { value: 'currency', label: 'Currency' },
-  { value: 'key', label: 'Keys' }
-] as const
-
-export const LISTING_STATUSES = [
-  { value: 'active', label: 'Active' },
-  { value: 'out_of_stock', label: 'Out of Stock' },
-  { value: 'draft', label: 'Draft' }
-] as const
-
-export const ORDER_STATUSES = [
-  { value: 'paid', label: 'Paid' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'dispute_raised', label: 'Dispute' },
-  { value: 'refunded', label: 'Refunded' },
-  { value: 'cancelled', label: 'Cancelled' }
-] as const
-
-export const DATE_RANGE_OPTIONS = [
-  { value: 'all', label: 'All Time' },
-  { value: '7days', label: 'Last 7 Days' },
-  { value: '30days', label: 'Last 30 Days' },
-  { value: '90days', label: 'Last 90 Days' }
-] as const
-
-export const SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest First' },
-  { value: 'oldest', label: 'Oldest First' },
-  { value: 'price_high', label: 'Price: High to Low' },
-  { value: 'price_low', label: 'Price: Low to High' },
-  { value: 'stock_high', label: 'Stock: High to Low' },
-  { value: 'stock_low', label: 'Stock: Low to High' }
-] as const
-
-export const ORDER_SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest First' },
-  { value: 'oldest', label: 'Oldest First' },
-  { value: 'price_high', label: 'Price: High to Low' },
-  { value: 'price_low', label: 'Price: Low to High' }
-] as const
+export interface BulkActionState {
+  selectionMode: boolean
+  selectedListings: Set<string>
+  showBulkActions: boolean
+  bulkActionType: string
+  bulkStatusChange: string
+  bulkCategoryChange: string
+  bulkPriceAdjustment: string
+  bulkPricePercentage: string
+  bulkProcessing: boolean
+}

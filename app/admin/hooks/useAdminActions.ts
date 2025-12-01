@@ -122,21 +122,22 @@ export function useAdminActions({
   }
 
   const handleRejectWithdrawal = async (withdrawalId: string, reason: string) => {
-    if (reason.trim().length < 5) {
-      alert('Provide reason (min 5 chars)')
-      return false
-    }
-    await supabase.from('withdrawals').update({
-      status: 'rejected',
-      processed_by: userId,
-      processed_at: new Date().toISOString(),
-      admin_notes: reason.trim()
-    }).eq('id', withdrawalId)
-    await logAdminAction(userId, 'withdrawal_rejected', `Rejected withdrawal ${withdrawalId}`)
-    alert('❌ Rejected.')
-    fetchWithdrawals()
-    return true
+  if (reason.trim().length < 5) {
+    alert('Provide reason (min 5 chars)')
+    return false
   }
+  await supabase.from('withdrawals').update({
+    status: 'rejected',
+    processed_by: userId,
+    processed_at: new Date().toISOString(),
+    rejection_reason: reason.trim(),
+    admin_notes: reason.trim()
+  }).eq('id', withdrawalId)
+  await logAdminAction(userId, 'withdrawal_rejected', `Rejected withdrawal ${withdrawalId}: ${reason.trim()}`)
+  alert('❌ Rejected.')
+  fetchWithdrawals()
+  return true
+}
 
   // Verification Actions
   const handleAcceptAgreement = async (verificationId: string) => {

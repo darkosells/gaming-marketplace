@@ -1,40 +1,6 @@
 // Admin Dashboard Types
 
-export type FraudType = 
-  | 'multiple_disputes'
-  | 'suspicious_activity'
-  | 'rapid_transactions'
-  | 'low_pricing'
-  | 'account_manipulation'
-  | 'multiple_accounts'
-  | 'payment_issue'
-  | 'vpn_detected'
-  | 'blacklisted_email'
-  | 'location_anomaly'
-  | 'device_mismatch'
-  | 'chargeback'
-
-export type FraudSeverity = 'low' | 'medium' | 'high' | 'critical'
-
-export interface FraudFlag {
-  id: string
-  user_id: string
-  type: FraudType
-  severity: FraudSeverity
-  description: string
-  status: 'active' | 'reviewed' | 'resolved' | 'false_positive'
-  auto_detected: boolean
-  detection_source: string
-  reviewed_by?: string
-  reviewed_at?: string
-  review_notes?: string
-  created_at: string
-  user?: {
-    username: string
-    email: string
-    created_at?: string
-  }
-}
+export const ITEMS_PER_PAGE = 10
 
 export interface AdminUser {
   id: string
@@ -43,37 +9,28 @@ export interface AdminUser {
   role: 'customer' | 'vendor'
   is_admin: boolean
   admin_level?: 'admin' | 'super_admin'
+  verified: boolean
+  rating: number
+  total_sales: number
   is_banned: boolean
   banned_at?: string
   ban_reason?: string
-  rating: number
-  average_rating?: number
-  total_sales: number
   created_at: string
-  verified?: boolean
-  vendor_since?: string
-  // Risk & fraud detection fields
-  risk_score?: number
-  risk_level?: 'low' | 'medium' | 'high' | 'critical'
-  is_high_risk?: boolean
-  fraud_flags_count?: number
-  last_fraud_check?: string
-  signup_ip?: string
-  last_ip?: string
-  account_flags?: string[]
 }
 
 export interface AdminListing {
   id: string
+  seller_id: string
   title: string
+  description: string
   game: string
   category: string
   price: string
   stock: number
-  status: 'active' | 'inactive' | 'sold_out'
-  seller_id: string
-  created_at: string
+  status: string
+  delivery_type: string
   image_url?: string
+  created_at: string
   profiles?: {
     username: string
   }
@@ -82,25 +39,25 @@ export interface AdminListing {
 export interface AdminOrder {
   id: string
   listing_id: string
-  listing_title?: string
-  listing_game?: string
   buyer_id: string
   seller_id: string
   amount: string
-  status: 'pending' | 'paid' | 'delivered' | 'completed' | 'dispute_raised' | 'refunded' | 'cancelled'
+  status: string
+  delivery_type: string
   created_at: string
   completed_at?: string
   delivered_at?: string
-  dispute_opened_at?: string
   dispute_reason?: string
-  resolved_by?: string
+  dispute_opened_at?: string
   resolution_notes?: string
+  resolved_by?: string
+  listing_title?: string
+  listing_game?: string
+  listing_category?: string
   buyer?: {
-    id: string
     username: string
   }
   seller?: {
-    id: string
     username: string
   }
 }
@@ -111,22 +68,17 @@ export interface AdminConversation {
   seller_id: string
   listing_id: string
   order_id?: string
-  last_message: string
-  last_message_at: string
-  listing?: {
-    title: string
-    game: string
-    image_url?: string
-  }
+  last_message?: string
+  last_message_at?: string
+  created_at: string
   buyer?: {
     username: string
   }
   seller?: {
     username: string
   }
-  order?: {
-    status: string
-    amount: string
+  listing?: {
+    title: string
   }
 }
 
@@ -137,14 +89,17 @@ export interface AdminReview {
   seller_id: string
   rating: number
   comment?: string
-  created_at: string
   edited_by_admin?: boolean
   edited_at?: string
+  created_at: string
   buyer?: {
     username: string
   }
   seller?: {
     username: string
+  }
+  order?: {
+    listing_title: string
   }
 }
 
@@ -152,18 +107,18 @@ export interface AdminWithdrawal {
   id: string
   user_id: string
   amount: string
-  net_amount: string
   fee: string
+  net_amount: string
   method: 'bitcoin' | 'skrill'
   address: string
-  status: 'pending' | 'completed' | 'rejected'
-  created_at: string
-  processed_at?: string
-  processed_by?: string
+  status: 'pending' | 'processing' | 'completed' | 'rejected'
   transaction_id?: string
   admin_notes?: string
+  rejection_reason?: string
+  processed_by?: string
+  processed_at?: string
+  created_at: string
   user?: {
-    id: string
     username: string
   }
   processor?: {
@@ -174,21 +129,9 @@ export interface AdminWithdrawal {
 export interface AdminVerification {
   id: string
   user_id: string
-  full_name: string
-  date_of_birth: string
-  phone_number: string
-  street_address: string
-  city: string
-  state_province: string
-  postal_code: string
-  country: string
-  id_type: string
+  status: 'pending' | 'approved' | 'rejected'
   id_front_url?: string
   id_back_url?: string
-  status: 'pending' | 'approved' | 'rejected'
-  created_at: string
-  reviewed_at?: string
-  reviewed_by?: string
   rejection_reason?: string
   rejection_type?: 'resubmission_required' | 'permanent'
   can_resubmit?: boolean
@@ -203,6 +146,9 @@ export interface AdminVerification {
   platform_names?: string
   platform_usernames?: string
   experience_description?: string
+  reviewed_by?: string
+  reviewed_at?: string
+  created_at: string
   user?: {
     id: string
     username: string
@@ -259,6 +205,26 @@ export interface AnalyticsData {
   }>
 }
 
+export interface FraudFlag {
+  id: string
+  user_id: string
+  type: 'multiple_disputes' | 'suspicious_activity' | 'rapid_transactions' | 'low_pricing' | 'account_manipulation' | 'chargeback' | 'identity_fraud'
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  description: string
+  status: 'active' | 'reviewed' | 'resolved' | 'false_positive'
+  auto_detected: boolean
+  detection_source: string
+  reviewed_by?: string
+  reviewed_at?: string
+  review_notes?: string
+  created_at: string
+  user?: {
+    username: string
+    email: string
+    created_at: string
+  }
+}
+
 // Fraud detection configuration
 export const FRAUD_CONFIG = {
   MAX_FAILED_LOGINS: 5,
@@ -269,5 +235,3 @@ export const FRAUD_CONFIG = {
   MAX_RAPID_ORDERS: 5,
   MIN_DELIVERY_TIME_MINUTES: 5
 }
-
-export const ITEMS_PER_PAGE = 10
