@@ -11,6 +11,7 @@ export interface AdminUser {
   admin_level?: 'admin' | 'super_admin'
   verified: boolean
   rating: number
+  average_rating?: number
   total_sales: number
   is_banned: boolean
   banned_at?: string
@@ -56,9 +57,11 @@ export interface AdminOrder {
   listing_category?: string
   buyer?: {
     username: string
+    id?: string
   }
   seller?: {
     username: string
+    id?: string
   }
 }
 
@@ -126,6 +129,7 @@ export interface AdminWithdrawal {
   created_at: string
   user?: {
     username: string
+    id?: string
   }
   processor?: {
     username: string
