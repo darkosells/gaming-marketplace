@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 import type { VendorTab } from './types'
 
 // Hooks
@@ -28,6 +29,7 @@ import SpaceBackground from './components/common/SpaceBackground'
 import WelcomeSection from './components/common/WelcomeSection'
 import StatsOverview from './components/common/StatsOverview'
 import QuickActions from './components/common/QuickActions'
+import VendorRankCard from './components/common/VendorRankCard'
 
 export default function VendorDashboardPage() {
   const [activeTab, setActiveTab] = useState<VendorTab>('listings')
@@ -54,7 +56,10 @@ export default function VendorDashboardPage() {
     uniqueOrderGames,
     fetchMyListings,
     fetchWithdrawals,
-    supabase
+    supabase,
+    // Rank data
+    rankData,
+    rankProgress
   } = useVendorData()
 
   // Listing filters hook
@@ -307,6 +312,16 @@ export default function VendorDashboardPage() {
               >
                 📊 Inventory
               </button>
+              {/* NEW: Seller Rank Tab */}
+              <button
+                onClick={() => setActiveTab('rank')}
+                className={`px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-sm lg:text-base whitespace-nowrap ${activeTab === 'rank'
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-lg shadow-amber-500/30'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+              >
+                🏆 <span className="hidden sm:inline">Seller </span>Rank
+              </button>
               <button
                 onClick={() => setActiveTab('guide')}
                 className={`px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-sm lg:text-base whitespace-nowrap ${activeTab === 'guide'
@@ -425,6 +440,19 @@ export default function VendorDashboardPage() {
               />
             )}
 
+            {/* NEW: Rank Tab Content */}
+            {activeTab === 'rank' && (
+              <VendorRankCard
+                currentRank={rankData.currentRank}
+                completedOrders={rankProgress.completedOrders}
+                averageRating={rankProgress.averageRating}
+                disputeRate={rankProgress.disputeRate}
+                accountAgeDays={rankProgress.accountAgeDays}
+                commissionRate={rankData.commissionRate}
+                totalReviews={rankProgress.totalReviews}
+              />
+            )}
+
             {activeTab === 'guide' && (
               <GuideTab />
             )}
@@ -432,11 +460,7 @@ export default function VendorDashboardPage() {
         </div>
 
         {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-6 sm:py-8 mt-8 sm:mt-12">
-          <div className="container mx-auto px-4 text-center text-gray-500 text-xs sm:text-sm">
-            <p>&copy; 2025 Nashflare. All rights reserved.</p>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   )

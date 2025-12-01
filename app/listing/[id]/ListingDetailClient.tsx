@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
+import VendorRankBadge, { VendorRank } from '@/app/dashboard/components/VendorRankBadge'
 
 interface Listing {
   id: string
@@ -34,6 +35,7 @@ interface Listing {
     total_reviews: number
     verified: boolean
     created_at: string
+    vendor_rank?: VendorRank
   } | null
 }
 
@@ -256,36 +258,24 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
     }
 
     try {
+      // Check if conversation already exists
       const { data: existingConv, error: checkError } = await supabase
         .from('conversations')
         .select('id')
         .eq('listing_id', listing.id)
         .eq('buyer_id', user.id)
         .eq('seller_id', listing.seller_id)
-        .single()
+        .maybeSingle()
 
       if (existingConv) {
+        // Conversation exists, go to it
         router.push(`/messages?conversation=${existingConv.id}`)
-        return
+      } else {
+        // No conversation exists, pass listing info via URL to create on first message
+        router.push(`/messages?listing_id=${listing.id}&seller_id=${listing.seller_id}`)
       }
-
-      const { data: newConv, error: createError } = await supabase
-        .from('conversations')
-        .insert({
-          listing_id: listing.id,
-          buyer_id: user.id,
-          seller_id: listing.seller_id,
-          last_message: 'Started conversation',
-          last_message_at: new Date().toISOString()
-        })
-        .select()
-        .single()
-
-      if (createError) throw createError
-
-      router.push(`/messages?conversation=${newConv.id}`)
     } catch (error) {
-      console.error('Error creating conversation:', error)
+      console.error('Error checking conversation:', error)
       setModalMessage({
         title: 'Failed to Start Chat',
         message: 'Failed to start conversation. Please try again.',
@@ -321,6 +311,7 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
   const sellerTotalReviews = profileData?.total_reviews || 0
   const sellerVerified = profileData?.verified || false
   const sellerAvatar = profileData?.avatar_url || null
+  const sellerRank: VendorRank = profileData?.vendor_rank || 'nova'
   const sellerJoinDate = profileData?.created_at 
     ? new Date(profileData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : 'Unknown'
@@ -885,14 +876,14 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                 </div>
               </div>
 
-              {/* Seller Info Card */}
+              {/* Seller Info Card (Desktop) */}
               <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   <span className="text-purple-400">👤</span>
                   Seller Information
                 </h3>
                 
-                <div className="flex items-center space-x-3 mb-6">
+                <div className="flex items-center space-x-3 mb-4">
                   <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center ring-4 ring-purple-500/20 overflow-hidden">
                     {sellerAvatar ? (
                       <img 
@@ -916,6 +907,21 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                       )}
                     </div>
                     <p className="text-sm text-gray-400">Member since {sellerJoinDate}</p>
+                  </div>
+                </div>
+
+                {/* Seller Rank Badge */}
+                <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-gray-400 text-sm">Seller Rank</span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {sellerRank === 'supernova' ? 'Elite Seller' :
+                         sellerRank === 'galaxy' ? 'Top Seller' :
+                         sellerRank === 'star' ? 'Trusted Seller' : 'New Seller'}
+                      </p>
+                    </div>
+                    <VendorRankBadge rank={sellerRank} size="md" showLabel={true} showTooltip={false} />
                   </div>
                 </div>
 
@@ -978,6 +984,21 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                     )}
                   </div>
                   <p className="text-xs sm:text-sm text-gray-400 truncate">Member since {sellerJoinDate}</p>
+                </div>
+              </div>
+
+              {/* Seller Rank Badge (Mobile) */}
+              <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-gray-400 text-sm">Seller Rank</span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {sellerRank === 'supernova' ? 'Elite Seller' :
+                       sellerRank === 'galaxy' ? 'Top Seller' :
+                       sellerRank === 'star' ? 'Trusted Seller' : 'New Seller'}
+                    </p>
+                  </div>
+                  <VendorRankBadge rank={sellerRank} size="sm" showLabel={true} showTooltip={false} />
                 </div>
               </div>
 

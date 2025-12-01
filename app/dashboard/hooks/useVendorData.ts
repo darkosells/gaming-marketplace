@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import type { Profile, Listing, Order, Withdrawal, InventoryStats } from '../types'
+import type { Profile, Listing, Order, Withdrawal, InventoryStats, VendorRank, RankProgress, RankData } from '../types'
 
 export function useVendorData() {
   const [user, setUser] = useState<any>(null)
@@ -110,7 +110,7 @@ export function useVendorData() {
     const overstocked = myListings.filter(l => l.stock > 50 && l.status === 'active')
     const totalValue = myListings.reduce((sum, l) => {
       if (l.status !== 'removed') {
-        return sum + (l.stock * parseFloat(l.price))
+        return sum + (l.stock * parseFloat(String(l.price)))
       }
       return sum
     }, 0)
@@ -156,9 +156,16 @@ export function useVendorData() {
 
       setUser(user)
 
+      // UPDATED: Fetch profile with rank fields included
       const profilePromise = supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          vendor_rank,
+          commission_rate,
+          dispute_rate,
+          vendor_rank_updated_at
+        `)
         .eq('id', user.id)
         .single()
 
@@ -174,7 +181,16 @@ export function useVendorData() {
         return
       }
 
-      setProfile(profileData)
+      // Set defaults for rank fields if not present (backwards compatibility)
+      const profileWithDefaults: Profile = {
+        ...profileData,
+        vendor_rank: profileData.vendor_rank || 'nova',
+        commission_rate: profileData.commission_rate ?? 5.00,
+        dispute_rate: profileData.dispute_rate ?? 0,
+        vendor_rank_updated_at: profileData.vendor_rank_updated_at || null
+      }
+
+      setProfile(profileWithDefaults)
 
       if (profileData?.role !== 'vendor') {
         router.push('/customer-dashboard')
@@ -217,9 +233,13 @@ export function useVendorData() {
   // Derived values
   const activeListings = myListings.filter(l => l.status === 'active')
   const completedOrders = myOrders.filter(o => o.status === 'completed')
-  const grossRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(o.amount), 0)
-  const totalCommission = grossRevenue * 0.05
-  const totalEarnings = grossRevenue * 0.95
+  const grossRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(String(o.amount)), 0)
+  
+  // UPDATED: Use dynamic commission rate from profile (rank-based) instead of hardcoded 0.05
+  const commissionRate = profile?.commission_rate ?? 5.00
+  const totalCommission = grossRevenue * (commissionRate / 100)
+  const totalEarnings = grossRevenue * (1 - commissionRate / 100)
+  
   const totalWithdrawn = withdrawals
     .filter(w => w.status === 'completed' || w.status === 'pending')
     .reduce((sum, w) => sum + parseFloat(String(w.amount)), 0)
@@ -229,9 +249,32 @@ export function useVendorData() {
     o.status === 'delivered' ||
     o.status === 'dispute_raised'
   )
-  const pendingEarnings = pendingOrders.reduce((sum, o) => sum + (parseFloat(o.amount) * 0.95), 0)
+  // UPDATED: Use dynamic commission rate for pending earnings
+  const pendingEarnings = pendingOrders.reduce((sum, o) => sum + (parseFloat(String(o.amount)) * (1 - commissionRate / 100)), 0)
   const uniqueGames = Array.from(new Set(myListings.map(l => l.game))).sort()
   const uniqueOrderGames = Array.from(new Set(myOrders.map(o => o.listing?.game || o.listing_game).filter((g): g is string => Boolean(g)))).sort()
+
+  // NEW: Rank data for VendorRankCard
+  const rankData: RankData = {
+    currentRank: (profile?.vendor_rank || 'nova') as VendorRank,
+    commissionRate: profile?.commission_rate ?? 5.00,
+    disputeRate: profile?.dispute_rate ?? 0,
+    rankUpdatedAt: profile?.vendor_rank_updated_at || null
+  }
+
+  // Calculate account age in days
+  const accountAgeDays = profile?.vendor_since 
+    ? Math.floor((Date.now() - new Date(profile.vendor_since).getTime()) / (1000 * 60 * 60 * 24))
+    : 0
+
+  // NEW: Rank progress data for VendorRankCard
+  const rankProgress: RankProgress = {
+    completedOrders: completedOrders.length,
+    averageRating: profile?.average_rating ?? 0,
+    disputeRate: profile?.dispute_rate ?? 0,
+    accountAgeDays,
+    totalReviews: profile?.total_reviews ?? 0
+  }
 
   return {
     user,
@@ -256,6 +299,9 @@ export function useVendorData() {
     fetchMyListings,
     fetchMyOrders,
     fetchWithdrawals,
-    supabase
+    supabase,
+    // NEW: Rank exports
+    rankData,
+    rankProgress
   }
 }

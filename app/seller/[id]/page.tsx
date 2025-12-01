@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import VendorRankBadge, { VendorRank, RANK_CONFIGS } from '@/app/dashboard/components/VendorRankBadge'
 
 interface SellerProfile {
   id: string
@@ -16,6 +17,9 @@ interface SellerProfile {
   total_sales: number
   avatar_url: string | null
   verified: boolean
+  // Rank fields
+  vendor_rank: VendorRank
+  commission_rate: number
 }
 
 interface Review {
@@ -62,9 +66,22 @@ export default function SellerProfilePage() {
 
   const fetchSellerProfile = async () => {
     try {
+      // Fetch seller profile with rank fields
       const { data: sellerData, error: sellerError } = await supabase
         .from('profiles')
-        .select('id, username, role, vendor_since, total_reviews, average_rating, total_sales, avatar_url, verified')
+        .select(`
+          id, 
+          username, 
+          role, 
+          vendor_since, 
+          total_reviews, 
+          average_rating, 
+          total_sales, 
+          avatar_url, 
+          verified,
+          vendor_rank,
+          commission_rate
+        `)
         .eq('id', params.id)
         .single()
 
@@ -76,7 +93,12 @@ export default function SellerProfilePage() {
         return
       }
 
-      setSeller(sellerData)
+      // Set defaults for rank fields if not present
+      setSeller({
+        ...sellerData,
+        vendor_rank: sellerData.vendor_rank || 'nova',
+        commission_rate: sellerData.commission_rate ?? 5.00
+      })
 
       const { data: listingsData, error: listingsError } = await supabase
         .from('listings')
@@ -171,6 +193,17 @@ export default function SellerProfilePage() {
     return listing.image_url
   }
 
+  // Get rank description for display
+  const getRankDescription = (rank: VendorRank) => {
+    const descriptions = {
+      nova: 'New Seller',
+      star: 'Trusted Seller',
+      galaxy: 'Top Seller',
+      supernova: 'Elite Seller'
+    }
+    return descriptions[rank]
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
@@ -208,6 +241,8 @@ export default function SellerProfilePage() {
     )
   }
 
+  const rankConfig = RANK_CONFIGS[seller.vendor_rank]
+
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
       {/* Animated Background */}
@@ -237,11 +272,12 @@ export default function SellerProfilePage() {
         <div className="container mx-auto px-4 pt-24 pb-12">
           <div className="max-w-6xl mx-auto">
             {/* Seller Header Card */}
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 mb-8 hover:border-purple-500/30 transition-all duration-300">
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-8 mb-8 hover:border-purple-500/30 transition-all duration-300">
               <div className="flex flex-col md:flex-row items-center gap-6">
-                {/* Avatar */}
+                {/* Avatar with Rank Glow */}
                 <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur opacity-50 group-hover:opacity-75 transition duration-300"></div>
+                  {/* Rank-based glow effect */}
+                  <div className={`absolute -inset-1.5 bg-gradient-to-r ${rankConfig.gradient} rounded-full blur-md opacity-60 group-hover:opacity-100 transition duration-300`}></div>
                   <div className="relative w-28 h-28 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center overflow-hidden ring-4 ring-purple-500/30">
                     {seller.avatar_url ? (
                       <img 
@@ -266,37 +302,61 @@ export default function SellerProfilePage() {
 
                 {/* Seller Info */}
                 <div className="flex-1 text-center md:text-left">
-                  <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
-                    <h1 className="text-4xl font-bold text-white">{seller.username}</h1>
-                    {seller.verified && (
-                      <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold border border-blue-500/30">
-                        ✓ Verified
-                      </span>
-                    )}
+                  <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-3 mb-2">
+                    <h1 className="text-3xl sm:text-4xl font-bold text-white">{seller.username}</h1>
+                    <div className="flex items-center gap-2 flex-wrap justify-center md:justify-start">
+                      {/* Vendor Rank Badge - Prominent Display */}
+                      <VendorRankBadge 
+                        rank={seller.vendor_rank} 
+                        size="lg" 
+                        showLabel={true}
+                        showTooltip={false}
+                      />
+                      {seller.verified && (
+                        <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold border border-blue-500/30">
+                          ✓ Verified
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  
+                  {/* Rank Description */}
+                  <p className={`text-sm mb-2 ${rankConfig.textColor}`}>
+                    {getRankDescription(seller.vendor_rank)}
+                  </p>
+                  
                   <p className="text-gray-400 mb-4">
                     Vendor since {new Date(seller.vendor_since).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </p>
                   
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-white/10 hover:border-yellow-500/30 transition-all duration-300">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                    {/* Rank Badge Card */}
+                    <div className={`bg-slate-800/50 rounded-xl p-3 sm:p-4 border border-white/10 hover:border-${rankConfig.bgGlow}/30 transition-all duration-300`}>
+                      <div className="text-2xl mb-2 text-center">{rankConfig.icon}</div>
+                      <p className={`text-lg sm:text-xl font-bold text-center ${rankConfig.textColor}`}>
+                        {rankConfig.name}
+                      </p>
+                      <p className="text-xs text-gray-400 text-center">Rank</p>
+                    </div>
+                    
+                    <div className="bg-slate-800/50 rounded-xl p-3 sm:p-4 border border-white/10 hover:border-yellow-500/30 transition-all duration-300">
                       <div className="flex items-center justify-center mb-2">
                         {renderStars(Math.round(seller.average_rating))}
                       </div>
-                      <p className="text-2xl font-bold text-white text-center">
+                      <p className="text-lg sm:text-xl font-bold text-white text-center">
                         {seller.average_rating > 0 ? seller.average_rating.toFixed(1) : 'N/A'}
                       </p>
                       <p className="text-xs text-gray-400 text-center">Rating</p>
                     </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-white/10 hover:border-purple-500/30 transition-all duration-300">
+                    <div className="bg-slate-800/50 rounded-xl p-3 sm:p-4 border border-white/10 hover:border-purple-500/30 transition-all duration-300">
                       <div className="text-2xl mb-2 text-center">📝</div>
-                      <p className="text-2xl font-bold text-white text-center">{seller.total_reviews}</p>
+                      <p className="text-lg sm:text-xl font-bold text-white text-center">{seller.total_reviews}</p>
                       <p className="text-xs text-gray-400 text-center">Reviews</p>
                     </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4 border border-white/10 hover:border-green-500/30 transition-all duration-300">
+                    <div className="bg-slate-800/50 rounded-xl p-3 sm:p-4 border border-white/10 hover:border-green-500/30 transition-all duration-300">
                       <div className="text-2xl mb-2 text-center">💰</div>
-                      <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent text-center">
+                      <p className="text-lg sm:text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent text-center">
                         {seller.total_sales}
                       </p>
                       <p className="text-xs text-gray-400 text-center">Sales</p>
@@ -307,11 +367,11 @@ export default function SellerProfilePage() {
             </div>
 
             {/* Tabs */}
-            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
+            <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-8 hover:border-purple-500/30 transition-all duration-300">
               <div className="flex space-x-4 mb-6 border-b border-white/10 pb-4">
                 <button
                   onClick={() => setActiveTab('listings')}
-                  className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                  className={`px-4 sm:px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
                     activeTab === 'listings'
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -321,7 +381,7 @@ export default function SellerProfilePage() {
                 </button>
                 <button
                   onClick={() => setActiveTab('reviews')}
-                  className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
+                  className={`px-4 sm:px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 ${
                     activeTab === 'reviews'
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -446,7 +506,7 @@ export default function SellerProfilePage() {
         {/* Footer */}
         <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
           <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2024 Nashflare. All rights reserved.</p>
+            <p>&copy; 2025 Nashflare. All rights reserved.</p>
           </div>
         </footer>
       </div>

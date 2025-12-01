@@ -405,22 +405,26 @@ export default function ListingsTab({
                       {listing.category === 'account' ? '🎮' : listing.category === 'currency' ? '💰' : '🔑'}
                     </div>
                   )}
+                  {/* Status Badge */}
                   <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
                     <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border ${listing.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
                         listing.status === 'sold' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' :
                           listing.status === 'out_of_stock' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
                             'bg-red-500/20 text-red-400 border-red-500/30'
                       }`}>
-                      {listing.status === 'out_of_stock' ? 'OOS' : listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
+                      {listing.status === 'out_of_stock' ? 'Out of Stock' : listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
                     </span>
                   </div>
-                  {listing.delivery_type === 'automatic' && (
-                    <div className={`absolute ${selectionMode ? 'bottom-2 sm:bottom-3 left-2 sm:left-3' : 'top-2 sm:top-3 left-2 sm:left-3'}`}>
-                      <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                        ⚡ Auto
-                      </span>
-                    </div>
-                  )}
+                  {/* Delivery Type Badge */}
+                  <div className={`absolute ${selectionMode ? 'bottom-2 sm:bottom-3 left-2 sm:left-3' : 'top-2 sm:top-3 left-2 sm:left-3'}`}>
+                    <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold border ${
+                      listing.delivery_type === 'automatic' 
+                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' 
+                        : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                    }`}>
+                      {listing.delivery_type === 'automatic' ? '⚡ Auto' : '👤 Manual'}
+                    </span>
+                  </div>
                 </div>
                 <div className="p-3 sm:p-4">
                   <h3 className="text-white font-semibold mb-1 truncate group-hover:text-purple-300 transition text-sm sm:text-base">{listing.title}</h3>

@@ -106,7 +106,8 @@ export default async function ListingPage({ params }: Props) {
         total_sales,
         total_reviews,
         verified,
-        created_at
+        created_at,
+        vendor_rank
       )
     `)
     .eq('id', id)
@@ -122,7 +123,7 @@ export default async function ListingPage({ params }: Props) {
     
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, rating, average_rating, total_sales, total_reviews, verified, created_at')
+      .select('id, username, avatar_url, rating, average_rating, total_sales, total_reviews, verified, created_at, vendor_rank')
       .eq('id', listing.seller_id)
       .single()
     

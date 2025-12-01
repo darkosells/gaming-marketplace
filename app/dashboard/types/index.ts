@@ -1,8 +1,26 @@
 // Vendor Dashboard Types
 
-export type VendorTab = 'listings' | 'orders' | 'balance' | 'inventory' | 'guide'
+export type VendorTab = 'listings' | 'orders' | 'balance' | 'inventory' | 'guide' | 'rank'
 export type InventoryFilter = 'all' | 'low' | 'out' | 'over'
 export type InventorySort = 'stock' | 'value' | 'usage'
+
+// NEW: Vendor Rank Types
+export type VendorRank = 'nova' | 'star' | 'galaxy' | 'supernova'
+
+export interface RankProgress {
+  completedOrders: number
+  averageRating: number
+  disputeRate: number
+  accountAgeDays: number
+  totalReviews: number
+}
+
+export interface RankData {
+  currentRank: VendorRank
+  commissionRate: number
+  disputeRate: number
+  rankUpdatedAt: string | null
+}
 
 export interface Profile {
   id: string
@@ -12,6 +30,17 @@ export interface Profile {
   is_admin: boolean
   verified: boolean
   created_at: string
+  // Existing optional fields
+  vendor_since?: string
+  average_rating?: number
+  total_reviews?: number
+  total_sales?: number
+  avatar_url?: string | null
+  // NEW: Rank fields
+  vendor_rank?: VendorRank
+  commission_rate?: number
+  dispute_rate?: number
+  vendor_rank_updated_at?: string | null
 }
 
 export interface Listing {
