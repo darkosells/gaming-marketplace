@@ -1,4 +1,4 @@
-// Create: components/AuditLogViewer.tsx
+// components/AuditLogViewer.tsx - FIXED VERSION
 
 'use client'
 
@@ -22,20 +22,21 @@ interface AuditLog {
 }
 
 interface AuditLogViewerProps {
-  currentAdminId: string
+  currentAdminId?: string
 }
 
 export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<any>(null)
   
-  // Filters
+  // Filters - DEFAULT TO 'all' so users can see existing logs
   const [actionTypeFilter, setActionTypeFilter] = useState('')
   const [severityFilter, setSeverityFilter] = useState('')
   const [targetTypeFilter, setTargetTypeFilter] = useState('')
   const [adminFilter, setAdminFilter] = useState('')
-  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'all'>('week')
+  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'all'>('all')
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -47,35 +48,45 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
 
   const loadAuditData = async () => {
     setLoading(true)
+    setError(null)
     
-    // Calculate date range
-    let startDate: Date | undefined
-    const now = new Date()
-    
-    if (dateRange === 'today') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    } else if (dateRange === 'week') {
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    } else if (dateRange === 'month') {
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    try {
+      // Calculate date range
+      let startDate: Date | undefined
+      const now = new Date()
+      
+      if (dateRange === 'today') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      } else if (dateRange === 'week') {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      } else if (dateRange === 'month') {
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      }
+      // If 'all', startDate remains undefined
+
+      const { data, error: fetchError } = await fetchAuditLogs({
+        actionType: (actionTypeFilter || undefined) as any,
+        severity: (severityFilter || undefined) as any,
+        targetType: (targetTypeFilter || undefined) as any,
+        adminId: adminFilter || undefined,
+        startDate: startDate,
+        limit: 500
+      })
+
+      if (fetchError) {
+        console.error('Error fetching logs:', fetchError)
+        setError('Failed to fetch audit logs. Please check if the admin_actions table exists.')
+      } else {
+        setLogs(data as AuditLog[])
+      }
+
+      // Load stats
+      const statsData = await getAuditStats()
+      setStats(statsData)
+    } catch (err) {
+      console.error('Error loading audit data:', err)
+      setError('An unexpected error occurred while loading audit data.')
     }
-
-    const { data, error } = await fetchAuditLogs({
-      actionType: (actionTypeFilter || undefined) as any,
-      severity: (severityFilter || undefined) as any,
-      targetType: (targetTypeFilter || undefined) as any,
-      adminId: adminFilter || undefined,
-      startDate: startDate,
-      limit: 500 // Get more for client-side pagination
-    })
-
-    if (!error && data) {
-      setLogs(data as AuditLog[])
-    }
-
-    // Load stats
-    const statsData = await getAuditStats()
-    setStats(statsData)
     
     setLoading(false)
   }
@@ -127,6 +138,16 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
 
   return (
     <div className="space-y-6">
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 text-red-400">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⚠️</span>
+            <span>{error}</span>
+          </div>
+        </div>
+      )}
+
       {/* Stats Overview */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -136,20 +157,20 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
           </div>
           <div className="bg-slate-800/80 border border-red-500/30 rounded-xl p-4">
             <div className="text-gray-300 text-sm mb-1">Critical</div>
-            <div className="text-2xl font-bold text-red-400">{stats.actionsBySeverity.critical || 0}</div>
+            <div className="text-2xl font-bold text-red-400">{stats.actionsBySeverity?.critical || 0}</div>
           </div>
           <div className="bg-slate-800/80 border border-orange-500/30 rounded-xl p-4">
             <div className="text-gray-300 text-sm mb-1">High Priority</div>
-            <div className="text-2xl font-bold text-orange-400">{stats.actionsBySeverity.high || 0}</div>
+            <div className="text-2xl font-bold text-orange-400">{stats.actionsBySeverity?.high || 0}</div>
           </div>
           <div className="bg-slate-800/80 border border-purple-500/30 rounded-xl p-4">
             <div className="text-gray-300 text-sm mb-1">Today</div>
             <div className="text-2xl font-bold text-purple-400">
-              {stats.recentActions.filter((a: any) => {
+              {stats.recentActions?.filter((a: any) => {
                 const actionDate = new Date(a.created_at)
                 const today = new Date()
                 return actionDate.toDateString() === today.toDateString()
-              }).length}
+              }).length || 0}
             </div>
           </div>
         </div>
@@ -163,13 +184,16 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
             <label className="block text-sm text-gray-300 mb-2">Date Range</label>
             <select 
               value={dateRange} 
-              onChange={(e) => setDateRange(e.target.value as any)}
+              onChange={(e) => {
+                setDateRange(e.target.value as any)
+                setCurrentPage(1)
+              }}
               className="w-full bg-slate-800 border border-white/20 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-purple-500"
             >
+              <option value="all" className="bg-slate-800 text-white">All Time</option>
               <option value="today" className="bg-slate-800 text-white">Today</option>
               <option value="week" className="bg-slate-800 text-white">Last 7 Days</option>
               <option value="month" className="bg-slate-800 text-white">Last 30 Days</option>
-              <option value="all" className="bg-slate-800 text-white">All Time</option>
             </select>
           </div>
           
@@ -177,7 +201,10 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
             <label className="block text-sm text-gray-300 mb-2">Severity</label>
             <select 
               value={severityFilter} 
-              onChange={(e) => setSeverityFilter(e.target.value)}
+              onChange={(e) => {
+                setSeverityFilter(e.target.value)
+                setCurrentPage(1)
+              }}
               className="w-full bg-slate-800 border border-white/20 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-purple-500"
             >
               <option value="" className="bg-slate-800 text-white">All Severities</option>
@@ -192,7 +219,10 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
             <label className="block text-sm text-gray-300 mb-2">Target Type</label>
             <select 
               value={targetTypeFilter} 
-              onChange={(e) => setTargetTypeFilter(e.target.value)}
+              onChange={(e) => {
+                setTargetTypeFilter(e.target.value)
+                setCurrentPage(1)
+              }}
               className="w-full bg-slate-800 border border-white/20 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-purple-500"
             >
               <option value="" className="bg-slate-800 text-white">All Types</option>
@@ -211,7 +241,10 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
             <input
               type="text"
               value={adminFilter}
-              onChange={(e) => setAdminFilter(e.target.value)}
+              onChange={(e) => {
+                setAdminFilter(e.target.value)
+                setCurrentPage(1)
+              }}
               placeholder="Search by admin name..."
               className="w-full bg-slate-800 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500"
             />
@@ -237,6 +270,11 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
           <div className="text-center py-12 bg-slate-800/80 border border-white/20 rounded-xl">
             <div className="text-4xl mb-4">📋</div>
             <p className="text-gray-300">No audit logs found</p>
+            <p className="text-gray-500 text-sm mt-2">
+              {dateRange !== 'all' 
+                ? 'Try selecting "All Time" in the date range filter' 
+                : 'Admin actions will appear here when performed'}
+            </p>
           </div>
         ) : (
           currentLogs.map((log) => (
@@ -248,13 +286,15 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
                 <div className="flex items-center gap-3">
                   <div className="text-3xl">{getActionIcon(log.action_type)}</div>
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-white font-semibold">
                         {formatActionType(log.action_type)}
                       </span>
-                      <span className={`px-2 py-1 rounded text-xs font-medium border ${getSeverityColor(log.severity)}`}>
-                        {log.severity.toUpperCase()}
-                      </span>
+                      {log.severity && (
+                        <span className={`px-2 py-1 rounded text-xs font-medium border ${getSeverityColor(log.severity)}`}>
+                          {log.severity.toUpperCase()}
+                        </span>
+                      )}
                       {log.target_type && (
                         <span className="px-2 py-1 rounded text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30">
                           {log.target_type}
@@ -262,7 +302,7 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
                       )}
                     </div>
                     <p className="text-sm text-gray-400">
-                      by <span className="text-purple-400 font-semibold">{log.admin_username}</span>
+                      by <span className="text-purple-400 font-semibold">{log.admin_username || 'Unknown'}</span>
                       {' '} • {' '}
                       {new Date(log.created_at).toLocaleString()}
                     </p>
@@ -277,7 +317,7 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
                 </div>
               )}
 
-              {log.changes && (
+              {log.changes && Object.keys(log.changes).length > 0 && (
                 <details className="bg-slate-900/50 border border-white/20 rounded-lg p-3">
                   <summary className="text-xs text-gray-300 font-semibold cursor-pointer hover:text-white transition">
                     View Changes
@@ -303,8 +343,8 @@ export default function AuditLogViewer({ currentAdminId }: AuditLogViewerProps) 
                 </details>
               )}
 
-              <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
-                <span>IP: {log.ip_address}</span>
+              <div className="mt-3 flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                {log.ip_address && <span>IP: {log.ip_address}</span>}
                 {log.target_id && <span>Target ID: {log.target_id.slice(0, 8)}...</span>}
               </div>
             </div>
