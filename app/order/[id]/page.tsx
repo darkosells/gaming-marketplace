@@ -32,6 +32,10 @@ export default function OrderDetailPage() {
   const [deliveryInfo, setDeliveryInfo] = useState<string | null>(null)
   const [showDeliveryInfo, setShowDeliveryInfo] = useState(false)
   const [copiedDelivery, setCopiedDelivery] = useState(false)
+  
+  // NEW: 24-hour delivery window states
+  const [deliveryDeadline, setDeliveryDeadline] = useState<string | null>(null)
+  const [deliveryDeadlinePassed, setDeliveryDeadlinePassed] = useState(false)
 
   const toast = (type: string, title: string, msg: string) => {
     const t = { id: Date.now().toString(), type, title, msg }
@@ -66,6 +70,8 @@ export default function OrderDetailPage() {
 
   useEffect(() => { mounted.current = true; checkAuth(); return () => { mounted.current = false } }, [])
   useEffect(() => { user && profile && fetchOrder() }, [user, profile])
+  
+  // 48-hour timer for delivered orders (existing)
   useEffect(() => {
     if (order?.status === 'delivered' && order.delivered_at) {
       const iv = setInterval(() => {
@@ -73,6 +79,35 @@ export default function OrderDetailPage() {
         h <= 0 ? (setTimeRemaining('Auto-completing...'), clearInterval(iv)) : setTimeRemaining(`${Math.floor(h)}h ${Math.floor((h % 1) * 60)}m ${Math.floor(((h % 1) * 60 % 1) * 60)}s`)
       }, 1000)
       return () => clearInterval(iv)
+    }
+  }, [order])
+
+  // NEW: 24-hour delivery window timer for manual delivery orders in 'paid' status
+  useEffect(() => {
+    if (order?.status === 'paid' && order.listing?.delivery_type === 'manual') {
+      // Use paid_at if available, otherwise fall back to created_at or when payment_status changed
+      const paidTime = order.paid_at || order.created_at
+      
+      const iv = setInterval(() => {
+        const hoursElapsed = (Date.now() - new Date(paidTime).getTime()) / 3600000
+        const hoursRemaining = 24 - hoursElapsed
+        
+        if (hoursRemaining <= 0) {
+          setDeliveryDeadline('Deadline passed')
+          setDeliveryDeadlinePassed(true)
+        } else {
+          const h = Math.floor(hoursRemaining)
+          const m = Math.floor((hoursRemaining % 1) * 60)
+          const s = Math.floor(((hoursRemaining % 1) * 60 % 1) * 60)
+          setDeliveryDeadline(`${h}h ${m}m ${s}s`)
+          setDeliveryDeadlinePassed(false)
+        }
+      }, 1000)
+      
+      return () => clearInterval(iv)
+    } else {
+      setDeliveryDeadline(null)
+      setDeliveryDeadlinePassed(false)
     }
   }, [order])
 
@@ -361,7 +396,7 @@ export default function OrderDetailPage() {
   const simPay = () => confirm('Simulate Payment', '⚠️ TEST: Simulate payment?', async () => {
     setModal(p => ({ ...p, show: false })); setActionLoading(true)
     try {
-      await supabase.from('orders').update({ payment_status: 'paid', status: 'paid' }).eq('id', id)
+      await supabase.from('orders').update({ payment_status: 'paid', status: 'paid', paid_at: new Date().toISOString() }).eq('id', id)
       const [b, s] = await Promise.all([supabase.from('profiles').select('email, username').eq('id', order.buyer_id).single(), supabase.from('profiles').select('email, username').eq('id', order.seller_id).single()])
       b.data?.email && s.data?.email && await sendOrderEmails({ id: order.id, listing_title: order.listing.title, quantity: order.quantity, total_amount: order.amount * 1.05, seller_amount: order.amount * 0.95, buyer_email: b.data.email, seller_email: s.data.email, buyer_username: b.data.username, seller_username: s.data.username, site_url: getSiteUrl() })
       toast('success', 'Paid!', 'Order marked as paid'); fetchOrder()
@@ -375,6 +410,7 @@ export default function OrderDetailPage() {
 
   const isBuyer = order.buyer_id === user?.id, isSeller = order.seller_id === user?.id, isAdmin = profile?.is_admin
   const fee = order.amount * 0.05, total = order.amount + fee, sc = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending
+  const isManualDelivery = order.listing?.delivery_type === 'manual'
 
   return (
     <div className="min-h-screen bg-slate-950 relative">
@@ -495,10 +531,103 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {/* Timer */}
+          {/* 48-Hour Timer for DELIVERED orders (existing) */}
           {order.status === 'delivered' && timeRemaining && isBuyer && (
             <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-2 border-yellow-500/50 rounded-2xl p-6 mb-6 animate-pulse">
               <div className="flex items-center gap-4"><div className="w-16 h-16 bg-yellow-500/20 rounded-xl flex items-center justify-center"><span className="text-4xl">⏱️</span></div><div><h3 className="text-xl font-bold text-yellow-400">Action Required</h3><p className="text-2xl font-mono font-bold text-white">{timeRemaining}</p><p className="text-gray-300 text-sm">Confirm or dispute. Auto-completes after 48h.</p></div></div>
+            </div>
+          )}
+
+          {/* NEW: 24-Hour Delivery Window Timer for PAID manual orders - VENDOR VIEW */}
+          {order.status === 'paid' && isManualDelivery && isSeller && deliveryDeadline && (
+            <div className={`border-2 rounded-2xl p-6 mb-6 ${
+              deliveryDeadlinePassed 
+                ? 'bg-gradient-to-r from-red-500/20 to-orange-500/20 border-red-500/50' 
+                : 'bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border-orange-500/50'
+            }`}>
+              <div className="flex items-center gap-4">
+                <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
+                  deliveryDeadlinePassed ? 'bg-red-500/20' : 'bg-orange-500/20'
+                }`}>
+                  <span className="text-4xl">{deliveryDeadlinePassed ? '🚨' : '⏰'}</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className={`text-xl font-bold ${deliveryDeadlinePassed ? 'text-red-400' : 'text-orange-400'}`}>
+                    {deliveryDeadlinePassed ? '⚠️ Delivery Deadline Passed!' : '📦 Delivery Required'}
+                  </h3>
+                  <p className={`text-2xl font-mono font-bold ${deliveryDeadlinePassed ? 'text-red-300' : 'text-white'}`}>
+                    {deliveryDeadline}
+                  </p>
+                  <p className={`text-sm ${deliveryDeadlinePassed ? 'text-red-300' : 'text-gray-300'}`}>
+                    {deliveryDeadlinePassed 
+                      ? 'The buyer can now open a dispute. Please deliver immediately!'
+                      : 'You have 24 hours from payment to deliver this order.'
+                    }
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setShowDelivery(true)}
+                  className={`px-6 py-3 rounded-xl font-bold text-white transition-all ${
+                    deliveryDeadlinePassed 
+                      ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:shadow-lg hover:shadow-red-500/50 animate-pulse'
+                      : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:shadow-lg hover:shadow-green-500/50'
+                  }`}
+                >
+                  📦 Deliver Now
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* NEW: 24-Hour Delivery Window Timer for PAID manual orders - BUYER VIEW */}
+          {order.status === 'paid' && isManualDelivery && isBuyer && deliveryDeadline && (
+            <div className={`border-2 rounded-2xl p-6 mb-6 ${
+              deliveryDeadlinePassed 
+                ? 'bg-gradient-to-r from-red-500/10 to-orange-500/10 border-red-500/50' 
+                : 'bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/50'
+            }`}>
+              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                <div className={`w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  deliveryDeadlinePassed ? 'bg-red-500/20' : 'bg-blue-500/20'
+                }`}>
+                  <span className="text-4xl">{deliveryDeadlinePassed ? '🛡️' : '⏳'}</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className={`text-xl font-bold ${deliveryDeadlinePassed ? 'text-red-400' : 'text-blue-400'}`}>
+                    {deliveryDeadlinePassed ? '🛡️ Buyer Protection Active' : '⏳ Waiting for Delivery'}
+                  </h3>
+                  <p className={`text-2xl font-mono font-bold ${deliveryDeadlinePassed ? 'text-red-300' : 'text-white'}`}>
+                    {deliveryDeadline}
+                  </p>
+                  <p className={`text-sm ${deliveryDeadlinePassed ? 'text-red-300' : 'text-gray-300'}`}>
+                    {deliveryDeadlinePassed 
+                      ? 'The vendor has exceeded the 24-hour delivery window. You can now open a dispute for non-delivery.'
+                      : 'The seller has 24 hours from payment to deliver your order. If they don\'t deliver in time, you\'ll be able to open a dispute.'
+                    }
+                  </p>
+                </div>
+                {deliveryDeadlinePassed && (
+                  <button 
+                    onClick={() => {
+                      setDisputeReason('Vendor failed to deliver within 24 hours')
+                      setShowDispute(true)
+                    }}
+                    className="px-6 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-red-500 to-orange-500 hover:shadow-lg hover:shadow-red-500/50 transition-all"
+                  >
+                    ⚠️ Open Dispute
+                  </button>
+                )}
+              </div>
+              {!deliveryDeadlinePassed && (
+                <div className="mt-4 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
+                  <p className="text-blue-300 text-sm flex items-center gap-2">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Your payment is protected. If the vendor doesn't deliver within 24 hours, you'll be able to request a refund.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -697,9 +826,13 @@ export default function OrderDetailPage() {
                 <button 
                   onClick={() => setShowDelivery(true)} 
                   disabled={actionLoading} 
-                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 hover:shadow-lg hover:shadow-green-500/50 transition-all"
+                  className={`w-full text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 hover:shadow-lg transition-all ${
+                    deliveryDeadlinePassed 
+                      ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:shadow-red-500/50 animate-pulse'
+                      : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:shadow-green-500/50'
+                  }`}
                 >
-                  📦 Deliver Order
+                  📦 Deliver Order {deliveryDeadlinePassed && '(URGENT!)'}
                 </button>
               )}
 
@@ -722,16 +855,54 @@ export default function OrderDetailPage() {
                 </div>
               )}
 
-              {/* BUYER: Dispute Form */}
-              {isBuyer && showDispute && order.status === 'delivered' && (
+              {/* NEW: BUYER ACTION - Dispute for Non-Delivery (when 24h passed and still 'paid') */}
+              {isBuyer && order.status === 'paid' && isManualDelivery && deliveryDeadlinePassed && !showDispute && (
+                <div className="bg-red-500/10 border-2 border-red-500/50 rounded-xl p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
+                      <span className="text-2xl">🛡️</span>
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-red-400">Buyer Protection Available</h4>
+                      <p className="text-sm text-gray-300">The vendor has exceeded the 24-hour delivery window</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setDisputeReason('Vendor failed to deliver within 24 hours')
+                      setShowDispute(true)
+                    }}
+                    className="w-full bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-red-500/50 transition-all"
+                  >
+                    ⚠️ Open Non-Delivery Dispute
+                  </button>
+                </div>
+              )}
+
+              {/* BUYER: Dispute Form (works for both post-delivery and non-delivery disputes) */}
+              {isBuyer && showDispute && (order.status === 'delivered' || (order.status === 'paid' && isManualDelivery && deliveryDeadlinePassed)) && (
                 <div className="bg-red-500/10 border-2 border-red-500/30 rounded-xl p-6">
                   <h4 className="text-xl font-bold text-red-400 mb-4">⚠️ Raise Dispute</h4>
+                  
+                  {/* Show special notice for non-delivery disputes */}
+                  {order.status === 'paid' && deliveryDeadlinePassed && (
+                    <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 mb-4">
+                      <p className="text-orange-300 text-sm flex items-center gap-2">
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        This is a non-delivery dispute. The vendor has exceeded the 24-hour delivery window.
+                      </p>
+                    </div>
+                  )}
+                  
                   <select 
                     value={disputeReason} 
                     onChange={e => setDisputeReason(e.target.value)} 
                     className="w-full bg-slate-800 border border-white/10 rounded-lg px-4 py-3 text-white mb-4 focus:border-red-500/50 focus:outline-none"
                   >
                     <option value="">Select reason...</option>
+                    <option value="Vendor failed to deliver within 24 hours">Vendor failed to deliver within 24 hours</option>
                     <option value="Item not received">Item not received</option>
                     <option value="Wrong item">Wrong item</option>
                     <option value="Not as described">Not as described</option>
@@ -743,7 +914,10 @@ export default function OrderDetailPage() {
                   <textarea 
                     value={disputeDesc} 
                     onChange={e => setDisputeDesc(e.target.value)} 
-                    placeholder="Describe the issue in detail (minimum 20 characters)..." 
+                    placeholder={order.status === 'paid' && deliveryDeadlinePassed 
+                      ? "Please describe the situation. Example: 'I paid for this order over 24 hours ago but have not received any delivery from the vendor...'"
+                      : "Describe the issue in detail (minimum 20 characters)..."
+                    }
                     rows={4} 
                     maxLength={1000} 
                     className="w-full bg-slate-800 border border-white/10 rounded-lg px-4 py-3 text-white mb-2 resize-none focus:border-red-500/50 focus:outline-none" 
@@ -812,10 +986,17 @@ export default function OrderDetailPage() {
                 </div>
               )}
 
-              {/* WAITING MESSAGES */}
-              {isBuyer && order.status === 'paid' && (
+              {/* WAITING MESSAGES - Updated for manual delivery with timer info */}
+              {isBuyer && order.status === 'paid' && !deliveryDeadlinePassed && (
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-center">
-                  <p className="text-blue-400 font-semibold">⏳ Waiting for seller to deliver the item...</p>
+                  <p className="text-blue-400 font-semibold">
+                    ⏳ Waiting for seller to deliver the item...
+                    {isManualDelivery && deliveryDeadline && (
+                      <span className="block text-sm text-gray-400 mt-1">
+                        Seller has {deliveryDeadline} to deliver
+                      </span>
+                    )}
+                  </p>
                 </div>
               )}
             </div>
