@@ -82,6 +82,10 @@ export interface AdminConversation {
     image_url?: string
     game?: string
   }
+  order?: {
+    status: string
+    amount: string
+  }
 }
 
 export interface AdminReview {
