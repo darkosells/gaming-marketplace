@@ -130,6 +130,8 @@ export interface AdminVerification {
   id: string
   user_id: string
   status: 'pending' | 'approved' | 'rejected'
+  full_name?: string
+  date_of_birth?: string
   id_front_url?: string
   id_back_url?: string
   rejection_reason?: string
