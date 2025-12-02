@@ -37,17 +37,20 @@ export async function POST(request: NextRequest) {
     // Create Supabase client with service role for admin access
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-    const charge = event.data
-    const orderId = charge.metadata?.order_id
+    const eventData = event.data
+    const orderId = eventData.metadata?.order_id
 
     if (!orderId) {
       console.log('No order_id in webhook metadata, skipping')
       return NextResponse.json({ received: true })
     }
 
-    // Handle different event types
-    switch (event.type) {
-      case 'charge:confirmed':
+    // Handle different event types (both charge and checkout events)
+    const eventType = event.type.replace('charge:', '').replace('checkout:', '')
+    
+    switch (eventType) {
+      case 'confirmed':
+      case 'completed':
         // Payment confirmed on blockchain
         console.log(`Payment confirmed for order ${orderId}`)
         
@@ -95,7 +98,7 @@ export async function POST(request: NextRequest) {
         }
         break
 
-      case 'charge:pending':
+      case 'pending':
         // Payment detected but not yet confirmed
         console.log(`Payment pending for order ${orderId}`)
         await supabase
@@ -104,9 +107,10 @@ export async function POST(request: NextRequest) {
           .eq('id', orderId)
         break
 
-      case 'charge:failed':
-        // Payment failed
-        console.log(`Payment failed for order ${orderId}`)
+      case 'failed':
+      case 'expired':
+        // Payment failed or expired
+        console.log(`Payment failed/expired for order ${orderId}`)
         await supabase
           .from('orders')
           .update({ 
@@ -116,16 +120,17 @@ export async function POST(request: NextRequest) {
           .eq('id', orderId)
         break
 
-      case 'charge:delayed':
+      case 'delayed':
+      case 'underpaid':
         // Payment delayed (underpaid or taking long to confirm)
-        console.log(`Payment delayed for order ${orderId}`)
+        console.log(`Payment delayed/underpaid for order ${orderId}`)
         await supabase
           .from('orders')
           .update({ payment_status: 'delayed' })
           .eq('id', orderId)
         break
 
-      case 'charge:resolved':
+      case 'resolved':
         // Previously delayed payment now resolved
         console.log(`Payment resolved for order ${orderId}`)
         await supabase
