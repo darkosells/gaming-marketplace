@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { AdminUser, ITEMS_PER_PAGE } from '../../types'
 import UserDetailsModal from '@/components/UserDetailsModal'
+import MaskedText, { RevealAllButton } from '@/components/MaskedText'
 
 interface UsersTabProps {
   users: AdminUser[]
@@ -35,6 +36,9 @@ export default function UsersTab({
 }: UsersTabProps) {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [riskFilter, setRiskFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'critical'>('all')
+  
+  // NEW: Global reveal state for all sensitive data
+  const [revealAllSensitive, setRevealAllSensitive] = useState(false)
 
   // Apply risk filter
   const riskFilteredUsers = riskFilter === 'all' 
@@ -129,6 +133,12 @@ export default function UsersTab({
             ))}
           </div>
 
+          {/* NEW: Reveal All Button */}
+          <RevealAllButton
+            isRevealed={revealAllSensitive}
+            onToggle={() => setRevealAllSensitive(!revealAllSensitive)}
+          />
+
           {canExportData && (
             <button
               onClick={onExportCSV}
@@ -146,6 +156,14 @@ export default function UsersTab({
             {selectedItems.length === riskFilteredUsers.length ? '✓ Deselect All' : 'Select All'}
           </button>
         </div>
+      </div>
+
+      {/* Sensitive Data Notice */}
+      <div className="bg-slate-800/50 border border-white/10 rounded-lg px-4 py-2 mb-4 flex items-center gap-2 text-sm">
+        <span className="text-purple-400">🔒</span>
+        <span className="text-gray-400">
+          Sensitive data (emails, IPs) is masked for security. Click to reveal individual items or use "Reveal All" button.
+        </span>
       </div>
 
       {/* Risk Summary Cards */}
@@ -244,16 +262,42 @@ export default function UsersTab({
                         <span>⭐ {u.rating?.toFixed(1) || '0.0'}</span>
                         <span>💰 {u.total_sales || 0} sales</span>
                         <span>📅 {new Date(u.created_at).toLocaleDateString()}</span>
+                        
+                        {/* MASKED: Last IP */}
                         {(u as any).last_ip && (
-                          <span className="font-mono text-xs text-gray-500">
-                            🌐 {(u as any).last_ip}
+                          <span className="flex items-center gap-1">
+                            <span className="text-gray-500">🌐</span>
+                            {revealAllSensitive ? (
+                              <span className="font-mono text-xs text-gray-400">{(u as any).last_ip}</span>
+                            ) : (
+                              <MaskedText 
+                                text={(u as any).last_ip} 
+                                type="generic" 
+                                size="sm"
+                                autoHideSeconds={30}
+                              />
+                            )}
                           </span>
                         )}
                       </div>
 
-                      {/* Email (smaller) */}
-                      <div className="text-xs text-gray-500 mt-1 truncate">
-                        {u.email}
+                      {/* MASKED: Email */}
+                      <div className="mt-2">
+                        {u.email && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-500 text-xs">📧</span>
+                            {revealAllSensitive ? (
+                              <span className="text-xs text-gray-400">{u.email}</span>
+                            ) : (
+                              <MaskedText 
+                                text={u.email} 
+                                type="email" 
+                                size="sm"
+                                autoHideSeconds={30}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

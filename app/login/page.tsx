@@ -6,12 +6,25 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Image from 'next/image'
 
+// Rate limit configuration
+const LOGIN_RATE_LIMIT = {
+  maxAttempts: 5,
+  windowMinutes: 15,
+  lockMinutes: 15
+}
+
 function LoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  
+  // Rate limiting states
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null)
+  const [lockedUntil, setLockedUntil] = useState<Date | null>(null)
+  const [lockCountdown, setLockCountdown] = useState<string>('')
+  
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -22,6 +35,111 @@ function LoginContent() {
       setSuccess('✅ Email verified! You can now login.')
     }
   }, [searchParams])
+
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (!lockedUntil) {
+      setLockCountdown('')
+      return
+    }
+
+    const updateCountdown = () => {
+      const now = new Date()
+      const diff = lockedUntil.getTime() - now.getTime()
+      
+      if (diff <= 0) {
+        setLockedUntil(null)
+        setLockCountdown('')
+        setAttemptsRemaining(LOGIN_RATE_LIMIT.maxAttempts)
+        return
+      }
+      
+      const minutes = Math.floor(diff / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      setLockCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [lockedUntil])
+
+  // Check rate limit status on mount and when email changes
+  const checkRateLimit = async (emailToCheck: string) => {
+    if (!emailToCheck) return
+    
+    try {
+      const { data, error } = await supabase.rpc('check_rate_limit', {
+        p_identifier: emailToCheck.toLowerCase(),
+        p_action_type: 'login',
+        p_max_attempts: LOGIN_RATE_LIMIT.maxAttempts,
+        p_window_minutes: LOGIN_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: LOGIN_RATE_LIMIT.lockMinutes
+      })
+
+      if (error) {
+        console.error('Rate limit check error:', error)
+        return
+      }
+
+      if (data) {
+        setAttemptsRemaining(data.attempts_remaining)
+        if (data.locked_until) {
+          setLockedUntil(new Date(data.locked_until))
+        } else {
+          setLockedUntil(null)
+        }
+      }
+    } catch (err) {
+      console.error('Rate limit check failed:', err)
+    }
+  }
+
+  // Record failed attempt
+  const recordFailedAttempt = async (emailToRecord: string) => {
+    try {
+      const { data, error } = await supabase.rpc('record_rate_limit_attempt', {
+        p_identifier: emailToRecord.toLowerCase(),
+        p_action_type: 'login',
+        p_max_attempts: LOGIN_RATE_LIMIT.maxAttempts,
+        p_window_minutes: LOGIN_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: LOGIN_RATE_LIMIT.lockMinutes,
+        p_success: false,
+        p_metadata: {}
+      })
+
+      if (error) {
+        console.error('Record attempt error:', error)
+        return
+      }
+
+      if (data) {
+        setAttemptsRemaining(data.attempts_remaining)
+        if (data.locked_until) {
+          setLockedUntil(new Date(data.locked_until))
+        }
+      }
+    } catch (err) {
+      console.error('Record attempt failed:', err)
+    }
+  }
+
+  // Clear rate limit on success
+  const clearRateLimit = async (emailToClear: string) => {
+    try {
+      await supabase.rpc('record_rate_limit_attempt', {
+        p_identifier: emailToClear.toLowerCase(),
+        p_action_type: 'login',
+        p_max_attempts: LOGIN_RATE_LIMIT.maxAttempts,
+        p_window_minutes: LOGIN_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: LOGIN_RATE_LIMIT.lockMinutes,
+        p_success: true,
+        p_metadata: {}
+      })
+    } catch (err) {
+      console.error('Clear rate limit failed:', err)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,13 +166,40 @@ function LoginContent() {
       return
     }
 
+    // Check rate limit before attempting login
+    try {
+      const { data: rateLimitData, error: rateLimitError } = await supabase.rpc('check_rate_limit', {
+        p_identifier: email.toLowerCase(),
+        p_action_type: 'login',
+        p_max_attempts: LOGIN_RATE_LIMIT.maxAttempts,
+        p_window_minutes: LOGIN_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: LOGIN_RATE_LIMIT.lockMinutes
+      })
+
+      if (rateLimitError) {
+        console.error('Rate limit check error:', rateLimitError)
+      } else if (rateLimitData && !rateLimitData.allowed) {
+        setLockedUntil(new Date(rateLimitData.locked_until))
+        setAttemptsRemaining(0)
+        setError('Too many failed attempts. Please try again later.')
+        setLoading(false)
+        return
+      }
+    } catch (err) {
+      console.error('Rate limit check failed:', err)
+    }
+
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (authError) throw authError
+      if (authError) {
+        // Record failed attempt
+        await recordFailedAttempt(email)
+        throw authError
+      }
 
       // Get user profile to check role and email verification
       const { data: profile, error: profileError } = await supabase
@@ -75,6 +220,9 @@ function LoginContent() {
         }, 1500)
         return
       }
+
+      // Clear rate limit on successful login
+      await clearRateLimit(email)
 
       // Redirect based on role
       if (profile.is_admin) {
@@ -99,6 +247,13 @@ function LoginContent() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Check rate limit when email field loses focus
+  const handleEmailBlur = () => {
+    if (email) {
+      checkRateLimit(email)
     }
   }
 
@@ -180,6 +335,37 @@ function LoginContent() {
                 </div>
               )}
 
+              {/* Rate Limit Warning */}
+              {lockedUntil && (
+                <div className="bg-orange-500/20 border border-orange-500/50 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-orange-200 text-sm font-medium">Account Temporarily Locked</p>
+                      <p className="text-orange-300/70 text-xs">
+                        Try again in <span className="font-mono font-bold">{lockCountdown}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Attempts Remaining Warning */}
+              {attemptsRemaining !== null && attemptsRemaining > 0 && attemptsRemaining <= 2 && !lockedUntil && (
+                <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-3">
+                  <p className="text-yellow-200 text-sm flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>{attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining before lockout</span>
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-white font-semibold mb-2 text-sm">Email</label>
                 <div className="relative group">
@@ -188,10 +374,12 @@ function LoginContent() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onBlur={handleEmailBlur}
                     placeholder="your@email.com"
                     className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                     required
                     maxLength={100}
+                    disabled={!!lockedUntil}
                   />
                 </div>
               </div>
@@ -208,6 +396,7 @@ function LoginContent() {
                     className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                     required
                     maxLength={72}
+                    disabled={!!lockedUntil}
                   />
                 </div>
               </div>
@@ -227,13 +416,20 @@ function LoginContent() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !!lockedUntil}
                 className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                     Signing in...
+                  </span>
+                ) : lockedUntil ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Locked - Wait {lockCountdown}
                   </span>
                 ) : (
                   'Sign In'

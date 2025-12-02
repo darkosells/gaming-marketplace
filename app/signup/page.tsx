@@ -1,11 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { sendVerificationEmail, generateVerificationCode } from '@/lib/email'
 import Image from 'next/image'
+
+// Rate limit configuration
+const SIGNUP_RATE_LIMIT = {
+  maxAttempts: 3,      // Max 3 signups per hour per IP
+  windowMinutes: 60,
+  lockMinutes: 60
+}
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -14,8 +21,121 @@ export default function SignupPage() {
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  
+  // Rate limiting states
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null)
+  const [lockedUntil, setLockedUntil] = useState<Date | null>(null)
+  const [lockCountdown, setLockCountdown] = useState<string>('')
+  
   const router = useRouter()
   const supabase = createClient()
+
+  // Get a simple fingerprint for rate limiting (IP is handled server-side, this is for client tracking)
+  const getClientFingerprint = () => {
+    // Use a combination of factors for client-side tracking
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.textBaseline = 'top'
+      ctx.font = '14px Arial'
+      ctx.fillText('fingerprint', 2, 2)
+    }
+    const fingerprint = canvas.toDataURL().slice(-50) + navigator.userAgent.slice(0, 50)
+    return btoa(fingerprint).slice(0, 32)
+  }
+
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (!lockedUntil) {
+      setLockCountdown('')
+      return
+    }
+
+    const updateCountdown = () => {
+      const now = new Date()
+      const diff = lockedUntil.getTime() - now.getTime()
+      
+      if (diff <= 0) {
+        setLockedUntil(null)
+        setLockCountdown('')
+        setAttemptsRemaining(SIGNUP_RATE_LIMIT.maxAttempts)
+        return
+      }
+      
+      const minutes = Math.floor(diff / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      setLockCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [lockedUntil])
+
+  // Check rate limit on mount
+  useEffect(() => {
+    checkRateLimit()
+  }, [])
+
+  const checkRateLimit = async () => {
+    try {
+      const fingerprint = getClientFingerprint()
+      
+      const { data, error } = await supabase.rpc('check_rate_limit', {
+        p_identifier: `signup_${fingerprint}`,
+        p_action_type: 'signup',
+        p_max_attempts: SIGNUP_RATE_LIMIT.maxAttempts,
+        p_window_minutes: SIGNUP_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: SIGNUP_RATE_LIMIT.lockMinutes
+      })
+
+      if (error) {
+        console.error('Rate limit check error:', error)
+        return
+      }
+
+      if (data) {
+        setAttemptsRemaining(data.attempts_remaining)
+        if (data.locked_until) {
+          setLockedUntil(new Date(data.locked_until))
+        } else {
+          setLockedUntil(null)
+        }
+      }
+    } catch (err) {
+      console.error('Rate limit check failed:', err)
+    }
+  }
+
+  const recordSignupAttempt = async (success: boolean) => {
+    try {
+      const fingerprint = getClientFingerprint()
+      
+      const { data, error } = await supabase.rpc('record_rate_limit_attempt', {
+        p_identifier: `signup_${fingerprint}`,
+        p_action_type: 'signup',
+        p_max_attempts: SIGNUP_RATE_LIMIT.maxAttempts,
+        p_window_minutes: SIGNUP_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: SIGNUP_RATE_LIMIT.lockMinutes,
+        p_success: success,
+        p_metadata: {}
+      })
+
+      if (error) {
+        console.error('Record attempt error:', error)
+        return
+      }
+
+      if (data && !success) {
+        setAttemptsRemaining(data.attempts_remaining)
+        if (data.locked_until) {
+          setLockedUntil(new Date(data.locked_until))
+        }
+      }
+    } catch (err) {
+      console.error('Record attempt failed:', err)
+    }
+  }
 
   // Validation functions
   const validateUsername = (username: string): string | null => {
@@ -70,6 +190,31 @@ export default function SignupPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
+
+    // Check rate limit first
+    try {
+      const fingerprint = getClientFingerprint()
+      
+      const { data: rateLimitData, error: rateLimitError } = await supabase.rpc('check_rate_limit', {
+        p_identifier: `signup_${fingerprint}`,
+        p_action_type: 'signup',
+        p_max_attempts: SIGNUP_RATE_LIMIT.maxAttempts,
+        p_window_minutes: SIGNUP_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: SIGNUP_RATE_LIMIT.lockMinutes
+      })
+
+      if (rateLimitError) {
+        console.error('Rate limit check error:', rateLimitError)
+      } else if (rateLimitData && !rateLimitData.allowed) {
+        setLockedUntil(new Date(rateLimitData.locked_until))
+        setAttemptsRemaining(0)
+        setError('Too many signup attempts. Please try again later.')
+        setLoading(false)
+        return
+      }
+    } catch (err) {
+      console.error('Rate limit check failed:', err)
+    }
 
     // Validate username
     const usernameError = validateUsername(username)
@@ -156,12 +301,19 @@ export default function SignupPage() {
         console.error('Error sending verification email:', err)
       })
 
+      // Record successful signup (clears rate limit)
+      await recordSignupAttempt(true)
+
       // Step 5: DON'T sign out - keep user logged in for verification
       // Step 6: Redirect to verification page with email
       router.push(`/verify-email?email=${encodeURIComponent(email)}`)
 
     } catch (error: any) {
       console.error('Signup error:', error)
+      
+      // Record failed attempt
+      await recordSignupAttempt(false)
+      
       setError(error.message || 'Failed to create account')
     } finally {
       setLoading(false)
@@ -237,6 +389,37 @@ export default function SignupPage() {
               </div>
             )}
 
+            {/* Rate Limit Warning */}
+            {lockedUntil && (
+              <div className="bg-orange-500/20 border border-orange-500/50 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-orange-200 text-sm font-medium">Signup Temporarily Blocked</p>
+                    <p className="text-orange-300/70 text-xs">
+                      Try again in <span className="font-mono font-bold">{lockCountdown}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Attempts Remaining Warning */}
+            {attemptsRemaining !== null && attemptsRemaining > 0 && attemptsRemaining <= 1 && !lockedUntil && (
+              <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-3">
+                <p className="text-yellow-200 text-sm flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>Last signup attempt before temporary block</span>
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="block text-white font-semibold mb-2 text-sm">Username</label>
               <div className="relative group">
@@ -252,6 +435,7 @@ export default function SignupPage() {
                   maxLength={20}
                   pattern="[a-zA-Z0-9_-]+"
                   title="Username can only contain letters, numbers, underscores, and hyphens"
+                  disabled={!!lockedUntil}
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">3-20 characters, letters/numbers/_ /- only</p>
@@ -269,6 +453,7 @@ export default function SignupPage() {
                   className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
                   maxLength={100}
+                  disabled={!!lockedUntil}
                 />
               </div>
             </div>
@@ -286,6 +471,7 @@ export default function SignupPage() {
                   required
                   minLength={8}
                   maxLength={72}
+                  disabled={!!lockedUntil}
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">At least 8 characters with a number or special character</p>
@@ -304,19 +490,27 @@ export default function SignupPage() {
                   required
                   minLength={8}
                   maxLength={72}
+                  disabled={!!lockedUntil}
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !!lockedUntil}
               className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                   Creating Account...
+                </span>
+              ) : lockedUntil ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Blocked - Wait {lockCountdown}
                 </span>
               ) : (
                 'Create Account'

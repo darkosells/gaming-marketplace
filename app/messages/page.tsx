@@ -104,6 +104,16 @@ function MessagesContent() {
   const [showDeliverySecurityModal, setShowDeliverySecurityModal] = useState(false)
   const [pendingRevealMessageId, setPendingRevealMessageId] = useState<string | null>(null)
   
+  // NEW: Rate limiting states
+  const [messageTimestamps, setMessageTimestamps] = useState<number[]>([])
+  const [conversationTimestamps, setConversationTimestamps] = useState<number[]>([])
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null)
+  
+  // Rate limit constants
+  const MESSAGE_COOLDOWN_MS = 1000 // 1 second between messages
+  const MAX_MESSAGES_PER_MINUTE = 20
+  const MAX_CONVERSATIONS_PER_HOUR = 5
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastTypingBroadcastRef = useRef<number>(0)
@@ -692,6 +702,77 @@ function MessagesContent() {
     return null
   }
 
+  // NEW: Rate limiting check for messages
+  const checkMessageRateLimit = (): { allowed: boolean; error?: string } => {
+    const now = Date.now()
+    
+    // Clean up old timestamps (older than 1 minute)
+    const recentTimestamps = messageTimestamps.filter(ts => now - ts < 60000)
+    
+    // Check cooldown (1 second between messages)
+    if (recentTimestamps.length > 0) {
+      const lastMessageTime = recentTimestamps[recentTimestamps.length - 1]
+      if (now - lastMessageTime < MESSAGE_COOLDOWN_MS) {
+        return { allowed: false, error: 'Please wait a moment before sending another message' }
+      }
+    }
+    
+    // Check messages per minute limit
+    if (recentTimestamps.length >= MAX_MESSAGES_PER_MINUTE) {
+      return { allowed: false, error: 'Too many messages. Please wait a minute before sending more.' }
+    }
+    
+    return { allowed: true }
+  }
+
+  // NEW: Record message timestamp
+  const recordMessageSent = () => {
+    const now = Date.now()
+    setMessageTimestamps(prev => {
+      // Keep only timestamps from last minute
+      const recent = prev.filter(ts => now - ts < 60000)
+      return [...recent, now]
+    })
+  }
+
+  // NEW: Rate limiting check for conversation creation
+  const checkConversationRateLimit = (): { allowed: boolean; error?: string } => {
+    const now = Date.now()
+    
+    // Clean up old timestamps (older than 1 hour)
+    const recentTimestamps = conversationTimestamps.filter(ts => now - ts < 3600000)
+    
+    // Check conversations per hour limit
+    if (recentTimestamps.length >= MAX_CONVERSATIONS_PER_HOUR) {
+      const oldestTimestamp = recentTimestamps[0]
+      const minutesUntilReset = Math.ceil((3600000 - (now - oldestTimestamp)) / 60000)
+      return { 
+        allowed: false, 
+        error: `Too many new conversations. Please wait ${minutesUntilReset} minutes before starting another.` 
+      }
+    }
+    
+    return { allowed: true }
+  }
+
+  // NEW: Record conversation creation timestamp
+  const recordConversationCreated = () => {
+    const now = Date.now()
+    setConversationTimestamps(prev => {
+      // Keep only timestamps from last hour
+      const recent = prev.filter(ts => now - ts < 3600000)
+      return [...recent, now]
+    })
+  }
+
+  // NEW: Clear rate limit error after delay
+  useEffect(() => {
+    if (rateLimitError) {
+      const timer = setTimeout(() => setRateLimitError(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [rateLimitError])
+
   const checkImageForSensitiveContent = (file: File): boolean => {
     const filename = file.name.toLowerCase()
     const sensitiveKeywords = ['password', 'ssn', 'license', 'card', 'bank', 'id']
@@ -818,6 +899,13 @@ function MessagesContent() {
 
     if (!selectedConversation) return
 
+    // NEW: Check rate limit
+    const rateLimitCheck = checkMessageRateLimit()
+    if (!rateLimitCheck.allowed) {
+      setRateLimitError(rateLimitCheck.error || 'Rate limit exceeded')
+      return
+    }
+
     const scamWarning = detectScamPattern(newMessage)
     if (scamWarning) {
       const confirmed = confirm(`⚠️ Security Warning: ${scamWarning}\n\nAre you sure you want to send this message?`)
@@ -872,6 +960,9 @@ function MessagesContent() {
         })
         .eq('id', selectedConversation.id)
 
+      // NEW: Record successful message for rate limiting
+      recordMessageSent()
+
       setNewMessage('')
       setSelectedImage(null)
       setImagePreview(null)
@@ -890,6 +981,20 @@ function MessagesContent() {
 
   const createConversationAndSendMessage = async () => {
     if (!pendingListingId || !pendingSellerId) return
+
+    // NEW: Check conversation rate limit
+    const convRateLimitCheck = checkConversationRateLimit()
+    if (!convRateLimitCheck.allowed) {
+      setRateLimitError(convRateLimitCheck.error || 'Rate limit exceeded')
+      return
+    }
+
+    // NEW: Check message rate limit
+    const msgRateLimitCheck = checkMessageRateLimit()
+    if (!msgRateLimitCheck.allowed) {
+      setRateLimitError(msgRateLimitCheck.error || 'Rate limit exceeded')
+      return
+    }
 
     const scamWarning = detectScamPattern(newMessage)
     if (scamWarning) {
@@ -945,6 +1050,10 @@ function MessagesContent() {
         })
 
       if (msgError) throw msgError
+
+      // NEW: Record successful conversation and message for rate limiting
+      recordConversationCreated()
+      recordMessageSent()
 
       setPendingListingId(null)
       setPendingSellerId(null)
@@ -2017,6 +2126,18 @@ function MessagesContent() {
                           </div>
                         </div>
                       )}
+
+                      {/* NEW: Rate limit error message */}
+                      {rateLimitError && (
+                        <div className="mb-3 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                          <p className="text-red-400 text-xs flex items-center gap-2">
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {rateLimitError}
+                          </p>
+                        </div>
+                      )}
                       
                       <div className="flex gap-2 sm:gap-3">
                         <input
@@ -2044,10 +2165,17 @@ function MessagesContent() {
                           <input
                             type="text"
                             value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
+                            onChange={(e) => setNewMessage(e.target.value.slice(0, 2000))}
+                            maxLength={2000}
                             placeholder="Type a message..."
                             className="relative w-full px-3 sm:px-4 py-2 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                           />
+                          {/* Character counter - shows when approaching limit */}
+                          {newMessage.length > 1800 && (
+                            <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${newMessage.length >= 2000 ? 'text-red-400' : 'text-yellow-400'}`}>
+                              {newMessage.length}/2000
+                            </span>
+                          )}
                         </div>
                         <button
                           type="submit"

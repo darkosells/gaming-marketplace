@@ -1,20 +1,152 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { createClient } from '@/lib/supabase'
+
+// Rate limit configuration
+const PASSWORD_RESET_RATE_LIMIT = {
+  maxAttempts: 3,      // Max 3 reset requests per hour per email
+  windowMinutes: 60,
+  lockMinutes: 60
+}
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  
+  // Rate limiting states
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null)
+  const [lockedUntil, setLockedUntil] = useState<Date | null>(null)
+  const [lockCountdown, setLockCountdown] = useState<string>('')
+  
   const router = useRouter()
+  const supabase = createClient()
+
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (!lockedUntil) {
+      setLockCountdown('')
+      return
+    }
+
+    const updateCountdown = () => {
+      const now = new Date()
+      const diff = lockedUntil.getTime() - now.getTime()
+      
+      if (diff <= 0) {
+        setLockedUntil(null)
+        setLockCountdown('')
+        setAttemptsRemaining(PASSWORD_RESET_RATE_LIMIT.maxAttempts)
+        return
+      }
+      
+      const minutes = Math.floor(diff / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      setLockCountdown(`${minutes}:${seconds.toString().padStart(2, '0')}`)
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [lockedUntil])
+
+  // Check rate limit when email changes
+  const checkRateLimit = async (emailToCheck: string) => {
+    if (!emailToCheck) return
+    
+    try {
+      const { data, error } = await supabase.rpc('check_rate_limit', {
+        p_identifier: `reset_${emailToCheck.toLowerCase()}`,
+        p_action_type: 'password_reset',
+        p_max_attempts: PASSWORD_RESET_RATE_LIMIT.maxAttempts,
+        p_window_minutes: PASSWORD_RESET_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: PASSWORD_RESET_RATE_LIMIT.lockMinutes
+      })
+
+      if (error) {
+        console.error('Rate limit check error:', error)
+        return
+      }
+
+      if (data) {
+        setAttemptsRemaining(data.attempts_remaining)
+        if (data.locked_until) {
+          setLockedUntil(new Date(data.locked_until))
+        } else {
+          setLockedUntil(null)
+        }
+      }
+    } catch (err) {
+      console.error('Rate limit check failed:', err)
+    }
+  }
+
+  // Record password reset attempt
+  const recordResetAttempt = async (emailToRecord: string, success: boolean) => {
+    try {
+      const { data, error } = await supabase.rpc('record_rate_limit_attempt', {
+        p_identifier: `reset_${emailToRecord.toLowerCase()}`,
+        p_action_type: 'password_reset',
+        p_max_attempts: PASSWORD_RESET_RATE_LIMIT.maxAttempts,
+        p_window_minutes: PASSWORD_RESET_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: PASSWORD_RESET_RATE_LIMIT.lockMinutes,
+        p_success: success,
+        p_metadata: {}
+      })
+
+      if (error) {
+        console.error('Record attempt error:', error)
+        return
+      }
+
+      if (data && !success) {
+        setAttemptsRemaining(data.attempts_remaining)
+        if (data.locked_until) {
+          setLockedUntil(new Date(data.locked_until))
+        }
+      }
+    } catch (err) {
+      console.error('Record attempt failed:', err)
+    }
+  }
+
+  const handleEmailBlur = () => {
+    if (email) {
+      checkRateLimit(email)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
+
+    // Check rate limit before attempting
+    try {
+      const { data: rateLimitData, error: rateLimitError } = await supabase.rpc('check_rate_limit', {
+        p_identifier: `reset_${email.toLowerCase()}`,
+        p_action_type: 'password_reset',
+        p_max_attempts: PASSWORD_RESET_RATE_LIMIT.maxAttempts,
+        p_window_minutes: PASSWORD_RESET_RATE_LIMIT.windowMinutes,
+        p_lock_minutes: PASSWORD_RESET_RATE_LIMIT.lockMinutes
+      })
+
+      if (rateLimitError) {
+        console.error('Rate limit check error:', rateLimitError)
+      } else if (rateLimitData && !rateLimitData.allowed) {
+        setLockedUntil(new Date(rateLimitData.locked_until))
+        setAttemptsRemaining(0)
+        setError('Too many reset requests. Please try again later.')
+        setLoading(false)
+        return
+      }
+    } catch (err) {
+      console.error('Rate limit check failed:', err)
+    }
 
     try {
       const response = await fetch('/api/auth/request-reset', {
@@ -26,8 +158,13 @@ export default function ForgotPassword() {
       const data = await response.json()
 
       if (!response.ok) {
+        // Record failed attempt
+        await recordResetAttempt(email, false)
         throw new Error(data.error || 'Failed to send reset code')
       }
+
+      // Record successful attempt (still counts toward rate limit to prevent email bombing)
+      await recordResetAttempt(email, false) // We use false here because we still want to count it
 
       // Redirect to reset password page with email
       router.push(`/reset-password?email=${encodeURIComponent(email)}`)
@@ -109,6 +246,37 @@ export default function ForgotPassword() {
               </div>
             )}
 
+            {/* Rate Limit Warning */}
+            {lockedUntil && (
+              <div className="bg-orange-500/20 border border-orange-500/50 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-orange-200 text-sm font-medium">Too Many Requests</p>
+                    <p className="text-orange-300/70 text-xs">
+                      Try again in <span className="font-mono font-bold">{lockCountdown}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Attempts Remaining Warning */}
+            {attemptsRemaining !== null && attemptsRemaining > 0 && attemptsRemaining <= 1 && !lockedUntil && (
+              <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-3">
+                <p className="text-yellow-200 text-sm flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>Last reset request before temporary block</span>
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="block text-white font-semibold mb-2 text-sm">Email Address</label>
               <div className="relative group">
@@ -117,10 +285,12 @@ export default function ForgotPassword() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onBlur={handleEmailBlur}
                   placeholder="your@email.com"
                   className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
                   required
                   maxLength={100}
+                  disabled={!!lockedUntil}
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">We'll send a 6-digit verification code to this email</p>
@@ -128,13 +298,20 @@ export default function ForgotPassword() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !!lockedUntil}
               className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                   Sending Code...
+                </span>
+              ) : lockedUntil ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Blocked - Wait {lockCountdown}
                 </span>
               ) : (
                 'Send Reset Code'
