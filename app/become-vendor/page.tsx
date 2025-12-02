@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 
@@ -13,6 +14,7 @@ export default function BecomeVendorPage() {
   const [step, setStep] = useState(1)
   const [previousSubmission, setPreviousSubmission] = useState<any>(null)
   const [isResubmission, setIsResubmission] = useState(false)
+  const [calculatedAge, setCalculatedAge] = useState<number | null>(null)
   
   const [formData, setFormData] = useState({
     fullName: '', dateOfBirth: '', phoneNumber: '', streetAddress: '', city: '', stateProvince: '', postalCode: '', country: 'United States',
@@ -25,11 +27,31 @@ export default function BecomeVendorPage() {
   const [idBackPreview, setIdBackPreview] = useState<string>('')
   const [verificationPhotoPreview, setVerificationPhotoPreview] = useState<string>('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [agreedToSellerRules, setAgreedToSellerRules] = useState(false)
 
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => { checkUser() }, [])
+
+  // Calculate age whenever date of birth changes
+  useEffect(() => {
+    if (formData.dateOfBirth) {
+      const birthDate = new Date(formData.dateOfBirth)
+      const today = new Date()
+      let age = today.getFullYear() - birthDate.getFullYear()
+      const monthDiff = today.getMonth() - birthDate.getMonth()
+      
+      // Adjust age if birthday hasn't occurred this year
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--
+      }
+      
+      setCalculatedAge(age)
+    } else {
+      setCalculatedAge(null)
+    }
+  }, [formData.dateOfBirth])
 
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -106,30 +128,63 @@ export default function BecomeVendorPage() {
 
   const validateStep = (stepNum: number): boolean => {
     if (stepNum === 1) {
-      if (!formData.fullName.trim() || formData.fullName.trim().length < 2) { alert('Enter your full legal name.'); return false }
-      if (!formData.dateOfBirth) { alert('Enter your date of birth.'); return false }
-      const age = Math.floor((Date.now() - new Date(formData.dateOfBirth).getTime()) / 31557600000)
-      if (age < 18) { alert('You must be 18 or older.'); return false }
-      if (!formData.phoneNumber || formData.phoneNumber.length < 10) { alert('Enter a valid phone number.'); return false }
+      if (!formData.fullName.trim() || formData.fullName.trim().length < 2) { 
+        alert('Please enter your full legal name.'); 
+        return false 
+      }
+      if (!formData.dateOfBirth) { 
+        alert('Please enter your date of birth.'); 
+        return false 
+      }
+      
+      // Enhanced age validation
+      if (calculatedAge === null) {
+        alert('Please enter a valid date of birth.')
+        return false
+      }
+      
+      if (calculatedAge < 0 || calculatedAge > 120) {
+        alert('Please enter a valid date of birth.')
+        return false
+      }
+      
+      if (calculatedAge < 18) { 
+        alert(`You must be at least 18 years old to become a vendor. Based on your date of birth, you are ${calculatedAge} years old.`)
+        return false 
+      }
+      
+      if (!formData.phoneNumber || formData.phoneNumber.length < 10) { 
+        alert('Please enter a valid phone number (at least 10 digits).'); 
+        return false 
+      }
     }
     if (stepNum === 2) {
-      if (!formData.streetAddress.trim()) { alert('Enter your street address.'); return false }
-      if (!formData.city.trim()) { alert('Enter your city.'); return false }
-      if (!formData.stateProvince.trim()) { alert('Enter your state/province.'); return false }
-      if (!formData.postalCode.trim()) { alert('Enter your postal code.'); return false }
+      if (!formData.streetAddress.trim()) { alert('Please enter your street address.'); return false }
+      if (!formData.city.trim()) { alert('Please enter your city.'); return false }
+      if (!formData.stateProvince.trim()) { alert('Please enter your state or province.'); return false }
+      if (!formData.postalCode.trim()) { alert('Please enter your postal code.'); return false }
     }
     if (stepNum === 3) {
-      if (!idFrontFile) { alert('Upload the front of your ID.'); return false }
+      if (!idFrontFile) { alert('Please upload the front of your ID.'); return false }
       if ((formData.idType === 'drivers_license' || formData.idType === 'national_id') && !idBackFile) { 
-        alert('Upload the back of your ID.'); return false 
+        alert('Please upload the back of your ID.'); 
+        return false 
       }
-      if (!verificationPhotoFile) { alert('Upload your verification photo.'); return false }
+      if (!verificationPhotoFile) { alert('Please upload your verification photo.'); return false }
     }
     return true
   }
 
   const handleSubmit = async () => {
-    if (!agreedToTerms) { alert('You must agree to the terms.'); return }
+    if (!agreedToTerms) { 
+      alert('You must agree to the Terms of Service and Privacy Policy.'); 
+      return 
+    }
+    if (!agreedToSellerRules) { 
+      alert('You must read and agree to the Seller Rules & Guidelines.'); 
+      return 
+    }
+    
     setSubmitting(true)
     try {
       const idFrontUrl = await uploadDocument(idFrontFile!, 'id_front')
@@ -146,6 +201,8 @@ export default function BecomeVendorPage() {
         has_previous_experience: formData.hasPreviousExperience,
         platform_names: formData.platformNames || null, platform_usernames: formData.platformUsernames || null,
         experience_description: formData.experienceDescription || null, status: 'pending',
+        agreed_to_seller_rules: true, // Track that they agreed to seller rules
+        agreed_to_seller_rules_at: new Date().toISOString(),
         resubmission_count: isResubmission ? (previousSubmission.resubmission_count || 0) + 1 : 0,
         previous_submission_id: isResubmission ? previousSubmission.id : null
       }
@@ -353,7 +410,32 @@ export default function BecomeVendorPage() {
                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} 
                     className="w-full bg-slate-800/50 border border-slate-600 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition text-sm sm:text-base" 
                   />
-                  <p className="text-xs text-gray-400 mt-1">You must be at least 18 years old</p>
+                  {/* Age Display with Validation */}
+                  {calculatedAge !== null && (
+                    <div className={`mt-2 p-2 sm:p-3 rounded-lg flex items-center gap-2 ${
+                      calculatedAge >= 18 
+                        ? 'bg-green-500/10 border border-green-500/30' 
+                        : 'bg-red-500/10 border border-red-500/30'
+                    }`}>
+                      <span className="text-lg">{calculatedAge >= 18 ? '✅' : '❌'}</span>
+                      <div>
+                        <p className={`text-xs sm:text-sm font-medium ${calculatedAge >= 18 ? 'text-green-400' : 'text-red-400'}`}>
+                          {calculatedAge >= 18 
+                            ? `Age verified: ${calculatedAge} years old` 
+                            : `You are ${calculatedAge} years old - Must be 18+`
+                          }
+                        </p>
+                        {calculatedAge < 18 && (
+                          <p className="text-gray-400 text-xs mt-1">
+                            You must be at least 18 years old to become a vendor on Nashflare.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {!formData.dateOfBirth && (
+                    <p className="text-xs text-gray-400 mt-1">You must be at least 18 years old to become a vendor</p>
+                  )}
                 </div>
 
                 <div className={fieldNeedsCorrection('phone_number') ? 'ring-2 ring-yellow-500 rounded-xl p-1' : ''}>
@@ -371,7 +453,8 @@ export default function BecomeVendorPage() {
 
                 <button 
                   onClick={() => validateStep(1) && setStep(2)} 
-                  className="w-full mt-6 sm:mt-8 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+                  disabled={calculatedAge !== null && calculatedAge < 18}
+                  className="w-full mt-6 sm:mt-8 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Continue
                   <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -748,8 +831,44 @@ export default function BecomeVendorPage() {
                   )}
                 </div>
 
-                {/* Terms Agreement - Mobile Optimized */}
-                <div className="bg-purple-500/10 border-2 border-purple-500/30 rounded-xl p-4 sm:p-5 mt-4 sm:mt-6">
+                {/* Seller Rules Agreement - NEW */}
+                <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-xl p-4 sm:p-5">
+                  <label className="flex items-start gap-2 sm:gap-3 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={agreedToSellerRules} 
+                      onChange={(e) => setAgreedToSellerRules(e.target.checked)} 
+                      className="w-4 h-4 sm:w-5 sm:h-5 mt-1 accent-amber-500 flex-shrink-0" 
+                    />
+                    <div className="text-white text-xs sm:text-sm leading-relaxed min-w-0">
+                      <p className="font-semibold mb-2 flex items-center gap-2">
+                        <span>📜</span> Seller Rules & Guidelines
+                        <span className="text-red-400">*</span>
+                      </p>
+                      <p className="text-gray-300 mb-3">
+                        I have read and agree to the{' '}
+                        <Link 
+                          href="/seller-rules" 
+                          target="_blank"
+                          className="text-amber-400 hover:text-amber-300 underline font-medium"
+                        >
+                          Seller Rules & Guidelines
+                        </Link>
+                        , including:
+                      </p>
+                      <ul className="space-y-1 text-gray-300">
+                        <li>• 5% commission on all sales</li>
+                        <li>• 48-hour buyer protection period</li>
+                        <li>• Prohibited items and conduct policies</li>
+                        <li>• Delivery requirements and dispute resolution</li>
+                        <li>• Violation penalties including account termination</li>
+                      </ul>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Terms of Service Agreement */}
+                <div className="bg-purple-500/10 border-2 border-purple-500/30 rounded-xl p-4 sm:p-5">
                   <label className="flex items-start gap-2 sm:gap-3 cursor-pointer">
                     <input 
                       type="checkbox" 
@@ -758,7 +877,10 @@ export default function BecomeVendorPage() {
                       className="w-4 h-4 sm:w-5 sm:h-5 mt-1 accent-purple-500 flex-shrink-0" 
                     />
                     <div className="text-white text-xs sm:text-sm leading-relaxed min-w-0">
-                      <p className="font-semibold mb-2">Terms and Conditions</p>
+                      <p className="font-semibold mb-2">
+                        Terms of Service & Privacy Policy
+                        <span className="text-red-400 ml-1">*</span>
+                      </p>
                       <p className="text-gray-300">
                         I agree to Nashflare's Terms of Service and Privacy Policy. I confirm that:
                       </p>
@@ -784,7 +906,7 @@ export default function BecomeVendorPage() {
                   </button>
                   <button 
                     onClick={handleSubmit} 
-                    disabled={submitting || !agreedToTerms} 
+                    disabled={submitting || !agreedToTerms || !agreedToSellerRules} 
                     className="w-full sm:flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {submitting ? (
@@ -803,6 +925,13 @@ export default function BecomeVendorPage() {
                     )}
                   </button>
                 </div>
+
+                {/* Validation reminder */}
+                {(!agreedToTerms || !agreedToSellerRules) && (
+                  <p className="text-center text-amber-400 text-xs sm:text-sm mt-3">
+                    ⚠️ You must agree to both the Seller Rules and Terms of Service to submit
+                  </p>
+                )}
               </div>
             )}
           </div>
