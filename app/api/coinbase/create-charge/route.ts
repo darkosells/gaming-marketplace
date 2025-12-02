@@ -67,71 +67,121 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create Coinbase Commerce checkout using the new API
-    const checkoutData = {
-      name: `Nashflare - ${body.listingTitle}`.substring(0, 100),
-      description: `Order #${order.id.substring(0, 8)}`,
-      pricing_type: 'fixed_price',
+    // Create Coinbase Commerce invoice/charge
+    const invoiceData = {
+      business_name: 'Nashflare',
+      customer_email: body.billingEmail,
+      customer_name: 'Customer',
+      memo: `Order #${order.id.substring(0, 8)} - ${body.listingTitle}`.substring(0, 200),
       local_price: {
         amount: total.toFixed(2),
         currency: 'USD'
       },
-      requested_info: ['email'],
       metadata: {
         order_id: order.id,
         listing_id: body.listingId,
         buyer_id: body.buyerId,
         seller_id: body.sellerId,
         quantity: body.quantity.toString()
-      }
+      },
+      redirect_url: `${siteUrl}/order/${order.id}?payment=success`,
+      cancel_url: `${siteUrl}/checkout?payment=cancelled`
     }
 
-    console.log('Creating Coinbase checkout:', checkoutData)
+    console.log('Creating Coinbase invoice:', invoiceData)
 
-    const response = await fetch(`${COINBASE_API_URL}/checkouts`, {
+    const response = await fetch(`${COINBASE_API_URL}/invoices`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-CC-Api-Key': COINBASE_API_KEY,
         'X-CC-Version': '2018-03-22'
       },
-      body: JSON.stringify(checkoutData)
+      body: JSON.stringify(invoiceData)
     })
 
     const result = await response.json()
+    console.log('Coinbase API response:', response.status, JSON.stringify(result))
 
     if (!response.ok) {
       console.error('Coinbase API error:', result)
       
-      // Delete the pending order since checkout creation failed
-      await supabase.from('orders').delete().eq('id', order.id)
+      // If invoices don't work, try the legacy charges endpoint
+      console.log('Trying legacy charges endpoint...')
       
-      return NextResponse.json(
-        { error: result.error?.message || 'Failed to create payment' },
-        { status: response.status }
-      )
+      const chargeData = {
+        name: `Nashflare - ${body.listingTitle}`.substring(0, 100),
+        description: `Order #${order.id.substring(0, 8)}`,
+        pricing_type: 'fixed_price',
+        local_price: {
+          amount: total.toFixed(2),
+          currency: 'USD'
+        },
+        metadata: {
+          order_id: order.id,
+          listing_id: body.listingId,
+          buyer_id: body.buyerId,
+          seller_id: body.sellerId,
+          quantity: body.quantity.toString()
+        },
+        redirect_url: `${siteUrl}/order/${order.id}?payment=success`,
+        cancel_url: `${siteUrl}/checkout?payment=cancelled`
+      }
+
+      const chargeResponse = await fetch(`${COINBASE_API_URL}/charges`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CC-Api-Key': COINBASE_API_KEY,
+          'X-CC-Version': '2018-03-22'
+        },
+        body: JSON.stringify(chargeData)
+      })
+
+      const chargeResult = await chargeResponse.json()
+      console.log('Charges API response:', chargeResponse.status, JSON.stringify(chargeResult))
+
+      if (!chargeResponse.ok) {
+        // Delete the pending order since both methods failed
+        await supabase.from('orders').delete().eq('id', order.id)
+        
+        return NextResponse.json(
+          { error: chargeResult.error?.message || result.error?.message || 'Failed to create payment. Please check your Coinbase Commerce account setup.' },
+          { status: chargeResponse.status }
+        )
+      }
+
+      // Charges endpoint worked
+      await supabase
+        .from('orders')
+        .update({ payment_id: chargeResult.data.id })
+        .eq('id', order.id)
+
+      return NextResponse.json({
+        success: true,
+        chargeId: chargeResult.data.id,
+        hostedUrl: chargeResult.data.hosted_url,
+        orderId: order.id
+      })
     }
 
-    console.log('Coinbase checkout created:', result.data.id)
+    console.log('Coinbase invoice created:', result.data.id)
 
-    // Update order with Coinbase checkout ID
+    // Update order with Coinbase invoice ID
     await supabase
       .from('orders')
       .update({ payment_id: result.data.id })
       .eq('id', order.id)
 
-    // Build the hosted URL - for checkouts, we need to construct it
-    const hostedUrl = `https://commerce.coinbase.com/checkout/${result.data.id}`
-
     return NextResponse.json({
       success: true,
-      checkoutId: result.data.id,
-      hostedUrl: hostedUrl,
+      invoiceId: result.data.id,
+      hostedUrl: result.data.hosted_url,
       orderId: order.id
     })
 
   } catch (error: any) {
-    console.error('Coinbase checkout creation error:', error)
+    console.error('Coinbase payment creation error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to create payment' },
       { status: 500 }
