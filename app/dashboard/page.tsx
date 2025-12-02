@@ -257,7 +257,7 @@ export default function VendorDashboardPage() {
         <Navigation />
 
         {/* Main Content */}
-        <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
+        <div className="container mx-auto px-4 pt-20 sm:pt-24 lg:pt-28 pb-4 sm:pb-6 lg:pb-8">
           {/* Welcome Section */}
           <WelcomeSection profile={profile} />
 
