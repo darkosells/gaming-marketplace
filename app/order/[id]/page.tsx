@@ -33,6 +33,11 @@ export default function OrderDetailPage() {
   const [showDeliveryInfo, setShowDeliveryInfo] = useState(false)
   const [copiedDelivery, setCopiedDelivery] = useState(false)
   
+  // NEW: Security confirmation states
+  const [showSecurityWarning, setShowSecurityWarning] = useState(false)
+  const [hasConfirmedSecurity, setHasConfirmedSecurity] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  
   // NEW: 24-hour delivery window states
   const [deliveryDeadline, setDeliveryDeadline] = useState<string | null>(null)
   const [deliveryDeadlinePassed, setDeliveryDeadlinePassed] = useState(false)
@@ -56,10 +61,65 @@ export default function OrderDetailPage() {
     }
   }
 
+  // NEW: Log delivery access to database
+  const logDeliveryAccess = async (accessType: 'reveal' | 'copy' | 'view_in_chat') => {
+    if (!user || !order) return
+    
+    try {
+      const { error } = await supabase.from('delivery_access_logs').insert({
+        user_id: user.id,
+        order_id: order.id,
+        conversation_id: conversationId,
+        access_type: accessType,
+        access_location: 'order_details'
+      })
+      
+      if (error) {
+        console.error('Failed to log delivery access:', error)
+      }
+    } catch (err) {
+      console.error('Error logging delivery access:', err)
+    }
+  }
+
+  // NEW: Handle reveal with security confirmation
+  const handleRevealDeliveryInfo = async () => {
+    if (!hasConfirmedSecurity) {
+      setShowSecurityWarning(true)
+      return
+    }
+    
+    // Log the reveal action
+    await logDeliveryAccess('reveal')
+    setShowDeliveryInfo(true)
+  }
+
+  // NEW: Confirm security warning and reveal
+  const confirmSecurityAndReveal = async () => {
+    setHasConfirmedSecurity(true)
+    setShowSecurityWarning(false)
+    
+    // Log the reveal action
+    await logDeliveryAccess('reveal')
+    setShowDeliveryInfo(true)
+    
+    toast('info', 'Access Logged', 'This reveal has been logged for security')
+  }
+
+  // NEW: Hide delivery info
+  const hideDeliveryInfo = () => {
+    setShowDeliveryInfo(false)
+  }
+
+  // UPDATED: Copy delivery info with logging
   const copyDeliveryInfo = async () => {
     if (!deliveryInfo) return
     try {
       await navigator.clipboard.writeText(deliveryInfo)
+      
+      // Log the copy action
+      await logDeliveryAccess('copy')
+      
       setCopiedDelivery(true)
       toast('success', 'Copied!', 'Delivery information copied to clipboard')
       setTimeout(() => setCopiedDelivery(false), 2000)
@@ -85,7 +145,6 @@ export default function OrderDetailPage() {
   // NEW: 24-hour delivery window timer for manual delivery orders in 'paid' status
   useEffect(() => {
     if (order?.status === 'paid' && order.listing?.delivery_type === 'manual') {
-      // Use paid_at if available, otherwise fall back to created_at or when payment_status changed
       const paidTime = order.paid_at || order.created_at
       
       const iv = setInterval(() => {
@@ -184,6 +243,8 @@ export default function OrderDetailPage() {
         return
       }
 
+      // Store conversation ID for logging
+      setConversationId(convId)
       console.log('Found conversation:', convId)
 
       // Get recent messages from this conversation
@@ -380,6 +441,7 @@ export default function OrderDetailPage() {
     finally { setActionLoading(false) }
   }
 
+  // UPDATED: Open chat with logging
   const openChat = async () => {
     if (!order) return
     try {
@@ -389,6 +451,12 @@ export default function OrderDetailPage() {
         if (lc) { await supabase.from('conversations').update({ order_id: order.id }).eq('id', lc.id); cid = lc.id }
         else cid = (await supabase.from('conversations').insert({ listing_id: order.listing_id, order_id: order.id, buyer_id: order.buyer_id, seller_id: order.seller_id, last_message: 'Started', last_message_at: new Date().toISOString() }).select('id').single()).data?.id
       }
+      
+      // Log view_in_chat action if delivery info exists
+      if (deliveryInfo && (order.status === 'delivered' || order.status === 'completed')) {
+        await logDeliveryAccess('view_in_chat')
+      }
+      
       router.push(`/messages?conversation=${cid}`)
     } catch { toast('error', 'Failed', 'Cannot open chat') }
   }
@@ -418,8 +486,8 @@ export default function OrderDetailPage() {
       <div className="fixed top-4 right-4 z-[100] space-y-3">{toasts.map(t => (
         <div key={t.id} className={`max-w-sm bg-slate-900/95 backdrop-blur-xl border rounded-xl p-4 shadow-2xl ${t.type === 'success' ? 'border-green-500/50' : t.type === 'error' ? 'border-red-500/50' : 'border-yellow-500/50'}`}>
           <div className="flex items-start gap-3">
-            <span className="text-lg">{t.type === 'success' ? '✅' : t.type === 'error' ? '❌' : '⚠️'}</span>
-            <div className="flex-1"><p className={`font-semibold ${t.type === 'success' ? 'text-green-400' : t.type === 'error' ? 'text-red-400' : 'text-yellow-400'}`}>{t.title}</p><p className="text-gray-300 text-sm">{t.msg}</p></div>
+            <span className="text-lg">{t.type === 'success' ? '✅' : t.type === 'error' ? '❌' : 'ℹ️'}</span>
+            <div className="flex-1"><p className={`font-semibold ${t.type === 'success' ? 'text-green-400' : t.type === 'error' ? 'text-red-400' : 'text-blue-400'}`}>{t.title}</p><p className="text-gray-300 text-sm">{t.msg}</p></div>
             <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))} className="text-gray-400 hover:text-white">✕</button>
           </div>
         </div>
@@ -437,6 +505,72 @@ export default function OrderDetailPage() {
             <div className="flex gap-3">
               <button onClick={modal.onOk} className={`flex-1 py-3 rounded-xl font-bold text-white bg-gradient-to-r ${modal.type === 'info' ? 'from-blue-500 to-cyan-500' : 'from-yellow-500 to-orange-500'}`}>Confirm</button>
               <button onClick={() => setModal(p => ({ ...p, show: false }))} className="flex-1 bg-white/5 text-white py-3 rounded-xl font-bold border border-white/10">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Security Warning Modal for Delivery Info Reveal */}
+      {showSecurityWarning && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[95] p-4">
+          <div className="bg-slate-900/95 border-2 border-orange-500/50 rounded-2xl p-6 max-w-md w-full animate-fade-in">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl flex items-center justify-center border border-orange-500/30">
+                <span className="text-3xl">🔐</span>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-orange-400">Security Notice</h3>
+                <p className="text-sm text-gray-400">Reveal Delivery Information</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
+                <p className="text-orange-200 text-sm leading-relaxed">
+                  <strong className="text-orange-300">⚠️ Important:</strong> Only reveal when you're ready to use this information. For your security, this action is logged.
+                </p>
+              </div>
+              
+              <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5">✓</span>
+                  <p className="text-gray-300 text-sm">Keep credentials private - don't share screenshots</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5">✓</span>
+                  <p className="text-gray-300 text-sm">Test immediately to verify everything works</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5">✓</span>
+                  <p className="text-gray-300 text-sm">Change passwords after logging in (for accounts)</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-red-400 mt-0.5">✕</span>
+                  <p className="text-gray-300 text-sm">Never share these details with anyone</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span>This reveal will be logged for security purposes</span>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={confirmSecurityAndReveal}
+                className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-orange-500/30 transition-all"
+              >
+                🔓 I Understand, Reveal
+              </button>
+              <button 
+                onClick={() => setShowSecurityWarning(false)}
+                className="flex-1 bg-white/5 text-white py-3 rounded-xl font-bold border border-white/10 hover:bg-white/10 transition-all"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -631,7 +765,7 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* DELIVERY INFORMATION DISPLAY - For Buyers */}
+          {/* UPDATED: DELIVERY INFORMATION DISPLAY - For Buyers - With Security Features */}
           {(isBuyer || isAdmin) && (order.status === 'delivered' || order.status === 'completed' || order.status === 'dispute_raised') && (
             <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-2 border-green-500/50 rounded-2xl p-6 mb-6">
               <div className="flex items-start justify-between gap-4 mb-4">
@@ -646,8 +780,9 @@ export default function OrderDetailPage() {
                 </div>
                 {deliveryInfo && (
                   <div className="flex items-center gap-2">
+                    {/* UPDATED: Show/Hide button with security check */}
                     <button
-                      onClick={() => setShowDeliveryInfo(!showDeliveryInfo)}
+                      onClick={showDeliveryInfo ? hideDeliveryInfo : handleRevealDeliveryInfo}
                       className={`px-4 py-2 rounded-lg border transition-all duration-200 text-sm font-medium ${
                         showDeliveryInfo
                           ? 'bg-green-500/20 border-green-500/30 text-green-400'
@@ -671,14 +806,18 @@ export default function OrderDetailPage() {
                         </span>
                       )}
                     </button>
+                    {/* Copy button - only enabled when revealed */}
                     <button
                       onClick={copyDeliveryInfo}
+                      disabled={!showDeliveryInfo}
                       className={`px-4 py-2 rounded-lg border transition-all duration-200 text-sm font-medium ${
                         copiedDelivery
                           ? 'bg-green-500/20 border-green-500/30 text-green-400'
-                          : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+                          : showDeliveryInfo
+                            ? 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+                            : 'bg-white/5 border-white/10 text-gray-600 cursor-not-allowed opacity-50'
                       }`}
-                      title="Copy delivery information"
+                      title={showDeliveryInfo ? "Copy delivery information" : "Reveal first to copy"}
                     >
                       {copiedDelivery ? (
                         <span className="flex items-center gap-2">
@@ -707,6 +846,15 @@ export default function OrderDetailPage() {
                       <pre className="text-white font-mono text-sm whitespace-pre-wrap break-all leading-relaxed select-all">
                         {deliveryInfo}
                       </pre>
+                      {/* Security reminder when revealed */}
+                      <div className="mt-3 pt-3 border-t border-green-500/20">
+                        <p className="text-xs text-green-400/70 flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                          This access has been logged for security purposes
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     <div className="bg-slate-900/80 border border-white/10 rounded-xl p-4">
@@ -715,6 +863,16 @@ export default function OrderDetailPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
                         <span className="text-sm">Click "Show" to reveal your delivery information</span>
+                      </div>
+                      {/* Blurred preview */}
+                      <div className="mt-3 relative">
+                        <div className="bg-slate-800/50 rounded-lg p-3 blur-sm select-none pointer-events-none">
+                          <p className="text-white font-mono text-sm">••••••••••••••••••••</p>
+                          <p className="text-white font-mono text-sm">••••••••••••••••</p>
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-2xl">🔒</span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1024,6 +1182,23 @@ export default function OrderDetailPage() {
         </div>
         <Footer />
       </div>
+
+      {/* Custom animation */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+      `}</style>
     </div>
   )
 }

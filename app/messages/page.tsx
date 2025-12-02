@@ -98,6 +98,12 @@ function MessagesContent() {
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<string | null>(null)
   const [pendingListingId, setPendingListingId] = useState<string | null>(null)
   const [pendingSellerId, setPendingSellerId] = useState<string | null>(null)
+  
+  // NEW: Delivery code reveal states
+  const [revealedDeliveryMessages, setRevealedDeliveryMessages] = useState<Set<string>>(new Set())
+  const [showDeliverySecurityModal, setShowDeliverySecurityModal] = useState(false)
+  const [pendingRevealMessageId, setPendingRevealMessageId] = useState<string | null>(null)
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastTypingBroadcastRef = useRef<number>(0)
@@ -128,6 +134,129 @@ function MessagesContent() {
     /free.*nitro/i,
   ]
 
+  // NEW: Check if message contains delivery info
+  const isDeliveryMessage = (message: Message): boolean => {
+    if (message.message_type !== 'system') return false
+    const content = message.content || ''
+    return (
+      content.includes('DELIVERY INFORMATION') || 
+      content.includes('DELIVERY INFO') ||
+      content.includes('📦 DELIVERY') ||
+      content.includes('automatically delivered') ||
+      content.includes('Account Details:') ||
+      content.includes('Game Key:') ||
+      content.includes('Top-Up Information:') ||
+      content.includes('Delivery Information:') ||
+      (content.includes('delivered') && (
+        content.includes('Username') || 
+        content.includes('Password') || 
+        content.includes('Code') ||
+        content.includes('Key') ||
+        content.includes('━━━')
+      ))
+    )
+  }
+
+  // NEW: Extract delivery content from message
+  const extractDeliveryContent = (content: string): { header: string; credentials: string; footer: string } => {
+    // Try to split the message into parts
+    let header = ''
+    let credentials = ''
+    let footer = ''
+    
+    // Pattern 1: Look for separator lines
+    const parts = content.split(/━{5,}/)
+    if (parts.length >= 3) {
+      header = parts[0].trim()
+      credentials = parts[1].trim()
+      footer = parts.slice(2).join('━━━━━━━━━━━━━━━━━━━━━━━━━').trim()
+    } else if (parts.length === 2) {
+      header = parts[0].trim()
+      credentials = ''
+      footer = parts[1].trim()
+    } else {
+      // Try to find credentials pattern
+      const lines = content.split('\n')
+      let inCredentials = false
+      
+      for (const line of lines) {
+        if (line.includes('DELIVERY') || line.includes('📦')) {
+          header += line + '\n'
+          inCredentials = true
+        } else if (line.includes('✅') || line.includes('⏰') || line.includes('⚠️')) {
+          footer += line + '\n'
+          inCredentials = false
+        } else if (inCredentials && (
+          line.includes('Username') || 
+          line.includes('Password') || 
+          line.includes('Email') ||
+          line.includes('Code') ||
+          line.includes('Key') ||
+          line.includes(':')
+        )) {
+          credentials += line + '\n'
+        } else if (inCredentials) {
+          credentials += line + '\n'
+        } else {
+          header += line + '\n'
+        }
+      }
+    }
+    
+    return { 
+      header: header || 'Delivery Information', 
+      credentials: credentials || content, 
+      footer 
+    }
+  }
+
+  // NEW: Log delivery access
+  const logDeliveryAccess = async (messageId: string, orderId: string | null) => {
+    if (!user || !selectedConversation) return
+    
+    try {
+      await supabase.from('delivery_access_logs').insert({
+        user_id: user.id,
+        order_id: orderId || selectedConversation.order_id,
+        conversation_id: selectedConversation.id,
+        access_type: 'reveal',
+        access_location: 'messenger'
+      })
+    } catch (err) {
+      console.error('Error logging delivery access:', err)
+    }
+  }
+
+  // NEW: Handle reveal button click
+  const handleRevealDeliveryMessage = (messageId: string) => {
+    setPendingRevealMessageId(messageId)
+    setShowDeliverySecurityModal(true)
+  }
+
+  // NEW: Confirm and reveal delivery message
+  const confirmAndRevealDelivery = async () => {
+    if (!pendingRevealMessageId) return
+    
+    // Log the access
+    await logDeliveryAccess(pendingRevealMessageId, selectedConversation?.order_id || null)
+    
+    // Add to revealed set
+    setRevealedDeliveryMessages(prev => new Set(prev).add(pendingRevealMessageId))
+    
+    // Close modal
+    setShowDeliverySecurityModal(false)
+    setPendingRevealMessageId(null)
+  }
+
+  // NEW: Hide delivery message
+  const hideDeliveryMessage = (messageId: string) => {
+    setRevealedDeliveryMessages(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(messageId)
+      return newSet
+    })
+  }
+
   useEffect(() => {
     checkUser()
   }, [])
@@ -144,7 +273,6 @@ function MessagesContent() {
       if (conversationId) {
         openConversation(conversationId)
       } else if (listingId && sellerId) {
-        // New conversation - store params to create on first message
         setPendingListingId(listingId)
         setPendingSellerId(sellerId)
         setShowMobileConversations(false)
@@ -157,14 +285,15 @@ function MessagesContent() {
       fetchMessages()
       markConversationAsRead(selectedConversation.id)
       
-      // Track other user's online status
+      // Reset revealed messages when switching conversations
+      setRevealedDeliveryMessages(new Set())
+      
       const otherUserId = selectedConversation.buyer_id === user.id 
         ? selectedConversation.seller_id 
         : selectedConversation.buyer_id
       
       const cleanupTracking = trackUserOnlineStatus(otherUserId)
       
-      // Subscribe to new messages
       const messagesChannel = supabase
         .channel(`conversation-${selectedConversation.id}`)
         .on(
@@ -190,7 +319,6 @@ function MessagesContent() {
             filter: `conversation_id=eq.${selectedConversation.id}`
           },
           (payload) => {
-            // Update read status in real-time
             setMessages(prev => 
               prev.map(msg => 
                 msg.id === payload.new.id ? { ...msg, read: payload.new.read } : msg
@@ -200,7 +328,6 @@ function MessagesContent() {
         )
         .subscribe()
 
-      // Subscribe to typing indicators
       const typingChannel = supabase
         .channel(`typing-${selectedConversation.id}`)
         .on('broadcast', { event: 'typing' }, ({ payload }) => {
@@ -215,7 +342,6 @@ function MessagesContent() {
               return newMap
             })
 
-            // Remove typing indicator after 3 seconds
             setTimeout(() => {
               setTypingUsers(prev => {
                 const newMap = new Map(prev)
@@ -241,11 +367,9 @@ function MessagesContent() {
     scrollToBottom()
   }, [messages])
 
-  // Handle typing input
   useEffect(() => {
     if (newMessage && selectedConversation && userProfile) {
       const now = Date.now()
-      // Only broadcast typing every 2 seconds to avoid spam
       if (now - lastTypingBroadcastRef.current > 2000) {
         broadcastTyping()
         lastTypingBroadcastRef.current = now
@@ -255,12 +379,10 @@ function MessagesContent() {
         setIsTyping(true)
       }
 
-      // Clear existing timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
       }
 
-      // Set timeout to stop typing after 3 seconds of inactivity
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false)
       }, 3000)
@@ -417,7 +539,6 @@ function MessagesContent() {
       setShowMobileConversations(false)
       await markConversationAsRead(conversationId)
       
-      // Track other user's online status
       const otherUserId = conv.buyer_id === user.id ? conv.seller_id : conv.buyer_id
       trackUserOnlineStatus(otherUserId)
     } else {
@@ -439,7 +560,6 @@ function MessagesContent() {
         setShowMobileConversations(false)
         await markConversationAsRead(conversationId)
         
-        // Track other user's online status
         const otherUserId = data.buyer_id === user.id ? data.seller_id : data.buyer_id
         trackUserOnlineStatus(otherUserId)
       } catch (error) {
@@ -462,7 +582,6 @@ function MessagesContent() {
 
       if (error) throw error
       
-      // Fetch reply messages separately if needed
       const messagesWithReplies = await Promise.all(
         (data || []).map(async (message) => {
           if (message.replied_to) {
@@ -484,12 +603,10 @@ function MessagesContent() {
     }
   }
 
-  // Track user online status
   const trackUserOnlineStatus = async (userId: string) => {
     if (!userId) return
     
     try {
-      // Function to check and update status
       const checkOnlineStatus = async () => {
         const { data: profileData } = await supabase
           .from('profiles')
@@ -502,22 +619,16 @@ function MessagesContent() {
           const now = new Date()
           const diffMinutes = Math.floor((now.getTime() - lastSeen.getTime()) / (1000 * 60))
           
-          // Consider online if active within last 3 minutes
           const isOnline = diffMinutes < 3
           setOtherUserOnline(isOnline)
           setOtherUserLastSeen(profileData.last_seen)
-          
-          console.log('User online status:', { userId, isOnline, diffMinutes, lastSeen: profileData.last_seen })
         } else {
           setOtherUserOnline(false)
           setOtherUserLastSeen(null)
         }
       }
 
-      // Check immediately
       await checkOnlineStatus()
-      
-      // Check every 10 seconds for updates
       const interval = setInterval(checkOnlineStatus, 10000)
 
       return () => {
@@ -529,7 +640,6 @@ function MessagesContent() {
     }
   }
 
-  // Update own last seen
   useEffect(() => {
     if (!user) return
 
@@ -540,16 +650,12 @@ function MessagesContent() {
         .eq('id', user.id)
     }
 
-    // Update immediately
     updateLastSeen()
-
-    // Update every minute while user is active
     const interval = setInterval(updateLastSeen, 60000)
 
     return () => clearInterval(interval)
   }, [user])
 
-  // Format last seen time
   const formatLastSeen = (lastSeenDate: string | null): string => {
     if (!lastSeenDate) return 'Last seen recently'
     
@@ -570,7 +676,6 @@ function MessagesContent() {
     return 'Last active long ago'
   }
 
-  // Detect scam patterns
   const detectScamPattern = (text: string): string | null => {
     for (const pattern of scamPatterns) {
       if (pattern.test(text)) {
@@ -587,16 +692,13 @@ function MessagesContent() {
     return null
   }
 
-  // Check if image might contain sensitive info
   const checkImageForSensitiveContent = (file: File): boolean => {
-    // Check filename for sensitive keywords
     const filename = file.name.toLowerCase()
     const sensitiveKeywords = ['password', 'ssn', 'license', 'card', 'bank', 'id']
     
     return sensitiveKeywords.some(keyword => filename.includes(keyword))
   }
 
-  // Compress image
   const compressImage = async (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -609,7 +711,6 @@ function MessagesContent() {
           let width = img.width
           let height = img.height
           
-          // Max dimensions
           const MAX_WIDTH = 1920
           const MAX_HEIGHT = 1920
           
@@ -648,32 +749,27 @@ function MessagesContent() {
     })
   }
 
-  // Handle image selection
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
     if (!validTypes.includes(file.type)) {
       alert('Only image files (JPG, PNG, GIF, WEBP) are allowed')
       return
     }
 
-    // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       alert('Image must be less than 5MB')
       return
     }
 
-    // Check for sensitive content in filename
     if (checkImageForSensitiveContent(file)) {
       setShowSecurityWarning(true)
     }
 
     setSelectedImage(file)
     
-    // Create preview
     const reader = new FileReader()
     reader.onload = (e) => {
       setImagePreview(e.target?.result as string)
@@ -681,20 +777,16 @@ function MessagesContent() {
     reader.readAsDataURL(file)
   }
 
-  // Upload image
   const uploadImage = async (): Promise<string | null> => {
     if (!selectedImage || !user) return null
 
     try {
-      // Compress image
       const compressedBlob = await compressImage(selectedImage)
       
-      // Generate unique filename
       const fileExt = selectedImage.name.split('.').pop()
       const fileName = `${user.id}-${Date.now()}.${fileExt}`
       const filePath = `messages/${fileName}`
 
-      // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('message-images')
         .upload(filePath, compressedBlob, {
@@ -704,7 +796,6 @@ function MessagesContent() {
 
       if (error) throw error
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('message-images')
         .getPublicUrl(filePath)
@@ -720,7 +811,6 @@ function MessagesContent() {
     e.preventDefault()
     if ((!newMessage.trim() && !selectedImage) || sending) return
 
-    // Check if we need to create a conversation first (new conversation from listing)
     if (pendingListingId && pendingSellerId && !selectedConversation) {
       await createConversationAndSendMessage()
       return
@@ -728,7 +818,6 @@ function MessagesContent() {
 
     if (!selectedConversation) return
 
-    // Check for scam patterns
     const scamWarning = detectScamPattern(newMessage)
     if (scamWarning) {
       const confirmed = confirm(`⚠️ Security Warning: ${scamWarning}\n\nAre you sure you want to send this message?`)
@@ -799,11 +888,9 @@ function MessagesContent() {
     }
   }
 
-  // Create conversation and send first message
   const createConversationAndSendMessage = async () => {
     if (!pendingListingId || !pendingSellerId) return
 
-    // Check for scam patterns
     const scamWarning = detectScamPattern(newMessage)
     if (scamWarning) {
       const confirmed = confirm(`⚠️ Security Warning: ${scamWarning}\n\nAre you sure you want to send this message?`)
@@ -814,7 +901,6 @@ function MessagesContent() {
     setIsTyping(false)
 
     try {
-      // First, create the conversation
       const { data: newConv, error: convError } = await supabase
         .from('conversations')
         .insert({
@@ -829,7 +915,6 @@ function MessagesContent() {
 
       if (convError) throw convError
 
-      // Upload image if needed
       let imageUrl: string | null = null
       if (selectedImage) {
         setUploadingImage(true)
@@ -845,7 +930,6 @@ function MessagesContent() {
 
       const messageContent = newMessage.trim() || (imageUrl ? '📷 Image' : '')
 
-      // Then send the first message
       const { error: msgError } = await supabase
         .from('messages')
         .insert({
@@ -862,7 +946,6 @@ function MessagesContent() {
 
       if (msgError) throw msgError
 
-      // Clear pending state
       setPendingListingId(null)
       setPendingSellerId(null)
       setNewMessage('')
@@ -871,11 +954,9 @@ function MessagesContent() {
       setShowSecurityWarning(false)
       setReplyingTo(null)
 
-      // Refresh and open the new conversation
       await fetchConversations()
       await openConversation(newConv.id)
       
-      // Update URL
       router.push(`/messages?conversation=${newConv.id}`)
     } catch (error) {
       console.error('Error creating conversation:', error)
@@ -906,7 +987,6 @@ function MessagesContent() {
     }
   }
 
-  // Report user (conversation-level, not message-level)
   const handleReportUser = () => {
     setShowReportModal(true)
   }
@@ -936,7 +1016,6 @@ function MessagesContent() {
       setReportReason('')
       setShowReportSuccess(true)
       
-      // Auto-hide success message after 3 seconds
       setTimeout(() => {
         setShowReportSuccess(false)
       }, 3000)
@@ -950,7 +1029,6 @@ function MessagesContent() {
 
   const isSeller = selectedConversation?.seller_id === user?.id
 
-  // Helper function to render avatar
   const renderAvatar = (avatarUrl: string | null, username: string, size: 'sm' | 'md' | 'lg' = 'md') => {
     const sizeClasses = {
       sm: 'w-8 h-8 text-xs',
@@ -975,13 +1053,11 @@ function MessagesContent() {
     )
   }
 
-  // Helper function to render message status
   const renderMessageStatus = (message: Message) => {
     if (message.sender_id !== user.id) return null
     if (message.message_type === 'system') return null
 
     const isRead = message.read
-    const isSent = true
 
     return (
       <div className="flex items-center gap-0.5 ml-1">
@@ -994,21 +1070,15 @@ function MessagesContent() {
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </>
-        ) : isSent ? (
+        ) : (
           <svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-        ) : (
-          <svg className="w-3.5 h-3.5 text-gray-500 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
         )}
       </div>
     )
   }
 
-  // Render typing indicator
   const renderTypingIndicator = () => {
     const typingUsersList = Array.from(typingUsers.values())
     if (typingUsersList.length === 0) return null
@@ -1037,6 +1107,133 @@ function MessagesContent() {
             </div>
           </div>
           <p className="text-xs text-gray-500 mt-1 px-2">{typingUsername} is typing...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // NEW: Render delivery message with blur/reveal
+  const renderDeliveryMessage = (message: Message) => {
+    const isRevealed = revealedDeliveryMessages.has(message.id)
+    const { header, credentials, footer } = extractDeliveryContent(message.content)
+    
+    return (
+      <div className="flex justify-center my-3 sm:my-4">
+        <div className="max-w-[90%] sm:max-w-[85%] bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-lg border-2 border-green-400/50 rounded-2xl p-3 sm:p-4 shadow-lg">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-xl sm:text-2xl">🔑</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-green-300 font-bold text-xs sm:text-sm">Delivery Information</span>
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                </div>
+                {/* Reveal/Hide buttons */}
+                <div className="flex items-center gap-2">
+                  {isRevealed ? (
+                    <button
+                      onClick={() => hideDeliveryMessage(message.id)}
+                      className="px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-lg text-xs font-medium text-green-300 hover:bg-green-500/30 transition-all flex items-center gap-1"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                      Hide
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleRevealDeliveryMessage(message.id)}
+                      className="px-3 py-1 bg-green-500/30 border border-green-500/50 rounded-lg text-xs font-medium text-white hover:bg-green-500/40 transition-all flex items-center gap-1"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      Reveal
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* Content area */}
+              {isRevealed ? (
+                <div className="space-y-2">
+                  {/* Header */}
+                  {header && (
+                    <div className="text-white text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words">
+                      {header}
+                    </div>
+                  )}
+                  
+                  {/* Credentials - shown when revealed */}
+                  <div className="bg-slate-900/80 border border-green-500/30 rounded-lg p-3">
+                    <pre className="text-white font-mono text-xs sm:text-sm whitespace-pre-wrap break-all leading-relaxed select-all">
+                      {credentials}
+                    </pre>
+                  </div>
+                  
+                  {/* Footer */}
+                  {footer && (
+                    <div className="text-white text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words">
+                      {footer}
+                    </div>
+                  )}
+                  
+                  {/* Security reminder */}
+                  <div className="mt-2 pt-2 border-t border-green-500/20">
+                    <p className="text-xs text-green-400/70 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      Access logged for security
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Header - always visible */}
+                  {header && (
+                    <div className="text-white text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words opacity-80">
+                      {header.split('\n').slice(0, 2).join('\n')}
+                    </div>
+                  )}
+                  
+                  {/* Blurred/hidden credentials */}
+                  <div className="bg-slate-900/80 border border-white/10 rounded-lg p-3 relative overflow-hidden">
+                    <div className="blur-sm select-none pointer-events-none">
+                      <p className="text-white font-mono text-xs sm:text-sm">
+                        ••••••••••••••••••••<br/>
+                        ••••••••••••••••<br/>
+                        ••••••••••
+                      </p>
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <div className="flex items-center gap-2 text-white">
+                        <span className="text-2xl">🔒</span>
+                        <span className="text-xs font-medium">Click "Reveal" to show</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Warning when hidden */}
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-2">
+                    <p className="text-xs text-orange-300 flex items-center gap-1">
+                      <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      Only reveal when ready to use. Action will be logged.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              <p className="text-xs text-green-300/60 mt-2 sm:mt-3 text-center">
+                {new Date(message.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -1074,6 +1271,71 @@ function MessagesContent() {
       {/* Content */}
       <div className="relative z-10">
         <Navigation />
+
+        {/* NEW: Delivery Security Warning Modal */}
+        {showDeliverySecurityModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-slate-900/95 backdrop-blur-xl border-2 border-orange-500/50 rounded-2xl p-6 max-w-md w-full shadow-2xl animate-fade-in">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl flex items-center justify-center border border-orange-500/30">
+                  <span className="text-3xl">🔐</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-orange-400">Security Notice</h3>
+                  <p className="text-sm text-gray-400">Reveal Delivery Information</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4 mb-6">
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
+                  <p className="text-orange-200 text-sm leading-relaxed">
+                    <strong className="text-orange-300">⚠️ Important:</strong> Only reveal when you're ready to use this information. For your security, this action is logged.
+                  </p>
+                </div>
+                
+                <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <p className="text-gray-300 text-sm">Keep credentials private</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-green-400 mt-0.5">✓</span>
+                    <p className="text-gray-300 text-sm">Test immediately to verify</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-red-400 mt-0.5">✕</span>
+                    <p className="text-gray-300 text-sm">Never share with anyone</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span>This reveal will be logged for security purposes</span>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={confirmAndRevealDelivery}
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-orange-500/30 transition-all"
+                >
+                  🔓 I Understand, Reveal
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowDeliverySecurityModal(false)
+                    setPendingRevealMessageId(null)
+                  }}
+                  className="flex-1 bg-white/5 text-white py-3 rounded-xl font-bold border border-white/10 hover:bg-white/10 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Security Warning Banner */}
         {showSecurityWarning && (
@@ -1470,7 +1732,6 @@ function MessagesContent() {
                                   : selectedConversation.buyer.username,
                                 'sm'
                               )}
-                              {/* Online status indicator */}
                               {otherUserOnline && (
                                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-800 animate-pulse"></div>
                               )}
@@ -1481,7 +1742,6 @@ function MessagesContent() {
                                   ? selectedConversation.seller.username 
                                   : selectedConversation.buyer.username}
                               </span>
-                              {/* Last seen status */}
                               <span className="text-xs font-normal text-gray-400">
                                 {otherUserOnline ? (
                                   <span className="text-green-400 flex items-center gap-1">
@@ -1537,7 +1797,6 @@ function MessagesContent() {
                           <span>🛡️</span>
                           <span>Never share passwords, credit cards, or personal documents. Nashflare staff will never ask for this info.</span>
                         </p>
-                        {/* SSL Protection Badge */}
                         <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
                           <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -1555,6 +1814,7 @@ function MessagesContent() {
                         const previousMessage = index > 0 ? messages[index - 1] : null
                         const showDateSeparator = shouldShowDateSeparator(message, previousMessage)
                         const hasScamPattern = detectScamPattern(message.content)
+                        const isDelivery = isDeliveryMessage(message)
                         
                         return (
                           <div key={message.id}>
@@ -1566,7 +1826,10 @@ function MessagesContent() {
                               </div>
                             )}
                             
-                            {isSystemMessage ? (
+                            {/* UPDATED: Delivery messages with blur/reveal */}
+                            {isSystemMessage && isDelivery ? (
+                              renderDeliveryMessage(message)
+                            ) : isSystemMessage ? (
                               <div className="flex justify-center my-3 sm:my-4">
                                 <div className="max-w-[90%] sm:max-w-[85%] bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 backdrop-blur-lg border border-blue-400/30 rounded-2xl p-3 sm:p-4 shadow-lg">
                                   <div className="flex items-start gap-2 sm:gap-3">
@@ -1628,7 +1891,6 @@ function MessagesContent() {
                                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/20' 
                                       : 'bg-slate-800/80 text-white border border-white/10'
                                   } ${hasScamPattern && !isOwnMessage ? 'border-red-500/50' : ''} group relative`}>
-                                    {/* Reply preview */}
                                     {message.reply_message && (
                                       <div className="mb-2 pb-2 border-b border-white/20">
                                         <div className="flex items-start gap-2 bg-black/20 rounded-lg p-2">
@@ -1662,7 +1924,6 @@ function MessagesContent() {
                                       <p className="text-xs sm:text-sm break-words leading-relaxed">{message.content}</p>
                                     )}
                                     
-                                    {/* Reply button (shown on hover) */}
                                     <button
                                       onClick={() => setReplyingTo(message)}
                                       className="absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-700 hover:bg-slate-600 rounded-full p-1.5"
@@ -1697,7 +1958,6 @@ function MessagesContent() {
 
                     {/* Message Input */}
                     <form onSubmit={sendMessage} className="p-3 sm:p-4 border-t border-white/10 bg-slate-800/60 relative">
-                      {/* Reply Preview */}
                       {replyingTo && (
                         <div className="mb-3 bg-slate-700/50 border border-white/10 rounded-xl p-3 flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -1725,7 +1985,6 @@ function MessagesContent() {
                         </div>
                       )}
                       
-                      {/* Image Preview */}
                       {imagePreview && (
                         <div className="mb-3 relative inline-block">
                           <img src={imagePreview} alt="Preview" className="h-20 rounded-lg border-2 border-purple-500/50" />
@@ -1824,16 +2083,16 @@ function MessagesContent() {
         @keyframes fade-in {
           from {
             opacity: 0;
-            transform: translateY(-10px);
+            transform: scale(0.95);
           }
           to {
             opacity: 1;
-            transform: translateY(0);
+            transform: scale(1);
           }
         }
         
         .animate-fade-in {
-          animation: fade-in 0.3s ease-out;
+          animation: fade-in 0.2s ease-out;
         }
       `}</style>
     </div>
