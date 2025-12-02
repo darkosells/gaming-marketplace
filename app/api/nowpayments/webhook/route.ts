@@ -10,6 +10,67 @@ function verifySignature(payload: any, receivedSignature: string, secret: string
   return computedSignature === receivedSignature
 }
 
+// Helper function to send order emails via Edge Function
+async function sendOrderEmailsFromWebhook(data: {
+  orderId: string
+  listingTitle: string
+  quantity: number
+  totalAmount: number
+  sellerAmount: number
+  buyerEmail: string
+  sellerEmail: string
+  buyerUsername: string
+  sellerUsername: string
+}) {
+  const EDGE_FUNCTION_URL = process.env.NEXT_PUBLIC_SUPABASE_URL + '/functions/v1/send-order-email'
+  
+  try {
+    // Send buyer confirmation email
+    await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'order_confirmation',
+        buyerEmail: data.buyerEmail,
+        buyerUsername: data.buyerUsername,
+        orderId: data.orderId,
+        listingTitle: data.listingTitle,
+        amount: data.totalAmount,
+        quantity: data.quantity,
+        sellerUsername: data.sellerUsername
+      })
+    })
+    console.log('✅ Buyer confirmation email sent')
+
+    // Send seller notification email
+    await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'new_sale',
+        sellerEmail: data.sellerEmail,
+        sellerUsername: data.sellerUsername,
+        orderId: data.orderId,
+        listingTitle: data.listingTitle,
+        amount: data.sellerAmount,
+        quantity: data.quantity,
+        buyerUsername: data.buyerUsername
+      })
+    })
+    console.log('✅ Seller notification email sent')
+
+  } catch (error) {
+    console.error('❌ Failed to send order emails:', error)
+    // Don't throw - emails are non-critical, order is already created
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Get environment variables inside the function
@@ -104,7 +165,7 @@ export async function POST(request: NextRequest) {
         // Reduce stock
         const { data: listing } = await supabase
           .from('listings')
-          .select('stock')
+          .select('stock, title')
           .eq('id', session.listing_id)
           .single()
 
@@ -120,6 +181,49 @@ export async function POST(request: NextRequest) {
           
           console.log(`Stock reduced: ${listing.stock} -> ${newStock}`)
         }
+
+        // ========================================
+        // 📧 SEND ORDER CONFIRMATION EMAILS
+        // ========================================
+        try {
+          // Fetch buyer info
+          const { data: buyer } = await supabase
+            .from('profiles')
+            .select('username, email')
+            .eq('id', session.buyer_id)
+            .single()
+
+          // Fetch seller info
+          const { data: seller } = await supabase
+            .from('profiles')
+            .select('username, email')
+            .eq('id', session.seller_id)
+            .single()
+
+          if (buyer && seller && listing) {
+            // Calculate seller amount (95% after 5% fee)
+            const sellerAmount = session.amount * 0.95
+
+            await sendOrderEmailsFromWebhook({
+              orderId: newOrder.id,
+              listingTitle: session.listing_title || listing.title || 'Gaming Item',
+              quantity: session.quantity,
+              totalAmount: session.amount,
+              sellerAmount: sellerAmount,
+              buyerEmail: buyer.email,
+              sellerEmail: seller.email,
+              buyerUsername: buyer.username || 'Buyer',
+              sellerUsername: seller.username || 'Seller'
+            })
+            console.log('📧 Order confirmation emails sent successfully')
+          } else {
+            console.warn('⚠️ Could not send emails - missing buyer/seller/listing data')
+          }
+        } catch (emailError) {
+          console.error('❌ Email sending failed (non-critical):', emailError)
+          // Don't fail the webhook - order is already created
+        }
+        // ========================================
 
         // Delete the checkout session (cleanup)
         await supabase.from('crypto_checkout_sessions').delete().eq('id', sessionId)

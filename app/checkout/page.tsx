@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
+import { sendOrderEmails } from '@/lib/email'
 
 // PayPal Client ID from environment variables
 const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || ''
@@ -411,6 +412,53 @@ export default function CheckoutPage() {
       console.error('Stock update error:', stockError)
       // Don't throw - order is created, stock update failure is non-critical
     }
+
+    // ========================================
+    // 📧 SEND ORDER CONFIRMATION EMAILS
+    // ========================================
+    try {
+      console.log('📧 Sending order confirmation emails...')
+      
+      // Fetch buyer profile (for username)
+      const { data: buyerProfile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single()
+
+      // Fetch seller profile (for email)
+      const { data: sellerProfile } = await supabase
+        .from('profiles')
+        .select('username, email')
+        .eq('id', cartItem.listing.seller_id)
+        .single()
+
+      if (sellerProfile?.email) {
+        // Calculate seller amount (95% after 5% fee)
+        const sellerAmount = totalPrice * 0.95
+
+        await sendOrderEmails({
+          id: order.id,
+          listing_title: cartItem.listing.title,
+          quantity: cartItem.quantity,
+          total_amount: totalPrice,
+          seller_amount: sellerAmount,
+          buyer_email: billingInfo.email,
+          seller_email: sellerProfile.email,
+          buyer_username: buyerProfile?.username || 'Buyer',
+          seller_username: cartItem.listing.profiles?.username || sellerProfile.username || 'Seller',
+          site_url: window.location.origin
+        })
+        
+        console.log('✅ Order confirmation emails sent successfully')
+      } else {
+        console.warn('⚠️ Could not send emails - seller email not found')
+      }
+    } catch (emailError) {
+      console.error('❌ Email sending failed (non-critical):', emailError)
+      // Don't throw - emails are non-critical, order is already created
+    }
+    // ========================================
 
     // Clear cart only after successful order creation
     localStorage.removeItem('cart')
