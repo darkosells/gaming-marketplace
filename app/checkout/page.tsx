@@ -41,7 +41,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [user, setUser] = useState<any>(null)
-  const [selectedPayment, setSelectedPayment] = useState('paypal') // Default to PayPal now
+  const [selectedPayment, setSelectedPayment] = useState('') // No default selection
   const [showMobileSummary, setShowMobileSummary] = useState(false)
   const [paypalLoaded, setPaypalLoaded] = useState(false)
   const [paypalError, setPaypalError] = useState<string | null>(null)
@@ -572,6 +572,12 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     if (!cartItem || !user) return
+
+    // Check if payment method is selected
+    if (!selectedPayment) {
+      setCryptoError('Please select a payment method')
+      return
+    }
 
     // For crypto, use NOWPayments
     if (selectedPayment === 'crypto') {
@@ -1236,9 +1242,11 @@ export default function CheckoutPage() {
                   <>
                     <button
                       onClick={handlePlaceOrder}
-                      disabled={processing || cryptoLoading || !isFormValid}
+                      disabled={processing || cryptoLoading || !isFormValid || !selectedPayment}
                       className={`w-full py-4 rounded-xl font-semibold transition-all duration-300 mb-4 ${
-                        selectedPayment === 'test'
+                        !selectedPayment
+                          ? 'bg-gray-600 text-gray-300'
+                          : selectedPayment === 'test'
                           ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg hover:shadow-green-500/50 hover:scale-105'
                           : selectedPayment === 'crypto'
                           ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg hover:shadow-orange-500/50 hover:scale-105'
@@ -1250,6 +1258,8 @@ export default function CheckoutPage() {
                           <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                           {cryptoLoading ? 'Preparing Checkout...' : 'Creating Order...'}
                         </span>
+                      ) : !selectedPayment ? (
+                        '💳 Select Payment Method'
                       ) : selectedPayment === 'test' ? (
                         '🚀 Create Test Order'
                       ) : selectedPayment === 'crypto' ? (
@@ -1309,6 +1319,14 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {!selectedPayment && (
+                  <div className="text-center py-4 px-3 bg-purple-500/10 border border-purple-500/30 rounded-xl mb-6">
+                    <div className="text-purple-400 text-2xl mb-2">💳</div>
+                    <p className="text-purple-300 text-sm font-medium">Select a payment method</p>
+                    <p className="text-gray-400 text-xs mt-1">Choose PayPal or Cryptocurrency above</p>
+                  </div>
+                )}
+
                 {/* Trust Badges */}
                 <div className="space-y-3 pt-4 border-t border-white/10">
                   <div className="flex items-center space-x-3 text-sm text-gray-300 group">
@@ -1353,9 +1371,11 @@ export default function CheckoutPage() {
               </div>
               <button
                 onClick={handlePlaceOrder}
-                disabled={processing || cryptoLoading}
+                disabled={processing || cryptoLoading || !selectedPayment}
                 className={`w-full py-3 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] ${
-                  selectedPayment === 'test'
+                  !selectedPayment
+                    ? 'bg-gray-600 text-gray-300'
+                    : selectedPayment === 'test'
                     ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg'
                     : selectedPayment === 'crypto'
                     ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg'
@@ -1367,6 +1387,8 @@ export default function CheckoutPage() {
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                     {cryptoLoading ? 'Preparing...' : 'Creating...'}
                   </span>
+                ) : !selectedPayment ? (
+                  '💳 Select Payment Method'
                 ) : selectedPayment === 'test' ? (
                   '🚀 Create Test Order'
                 ) : selectedPayment === 'crypto' ? (

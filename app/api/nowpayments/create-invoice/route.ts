@@ -29,11 +29,11 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    if (!NOWPAYMENTS_API_KEY) {
+    if (!NOWPAYMENTS_API_KEY || NOWPAYMENTS_API_KEY === 'undefined') {
       console.error('NOWPAYMENTS_API_KEY not configured')
       return NextResponse.json(
-        { error: 'Cryptocurrency payments not configured' },
-        { status: 500 }
+        { error: 'Cryptocurrency payments are not available yet. Please use PayPal or try again later.' },
+        { status: 503 }
       )
     }
 
