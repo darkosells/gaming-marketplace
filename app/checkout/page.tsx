@@ -1,10 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+
+// PayPal Client ID - Replace with your Sandbox Client ID
+// Get it from: https://developer.paypal.com/dashboard/applications/sandbox
+const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || 'YOUR_SANDBOX_CLIENT_ID'
 
 interface CartItem {
   listing_id: string
@@ -24,15 +28,25 @@ interface CartItem {
   }
 }
 
+declare global {
+  interface Window {
+    paypal?: any
+  }
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const [cartItem, setCartItem] = useState<CartItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [user, setUser] = useState<any>(null)
-  const [selectedPayment, setSelectedPayment] = useState('test')
+  const [selectedPayment, setSelectedPayment] = useState('paypal') // Default to PayPal now
   const [showComingSoon, setShowComingSoon] = useState(false)
   const [showMobileSummary, setShowMobileSummary] = useState(false)
+  const [paypalLoaded, setPaypalLoaded] = useState(false)
+  const [paypalError, setPaypalError] = useState<string | null>(null)
+  const paypalButtonsRef = useRef<HTMLDivElement>(null)
+  const paypalButtonsRendered = useRef(false)
   
   // Billing form state
   const [billingInfo, setBillingInfo] = useState({
@@ -51,11 +65,210 @@ export default function CheckoutPage() {
     checkAuth()
   }, [])
 
+  // Load PayPal SDK
+  useEffect(() => {
+    if (PAYPAL_CLIENT_ID === 'YOUR_SANDBOX_CLIENT_ID') {
+      setPaypalError('PayPal Client ID not configured. Please add NEXT_PUBLIC_PAYPAL_CLIENT_ID to your environment variables.')
+      return
+    }
+
+    // Check if script already exists
+    if (document.querySelector('script[src*="paypal.com/sdk"]')) {
+      if (window.paypal) {
+        setPaypalLoaded(true)
+      }
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`
+    script.async = true
+    
+    script.onload = () => {
+      setPaypalLoaded(true)
+      setPaypalError(null)
+    }
+    
+    script.onerror = () => {
+      setPaypalError('Failed to load PayPal SDK. Please check your internet connection.')
+    }
+    
+    document.body.appendChild(script)
+
+    return () => {
+      // Don't remove the script on cleanup as it may still be needed
+    }
+  }, [])
+
+  // Render PayPal buttons when SDK is loaded and PayPal is selected
+  const renderPayPalButtons = useCallback(() => {
+    if (!paypalLoaded || !window.paypal || !paypalButtonsRef.current || !cartItem || paypalButtonsRendered.current) {
+      return
+    }
+
+    // Clear any existing buttons
+    paypalButtonsRef.current.innerHTML = ''
+    
+    const subtotal = cartItem.listing.price * cartItem.quantity
+    const serviceFee = subtotal * 0.05
+    const total = subtotal + serviceFee
+
+    try {
+      window.paypal.Buttons({
+        style: {
+          layout: 'vertical',
+          color: 'gold',
+          shape: 'rect',
+          label: 'paypal',
+          height: 50
+        },
+        
+        // Create PayPal order
+        createOrder: (data: any, actions: any) => {
+          return actions.order.create({
+            purchase_units: [{
+              description: `Nashflare - ${cartItem.listing.title}`,
+              amount: {
+                currency_code: 'USD',
+                value: total.toFixed(2),
+                breakdown: {
+                  item_total: {
+                    currency_code: 'USD',
+                    value: subtotal.toFixed(2)
+                  },
+                  handling: {
+                    currency_code: 'USD',
+                    value: serviceFee.toFixed(2)
+                  }
+                }
+              },
+              items: [{
+                name: cartItem.listing.title,
+                description: `${cartItem.listing.game} - ${cartItem.listing.category}`,
+                unit_amount: {
+                  currency_code: 'USD',
+                  value: cartItem.listing.price.toFixed(2)
+                },
+                quantity: cartItem.quantity.toString(),
+                category: 'DIGITAL_GOODS'
+              }]
+            }],
+            application_context: {
+              brand_name: 'Nashflare',
+              shipping_preference: 'NO_SHIPPING'
+            }
+          })
+        },
+
+        // Capture payment on approval
+        onApprove: async (data: any, actions: any) => {
+          setProcessing(true)
+          
+          try {
+            // Capture the payment
+            const details = await actions.order.capture()
+            
+            if (details.status === 'COMPLETED') {
+              // Create order in our database
+              await createDatabaseOrder(details.id, 'paypal', 'paid')
+            } else {
+              throw new Error('Payment was not completed')
+            }
+          } catch (error: any) {
+            console.error('PayPal capture error:', error)
+            setPaypalError('Payment failed. Please try again.')
+            setProcessing(false)
+          }
+        },
+
+        onError: (err: any) => {
+          console.error('PayPal error:', err)
+          setPaypalError('An error occurred with PayPal. Please try again.')
+          setProcessing(false)
+        },
+
+        onCancel: () => {
+          // User cancelled - do nothing, they can try again
+          console.log('Payment cancelled by user')
+        }
+      }).render(paypalButtonsRef.current)
+      
+      paypalButtonsRendered.current = true
+    } catch (error) {
+      console.error('Error rendering PayPal buttons:', error)
+      setPaypalError('Failed to initialize PayPal. Please refresh the page.')
+    }
+  }, [paypalLoaded, cartItem])
+
+  // Re-render PayPal buttons when payment method changes or cart updates
+  useEffect(() => {
+    if (selectedPayment === 'paypal' && paypalLoaded && cartItem) {
+      paypalButtonsRendered.current = false
+      renderPayPalButtons()
+    }
+  }, [selectedPayment, paypalLoaded, cartItem, renderPayPalButtons])
+
+  const createDatabaseOrder = async (paymentId: string, paymentMethod: string, paymentStatus: string) => {
+    if (!cartItem || !user) {
+      throw new Error('Missing cart item or user')
+    }
+
+    const totalPrice = cartItem.listing.price * cartItem.quantity
+
+    // Create the order with paid status
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        listing_id: cartItem.listing.id,
+        buyer_id: user.id,
+        seller_id: cartItem.listing.seller_id,
+        amount: totalPrice,
+        quantity: cartItem.quantity,
+        status: paymentStatus === 'paid' ? 'paid' : 'pending',
+        payment_status: paymentStatus,
+        payment_method: paymentMethod,
+        payment_id: paymentId, // Store PayPal transaction ID
+        paid_at: paymentStatus === 'paid' ? new Date().toISOString() : null
+      })
+      .select()
+      .single()
+
+    if (orderError) {
+      console.error('Order creation error:', orderError)
+      throw new Error(orderError.message || 'Failed to create order')
+    }
+
+    if (!order) {
+      throw new Error('Order was not created')
+    }
+
+    // Reduce stock for the listing
+    const { error: stockError } = await supabase
+      .from('listings')
+      .update({ 
+        stock: cartItem.listing.stock - cartItem.quantity,
+        status: cartItem.listing.stock - cartItem.quantity <= 0 ? 'sold' : 'active'
+      })
+      .eq('id', cartItem.listing.id)
+
+    if (stockError) {
+      console.error('Stock update error:', stockError)
+      // Don't throw - order is created, stock update failure is non-critical
+    }
+
+    // Clear cart
+    localStorage.removeItem('cart')
+    window.dispatchEvent(new Event('cart-updated'))
+
+    // Redirect to order page
+    router.push(`/order/${order.id}`)
+  }
+
   const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
-      router.push('/login')
+      router.push('/login?returnUrl=/checkout')
       return
     }
     
@@ -86,7 +299,7 @@ export default function CheckoutPage() {
       if (listing && listing.status === 'active') {
         setCartItem({
           listing_id: cart.listing_id,
-          quantity: 1, // Always 1
+          quantity: 1,
           listing: listing
         })
       } else {
@@ -99,16 +312,10 @@ export default function CheckoutPage() {
     }
   }
 
-  const handlePlaceOrder = async () => {
+  // Handle test order creation (simulate payment)
+  const handleTestOrder = async () => {
     if (!cartItem || !user) return
 
-    // For real payment methods, show coming soon message
-    if (selectedPayment === 'card' || selectedPayment === 'crypto') {
-      setShowComingSoon(true)
-      return
-    }
-
-    // Basic validation for test mode
     if (!billingInfo.firstName || !billingInfo.lastName || !billingInfo.email) {
       alert('Please fill in all required billing information')
       return
@@ -119,7 +326,6 @@ export default function CheckoutPage() {
     try {
       const totalPrice = cartItem.listing.price * cartItem.quantity
 
-      // Create the order
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -130,7 +336,7 @@ export default function CheckoutPage() {
           quantity: cartItem.quantity,
           status: 'pending',
           payment_status: 'pending',
-          payment_method: selectedPayment
+          payment_method: 'test'
         })
         .select()
         .single()
@@ -144,11 +350,9 @@ export default function CheckoutPage() {
         throw new Error('Order was not created')
       }
 
-      // Clear cart
       localStorage.removeItem('cart')
       window.dispatchEvent(new Event('cart-updated'))
 
-      // Redirect to order page
       router.push(`/order/${order.id}`)
 
     } catch (error: any) {
@@ -157,6 +361,25 @@ export default function CheckoutPage() {
     } finally {
       setProcessing(false)
     }
+  }
+
+  const handlePlaceOrder = async () => {
+    if (!cartItem || !user) return
+
+    // For crypto, show coming soon
+    if (selectedPayment === 'crypto') {
+      setShowComingSoon(true)
+      return
+    }
+
+    // For test mode, create test order
+    if (selectedPayment === 'test') {
+      await handleTestOrder()
+      return
+    }
+
+    // For PayPal, the buttons handle the payment flow
+    // This function is not called when PayPal is selected
   }
 
   if (loading) {
@@ -195,7 +418,6 @@ export default function CheckoutPage() {
             onClick={() => setShowMobileSummary(false)}
           ></div>
           <div className="relative w-full bg-slate-900/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-slide-up">
-            {/* Header */}
             <div className="sticky top-0 bg-slate-900/95 backdrop-blur-xl border-b border-white/10 p-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white">Order Summary</h3>
               <button 
@@ -208,9 +430,7 @@ export default function CheckoutPage() {
               </button>
             </div>
 
-            {/* Content */}
             <div className="p-4 space-y-4">
-              {/* Item */}
               <div className="flex gap-3 pb-4 border-b border-white/10">
                 <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
                   {cartItem.listing.image_url ? (
@@ -237,7 +457,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Pricing */}
               <div className="space-y-3">
                 <div className="flex justify-between text-gray-300">
                   <span>Subtotal</span>
@@ -255,7 +474,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Trust Badges */}
               <div className="space-y-3 pt-4 border-t border-white/10">
                 <div className="flex items-center space-x-3 text-sm text-gray-300">
                   <span className="text-green-400 text-xl">🔒</span>
@@ -415,69 +633,45 @@ export default function CheckoutPage() {
                 </h2>
 
                 <div className="space-y-3">
-                  {/* Test/Simulation Mode */}
+                  {/* PayPal - Primary Payment Method */}
                   <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
-                    selectedPayment === 'test' 
-                      ? 'bg-green-500/20 border-green-500/50' 
-                      : 'bg-slate-800/50 border-white/10 hover:border-green-500/30'
+                    selectedPayment === 'paypal' 
+                      ? 'bg-blue-500/20 border-blue-500/50' 
+                      : 'bg-slate-800/50 border-white/10 hover:border-blue-500/30'
                   }`}>
                     <input
                       type="radio"
                       name="payment"
-                      value="test"
-                      checked={selectedPayment === 'test'}
-                      onChange={(e) => setSelectedPayment(e.target.value)}
+                      value="paypal"
+                      checked={selectedPayment === 'paypal'}
+                      onChange={(e) => {
+                        setSelectedPayment(e.target.value)
+                        paypalButtonsRendered.current = false
+                      }}
                       className="sr-only"
                     />
                     <div className={`w-5 h-5 rounded-full border-2 mr-3 sm:mr-4 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0 ${
-                      selectedPayment === 'test' ? 'border-green-500' : 'border-gray-500'
+                      selectedPayment === 'paypal' ? 'border-blue-500' : 'border-gray-500'
                     }`}>
-                      {selectedPayment === 'test' && (
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      {selectedPayment === 'paypal' && (
+                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
-                        <span>Test Mode</span>
-                        <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-bold rounded">DEV</span>
+                        <span>PayPal</span>
+                        <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-bold rounded">RECOMMENDED</span>
                       </p>
-                      <p className="text-gray-400 text-xs sm:text-sm">Simulate payment for testing purposes</p>
+                      <p className="text-gray-400 text-xs sm:text-sm">Pay with PayPal, Credit or Debit Card</p>
                     </div>
-                    <div className="flex gap-2 ml-2 flex-shrink-0">
-                      <span className="text-xl sm:text-2xl">🧪</span>
-                    </div>
-                  </label>
-
-                  {/* Credit/Debit Card (Coming Soon) */}
-                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
-                    selectedPayment === 'card' 
-                      ? 'bg-purple-500/20 border-purple-500/50' 
-                      : 'bg-slate-800/50 border-white/10 hover:border-purple-500/30'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="card"
-                      checked={selectedPayment === 'card'}
-                      onChange={(e) => setSelectedPayment(e.target.value)}
-                      className="sr-only"
-                    />
-                    <div className={`w-5 h-5 rounded-full border-2 mr-3 sm:mr-4 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0 ${
-                      selectedPayment === 'card' ? 'border-purple-500' : 'border-gray-500'
-                    }`}>
-                      {selectedPayment === 'card' && (
-                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
-                        <span>Credit / Debit Card</span>
-                        <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded whitespace-nowrap">COMING SOON</span>
-                      </p>
-                      <p className="text-gray-400 text-xs sm:text-sm">Visa, Mastercard, American Express</p>
-                    </div>
-                    <div className="flex gap-2 ml-2 flex-shrink-0">
-                      <span className="text-xl sm:text-2xl">💳</span>
+                    <div className="flex gap-1 sm:gap-2 ml-2 flex-shrink-0">
+                      {/* PayPal Logo */}
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#003087] rounded-lg flex items-center justify-center">
+                        <span className="text-white font-bold text-xs">PP</span>
+                      </div>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                        <span className="text-white text-lg">💳</span>
+                      </div>
                     </div>
                   </label>
 
@@ -513,9 +707,89 @@ export default function CheckoutPage() {
                       <span className="text-xl sm:text-2xl">₿</span>
                     </div>
                   </label>
+
+                  {/* Test/Simulation Mode */}
+                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
+                    selectedPayment === 'test' 
+                      ? 'bg-green-500/20 border-green-500/50' 
+                      : 'bg-slate-800/50 border-white/10 hover:border-green-500/30'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="test"
+                      checked={selectedPayment === 'test'}
+                      onChange={(e) => setSelectedPayment(e.target.value)}
+                      className="sr-only"
+                    />
+                    <div className={`w-5 h-5 rounded-full border-2 mr-3 sm:mr-4 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0 ${
+                      selectedPayment === 'test' ? 'border-green-500' : 'border-gray-500'
+                    }`}>
+                      {selectedPayment === 'test' && (
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
+                        <span>Test Mode</span>
+                        <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-bold rounded">DEV</span>
+                      </p>
+                      <p className="text-gray-400 text-xs sm:text-sm">Simulate payment for testing purposes</p>
+                    </div>
+                    <div className="flex gap-2 ml-2 flex-shrink-0">
+                      <span className="text-xl sm:text-2xl">🧪</span>
+                    </div>
+                  </label>
                 </div>
 
-                {/* Info box based on selection */}
+                {/* PayPal Buttons Container */}
+                {selectedPayment === 'paypal' && (
+                  <div className="mt-6">
+                    {paypalError ? (
+                      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                        <p className="text-red-400 text-sm flex items-start gap-2">
+                          <span className="text-lg flex-shrink-0">⚠️</span>
+                          <span>{paypalError}</span>
+                        </p>
+                      </div>
+                    ) : !paypalLoaded ? (
+                      <div className="p-4 bg-slate-800/50 rounded-xl flex items-center justify-center">
+                        <div className="flex items-center gap-3 text-gray-400">
+                          <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
+                          <span>Loading PayPal...</span>
+                        </div>
+                      </div>
+                    ) : processing ? (
+                      <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl flex items-center justify-center">
+                        <div className="flex items-center gap-3 text-blue-400">
+                          <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
+                          <span>Processing payment...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl mb-4">
+                          <p className="text-blue-300 text-xs sm:text-sm flex items-start gap-2">
+                            <span className="text-lg flex-shrink-0">ℹ️</span>
+                            <span>
+                              <span className="font-semibold">Secure Payment:</span> Click the PayPal button below to complete your purchase. 
+                              You can pay with your PayPal balance or any credit/debit card.
+                            </span>
+                          </p>
+                        </div>
+                        <div 
+                          ref={paypalButtonsRef} 
+                          className="paypal-buttons-container min-h-[150px]"
+                        ></div>
+                        <p className="text-center text-gray-500 text-xs mt-3">
+                          🔒 Secured by PayPal
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Info box for other payment methods */}
                 {selectedPayment === 'test' && (
                   <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-green-500/10 rounded-xl border border-green-500/30">
                     <p className="text-green-300 text-xs sm:text-sm flex items-start gap-2">
@@ -523,21 +797,6 @@ export default function CheckoutPage() {
                       <span>
                         <span className="font-semibold">Test Mode Active:</span> Your order will be created and you can simulate the payment on the order details page. 
                         No real payment will be processed.
-                      </span>
-                    </p>
-                  </div>
-                )}
-
-                {selectedPayment === 'card' && (
-                  <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
-                    <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
-                      <span className="text-base sm:text-lg flex-shrink-0">🚧</span>
-                      <span>
-                        <span className="font-semibold">Coming Soon:</span> Bank card payments are being integrated. 
-                        Want to be notified when this goes live? Email us at{' '}
-                        <a href="mailto:contact@nashflare.com" className="text-yellow-200 underline hover:text-white transition">
-                          contact@nashflare.com
-                        </a>
                       </span>
                     </p>
                   </div>
@@ -568,7 +827,6 @@ export default function CheckoutPage() {
                   Order Summary
                 </h2>
 
-                {/* Item */}
                 <div className="flex gap-3 mb-6 pb-6 border-b border-white/10">
                   <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
                     {cartItem.listing.image_url ? (
@@ -595,7 +853,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Pricing */}
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between text-gray-300">
                     <span>Subtotal</span>
@@ -613,38 +870,42 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Place Order Button */}
-                <button
-                  onClick={handlePlaceOrder}
-                  disabled={processing || (selectedPayment !== 'test')}
-                  className={`w-full py-4 rounded-xl font-semibold transition-all duration-300 mb-4 ${
-                    selectedPayment === 'test'
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg hover:shadow-green-500/50 hover:scale-105'
-                      : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/50 hover:scale-105'
-                  } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
-                >
-                  {processing ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Creating Order...
-                    </span>
-                  ) : selectedPayment === 'test' ? (
-                    'Create Test Order'
-                  ) : (
-                    'Payment Coming Soon'
-                  )}
-                </button>
+                {/* Desktop Place Order Button - Only show for non-PayPal methods */}
+                {selectedPayment !== 'paypal' && (
+                  <>
+                    <button
+                      onClick={handlePlaceOrder}
+                      disabled={processing || selectedPayment === 'crypto'}
+                      className={`w-full py-4 rounded-xl font-semibold transition-all duration-300 mb-4 ${
+                        selectedPayment === 'test'
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg hover:shadow-green-500/50 hover:scale-105'
+                          : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/50'
+                      } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
+                    >
+                      {processing ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          Creating Order...
+                        </span>
+                      ) : selectedPayment === 'test' ? (
+                        '🚀 Create Test Order'
+                      ) : (
+                        '⏳ Coming Soon'
+                      )}
+                    </button>
 
-                {selectedPayment === 'test' && (
-                  <p className="text-center text-gray-500 text-xs mb-6">
-                    You'll simulate payment on the order page
-                  </p>
+                    {selectedPayment === 'test' && (
+                      <p className="text-center text-gray-500 text-xs mb-6">
+                        You'll simulate payment on the order page
+                      </p>
+                    )}
+                  </>
                 )}
 
-                {selectedPayment !== 'test' && (
-                  <p className="text-center text-yellow-400 text-xs mb-6">
-                    Select "Test Mode" to create a test order
-                  </p>
+                {selectedPayment === 'paypal' && (
+                  <div className="text-center text-gray-400 text-sm mb-6">
+                    <p>👆 Use the PayPal buttons above to complete your payment</p>
+                  </div>
                 )}
 
                 {/* Trust Badges */}
@@ -671,9 +932,51 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Mobile Fixed Bottom Bar */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
-          <div className="flex flex-col gap-3">
+        {/* Mobile Fixed Bottom Bar - Only show for non-PayPal methods */}
+        {selectedPayment !== 'paypal' && (
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-400 mb-0.5">Total</p>
+                  <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                    ${total.toFixed(2)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowMobileSummary(true)}
+                  className="bg-white/10 text-white px-4 py-3 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[48px] text-sm whitespace-nowrap"
+                >
+                  📋 Summary
+                </button>
+              </div>
+              <button
+                onClick={handlePlaceOrder}
+                disabled={processing || selectedPayment === 'crypto'}
+                className={`w-full py-3 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] ${
+                  selectedPayment === 'test'
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg'
+                    : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {processing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Creating...
+                  </span>
+                ) : selectedPayment === 'test' ? (
+                  '🚀 Create Test Order'
+                ) : (
+                  '⏳ Coming Soon'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile PayPal Info Bar */}
+        {selectedPayment === 'paypal' && (
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <p className="text-xs text-gray-400 mb-0.5">Total</p>
@@ -687,29 +990,12 @@ export default function CheckoutPage() {
               >
                 📋 Summary
               </button>
+              <div className="bg-blue-500/20 text-blue-400 px-4 py-3 rounded-xl font-semibold text-sm whitespace-nowrap">
+                👆 Use PayPal Above
+              </div>
             </div>
-            <button
-              onClick={handlePlaceOrder}
-              disabled={processing || (selectedPayment !== 'test')}
-              className={`w-full py-3 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] ${
-                selectedPayment === 'test'
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg'
-                  : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {processing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  Creating...
-                </span>
-              ) : selectedPayment === 'test' ? (
-                '🚀 Create Test Order'
-              ) : (
-                '⏳ Payment Coming Soon'
-              )}
-            </button>
           </div>
-        </div>
+        )}
 
         {/* Footer */}
         <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-6 sm:py-8 mt-8 sm:mt-12">
@@ -726,10 +1012,7 @@ export default function CheckoutPage() {
             <div className="text-5xl sm:text-6xl mb-4 sm:mb-6">🚧</div>
             <h3 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4">Payment Coming Soon!</h3>
             <p className="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-base">
-              {selectedPayment === 'card' 
-                ? 'Bank card payments are currently being integrated with our payment provider.'
-                : 'Cryptocurrency payments via Coinbase Commerce are currently being integrated.'
-              }
+              Cryptocurrency payments via Coinbase Commerce are currently being integrated.
             </p>
             <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">
               Want to be notified when this payment method goes live?<br />
@@ -739,6 +1022,16 @@ export default function CheckoutPage() {
               </a>
             </p>
             <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setShowComingSoon(false)
+                  setSelectedPayment('paypal')
+                  paypalButtonsRendered.current = false
+                }}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-blue-500/50 transition-all min-h-[48px]"
+              >
+                Pay with PayPal Instead
+              </button>
               <button
                 onClick={() => {
                   setShowComingSoon(false)
@@ -776,6 +1069,13 @@ export default function CheckoutPage() {
         }
         .safe-area-bottom {
           padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+        }
+        /* PayPal button container styling */
+        .paypal-buttons-container {
+          min-height: 150px;
+        }
+        .paypal-buttons-container iframe {
+          z-index: 1 !important;
         }
       `}</style>
     </div>
