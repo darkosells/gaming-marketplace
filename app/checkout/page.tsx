@@ -173,25 +173,38 @@ export default function CheckoutPage() {
           setProcessing(true)
           setPaypalError(null)
           
-          // Get the order ID
           const ppOrderId = data.orderID || paypalOrderId.current
           console.log('Payment approved! PayPal Order ID:', ppOrderId)
           
-          // Start capture in background but don't wait for response
-          // The popup closing is a known Sandbox issue
-          actions.order.capture().then((details: any) => {
-            console.log('Capture confirmed:', details)
-          }).catch((err: any) => {
-            console.log('Capture response not received (popup closed) - this is okay in Sandbox')
-          })
-          
-          // Create database order immediately - payment was approved
           try {
-            console.log('Creating database order...')
-            await createDatabaseOrder(ppOrderId, 'paypal', 'paid')
+            // Capture payment on the SERVER (more reliable than client-side)
+            console.log('Capturing payment via server API...')
+            const captureResponse = await fetch('/api/paypal/capture', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ orderId: ppOrderId }),
+            })
+            
+            const captureResult = await captureResponse.json()
+            console.log('Server capture result:', captureResult)
+            
+            if (!captureResponse.ok || !captureResult.success) {
+              throw new Error(captureResult.error || 'Failed to capture payment')
+            }
+            
+            if (captureResult.status === 'COMPLETED') {
+              console.log('Payment captured successfully! Creating database order...')
+              // Now create the database order - payment is confirmed
+              await createDatabaseOrder(captureResult.captureId || ppOrderId, 'paypal', 'paid')
+            } else {
+              throw new Error(`Payment status: ${captureResult.status}`)
+            }
+            
           } catch (error: any) {
-            console.error('Failed to create order:', error)
-            setPaypalError(error.message || 'Failed to create order. Please contact support.')
+            console.error('Payment capture error:', error)
+            setPaypalError(error.message || 'Payment failed. Please try again.')
             setProcessing(false)
           }
         },
