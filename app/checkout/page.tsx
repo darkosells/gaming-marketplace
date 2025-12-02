@@ -198,7 +198,24 @@ export default function CheckoutPage() {
         
         // Check form before allowing PayPal
         onClick: (data: any, actions: any) => {
-          if (!validateForm()) {
+          // Use ref to get latest billing info values (not stale closure)
+          const billing = billingInfoRef.current
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+          
+          const isValid = billing.firstName.trim() && 
+                          billing.lastName.trim() && 
+                          billing.email.trim() &&
+                          emailRegex.test(billing.email)
+          
+          if (!isValid) {
+            // Set form errors for visual feedback
+            const errors: {[key: string]: string} = {}
+            if (!billing.firstName.trim()) errors.firstName = 'First name is required'
+            if (!billing.lastName.trim()) errors.lastName = 'Last name is required'
+            if (!billing.email.trim()) errors.email = 'Email is required'
+            else if (!emailRegex.test(billing.email)) errors.email = 'Please enter a valid email'
+            setFormErrors(errors)
+            
             setPaypalError('Please fill in all required billing fields before paying.')
             return actions.reject()
           }

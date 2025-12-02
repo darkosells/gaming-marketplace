@@ -8,15 +8,22 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 // Verify IPN signature
 function verifySignature(payload: any, receivedSignature: string, secret: string): boolean {
-  // Sort parameters alphabetically
   const sortedParams = JSON.stringify(payload, Object.keys(payload).sort())
-  
-  // Create HMAC SHA-512 signature
   const hmac = crypto.createHmac('sha512', secret)
   hmac.update(sortedParams)
   const computedSignature = hmac.digest('hex')
-  
   return computedSignature === receivedSignature
+}
+
+// Decode order data from base64
+function decodeOrderData(encodedOrderId: string): any {
+  try {
+    const decoded = Buffer.from(encodedOrderId, 'base64').toString('utf-8')
+    return JSON.parse(decoded)
+  } catch (error) {
+    console.error('Failed to decode order data:', error)
+    return null
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -35,118 +42,108 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create Supabase client with service role for admin access
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-    const orderId = payload.order_id
+    const encodedOrderId = payload.order_id
     const paymentStatus = payload.payment_status
+    const paymentId = payload.payment_id
 
-    if (!orderId) {
+    if (!encodedOrderId) {
       console.log('No order_id in webhook payload, skipping')
       return NextResponse.json({ received: true })
     }
 
-    console.log(`Processing payment status: ${paymentStatus} for order: ${orderId}`)
+    // Decode order data from the order_id field
+    const orderData = decodeOrderData(encodedOrderId)
+    if (!orderData) {
+      console.error('Failed to decode order data')
+      return NextResponse.json({ error: 'Invalid order data' }, { status: 400 })
+    }
 
-    // Handle different payment statuses
-    // NOWPayments statuses: waiting, confirming, confirmed, sending, partially_paid, finished, failed, refunded, expired
+    console.log(`Processing payment status: ${paymentStatus}`)
+    console.log('Order data:', orderData)
+
     switch (paymentStatus) {
       case 'finished':
-        // Payment completed successfully
-        console.log(`Payment finished for order ${orderId}`)
+        // Payment completed - NOW create the order!
+        console.log('Payment finished - creating order')
         
-        // Update order to paid
-        const { error: updateError } = await supabase
+        // Check if order already exists (duplicate webhook protection)
+        const { data: existingOrder } = await supabase
           .from('orders')
-          .update({
+          .select('id')
+          .eq('payment_id', String(paymentId))
+          .single()
+
+        if (existingOrder) {
+          console.log('Order already exists:', existingOrder.id)
+          return NextResponse.json({ received: true, message: 'Order already exists' })
+        }
+
+        // Create the order now that payment is confirmed
+        const { data: newOrder, error: orderError } = await supabase
+          .from('orders')
+          .insert({
+            listing_id: orderData.listing_id,
+            buyer_id: orderData.buyer_id,
+            seller_id: orderData.seller_id,
+            amount: orderData.amount,
+            quantity: orderData.quantity,
             status: 'paid',
             payment_status: 'paid',
+            payment_method: 'crypto',
+            payment_id: String(paymentId),
             paid_at: new Date().toISOString()
           })
-          .eq('id', orderId)
-          .eq('payment_status', 'pending') // Only update if still pending
+          .select()
+          .single()
 
-        if (updateError) {
-          console.error('Failed to update order:', updateError)
-        } else {
-          console.log(`Order ${orderId} marked as paid`)
+        if (orderError || !newOrder) {
+          console.error('Failed to create order:', orderError)
+          return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
+        }
+
+        console.log(`Order created: ${newOrder.id}`)
+
+        // Reduce stock
+        const { data: listing } = await supabase
+          .from('listings')
+          .select('stock')
+          .eq('id', orderData.listing_id)
+          .single()
+
+        if (listing) {
+          const newStock = Math.max(0, listing.stock - orderData.quantity)
+          await supabase
+            .from('listings')
+            .update({ 
+              stock: newStock,
+              status: newStock <= 0 ? 'sold' : 'active'
+            })
+            .eq('id', orderData.listing_id)
           
-          // Reduce stock
-          const { data: order } = await supabase
-            .from('orders')
-            .select('listing_id, quantity')
-            .eq('id', orderId)
-            .single()
-
-          if (order) {
-            const { data: listing } = await supabase
-              .from('listings')
-              .select('stock')
-              .eq('id', order.listing_id)
-              .single()
-
-            if (listing) {
-              const newStock = Math.max(0, listing.stock - order.quantity)
-              await supabase
-                .from('listings')
-                .update({ 
-                  stock: newStock,
-                  status: newStock <= 0 ? 'sold' : 'active'
-                })
-                .eq('id', order.listing_id)
-              
-              console.log(`Stock reduced for listing ${order.listing_id}: ${listing.stock} -> ${newStock}`)
-            }
-          }
+          console.log(`Stock reduced: ${listing.stock} -> ${newStock}`)
         }
         break
 
       case 'confirmed':
-      case 'sending':
-        // Payment confirmed on blockchain, being processed
-        console.log(`Payment confirmed/sending for order ${orderId}`)
-        await supabase
-          .from('orders')
-          .update({ payment_status: 'processing' })
-          .eq('id', orderId)
-        break
-
       case 'confirming':
-        // Transaction detected, waiting for confirmations
-        console.log(`Payment confirming for order ${orderId}`)
-        await supabase
-          .from('orders')
-          .update({ payment_status: 'confirming' })
-          .eq('id', orderId)
+      case 'sending':
+        console.log(`Payment ${paymentStatus} - waiting for completion`)
         break
 
       case 'partially_paid':
-        // Customer sent less than required
-        console.log(`Payment partially paid for order ${orderId}`)
-        await supabase
-          .from('orders')
-          .update({ payment_status: 'partial' })
-          .eq('id', orderId)
+        console.log('Payment partially paid - waiting for full amount')
         break
 
       case 'failed':
       case 'expired':
       case 'refunded':
-        // Payment failed, expired, or refunded
-        console.log(`Payment ${paymentStatus} for order ${orderId}`)
-        await supabase
-          .from('orders')
-          .update({ 
-            status: 'cancelled',
-            payment_status: paymentStatus 
-          })
-          .eq('id', orderId)
+        console.log(`Payment ${paymentStatus} - no order created`)
         break
 
       case 'waiting':
-        // Waiting for customer to send payment
-        console.log(`Payment waiting for order ${orderId}`)
-        // No action needed, order already in pending state
+        console.log('Payment waiting - no action needed')
         break
 
       default:
@@ -164,7 +161,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// NOWPayments may send GET requests to verify endpoint
 export async function GET() {
   return NextResponse.json({ status: 'NOWPayments webhook endpoint active' })
 }
