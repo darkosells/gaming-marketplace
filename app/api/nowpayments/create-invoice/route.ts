@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const NOWPAYMENTS_API_KEY = process.env.NOWPAYMENTS_API_KEY!
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-const NOWPAYMENTS_API_URL = process.env.NOWPAYMENTS_SANDBOX === 'true'
-  ? 'https://api-sandbox.nowpayments.io/v1'
-  : 'https://api.nowpayments.io/v1'
+const NOWPAYMENTS_API_URL_PRODUCTION = 'https://api.nowpayments.io/v1'
+const NOWPAYMENTS_API_URL_SANDBOX = 'https://api-sandbox.nowpayments.io/v1'
 
 interface CreateInvoiceRequest {
   listingId: string
@@ -21,6 +16,13 @@ interface CreateInvoiceRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // Get environment variables inside the function
+    const NOWPAYMENTS_API_KEY = process.env.NOWPAYMENTS_API_KEY
+    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const isSandbox = process.env.NOWPAYMENTS_SANDBOX === 'true'
+    const NOWPAYMENTS_API_URL = isSandbox ? NOWPAYMENTS_API_URL_SANDBOX : NOWPAYMENTS_API_URL_PRODUCTION
+
     const body: CreateInvoiceRequest = await request.json()
     
     if (!body.listingId || !body.amount || !body.buyerId || !body.sellerId) {
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    if (!NOWPAYMENTS_API_KEY || NOWPAYMENTS_API_KEY === 'undefined') {
+    if (!NOWPAYMENTS_API_KEY) {
       console.error('NOWPAYMENTS_API_KEY not configured')
       return NextResponse.json(
         { error: 'Cryptocurrency payments are not available yet. Please use PayPal or try again later.' },
@@ -38,7 +40,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const isSandbox = process.env.NOWPAYMENTS_SANDBOX === 'true'
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+      console.error('Supabase environment variables not configured')
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      )
+    }
+
     console.log(`NOWPayments mode: ${isSandbox ? 'SANDBOX' : 'PRODUCTION'}`)
     console.log(`API URL: ${NOWPAYMENTS_API_URL}`)
 
@@ -75,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Checkout session created:', session.id)
 
-    // Use short session ID for NOWPayments (not encoded JSON)
+    // Use short session ID for NOWPayments
     const invoiceData = {
       price_amount: total,
       price_currency: 'USD',

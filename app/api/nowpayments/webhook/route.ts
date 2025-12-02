@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
-const NOWPAYMENTS_IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET!
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
 function verifySignature(payload: any, receivedSignature: string, secret: string): boolean {
   const sortedParams = JSON.stringify(payload, Object.keys(payload).sort())
   const hmac = crypto.createHmac('sha512', secret)
@@ -16,6 +12,16 @@ function verifySignature(payload: any, receivedSignature: string, secret: string
 
 export async function POST(request: NextRequest) {
   try {
+    // Get environment variables inside the function
+    const NOWPAYMENTS_IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET
+    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+      console.error('Supabase environment variables not configured')
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+
     const payload = await request.json()
     const receivedSignature = request.headers.get('x-nowpayments-sig')
 
@@ -31,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-    const sessionId = payload.order_id // This is the short session ID
+    const sessionId = payload.order_id
     const paymentStatus = payload.payment_status
     const paymentId = payload.payment_id
 
