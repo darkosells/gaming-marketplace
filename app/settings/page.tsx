@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 import { sendPasswordChangedEmail, sendUsernameChangedEmail } from '@/lib/email'
 
 // Custom Modal Component
@@ -605,7 +606,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden flex flex-col">
       {/* Custom Modal */}
       <CustomModal
         isOpen={modal.isOpen}
@@ -651,7 +652,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10">
+      <div className="relative z-10 flex-1">
         <Navigation />
 
         <div className="container mx-auto px-3 sm:px-4 pt-20 sm:pt-24 pb-8 sm:pb-12">
@@ -1306,14 +1307,10 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-6 sm:py-8 mt-8 sm:mt-12">
-          <div className="container mx-auto px-3 sm:px-4 text-center text-gray-500 text-xs sm:text-sm">
-            <p>&copy; 2024 Nashflare. All rights reserved.</p>
-          </div>
-        </footer>
       </div>
+
+      {/* Footer */}
+      <Footer />
 
       {/* Custom CSS */}
       <style jsx>{`

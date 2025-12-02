@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 
 export default function BecomeVendorPage() {
   const [user, setUser] = useState<any>(null)
@@ -15,6 +16,7 @@ export default function BecomeVendorPage() {
   const [previousSubmission, setPreviousSubmission] = useState<any>(null)
   const [isResubmission, setIsResubmission] = useState(false)
   const [calculatedAge, setCalculatedAge] = useState<number | null>(null)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
   
   const [formData, setFormData] = useState({
     fullName: '', dateOfBirth: '', phoneNumber: '', streetAddress: '', city: '', stateProvince: '', postalCode: '', country: 'United States',
@@ -201,7 +203,7 @@ export default function BecomeVendorPage() {
         has_previous_experience: formData.hasPreviousExperience,
         platform_names: formData.platformNames || null, platform_usernames: formData.platformUsernames || null,
         experience_description: formData.experienceDescription || null, status: 'pending',
-        agreed_to_seller_rules: true, // Track that they agreed to seller rules
+        agreed_to_seller_rules: true,
         agreed_to_seller_rules_at: new Date().toISOString(),
         resubmission_count: isResubmission ? (previousSubmission.resubmission_count || 0) + 1 : 0,
         previous_submission_id: isResubmission ? previousSubmission.id : null
@@ -211,8 +213,9 @@ export default function BecomeVendorPage() {
       if (isResubmission && previousSubmission) { 
         await supabase.from('vendor_verifications').update({ can_resubmit: false }).eq('id', previousSubmission.id) 
       }
-      alert(isResubmission ? '✅ Resubmission successful! Your updated application is now under review.' : '✅ Application submitted! We will review it within 1-3 business days.')
-      router.push('/customer-dashboard')
+      
+      // Show success modal instead of ugly alert
+      setShowSuccessModal(true)
     } catch (error) { 
       console.error('Error:', error)
       alert('Failed to submit. Please try again.') 
@@ -220,24 +223,110 @@ export default function BecomeVendorPage() {
     setSubmitting(false)
   }
 
+  // Success Modal Component
+  const SuccessModal = () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
+      
+      {/* Modal Content */}
+      <div className="relative bg-slate-900/95 backdrop-blur-xl border border-slate-700/50 rounded-2xl sm:rounded-3xl p-6 sm:p-8 lg:p-10 max-w-md w-full mx-4 shadow-2xl">
+        {/* Glowing effect */}
+        <div className="absolute -inset-1 bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-teal-500/20 rounded-2xl sm:rounded-3xl blur-xl"></div>
+        
+        <div className="relative">
+          {/* Success Icon with Animation */}
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              {/* Animated rings */}
+              <div className="absolute inset-0 w-24 h-24 sm:w-28 sm:h-28 bg-green-500/20 rounded-full animate-ping"></div>
+              <div className="absolute inset-2 w-20 h-20 sm:w-24 sm:h-24 bg-green-500/30 rounded-full animate-pulse"></div>
+              
+              {/* Main icon */}
+              <div className="relative w-24 h-24 sm:w-28 sm:h-28 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/30">
+                <svg className="w-12 h-12 sm:w-14 sm:h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Title */}
+          <h2 className="text-2xl sm:text-3xl font-bold text-white text-center mb-3">
+            {isResubmission ? 'Resubmission Successful!' : 'Application Submitted!'}
+          </h2>
+
+          {/* Message */}
+          <p className="text-gray-300 text-center text-sm sm:text-base mb-6 leading-relaxed">
+            {isResubmission 
+              ? 'Your updated application has been received and is now under review.'
+              : 'Thank you for applying to become a vendor on Nashflare!'
+            }
+          </p>
+
+          {/* Info Card */}
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-white font-medium text-sm">Review Time</p>
+                <p className="text-gray-400 text-xs">1-3 business days</p>
+              </div>
+            </div>
+            <p className="text-gray-400 text-xs sm:text-sm">
+              We'll notify you by email once your application has been reviewed. You can also check your status in the dashboard.
+            </p>
+          </div>
+
+          {/* What's Next Section */}
+          <div className="space-y-2 mb-6">
+            <p className="text-white font-medium text-sm mb-3">What happens next?</p>
+            <div className="flex items-start gap-2">
+              <span className="text-green-400 mt-0.5">✓</span>
+              <p className="text-gray-400 text-xs sm:text-sm">Our team will verify your identity documents</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-400 mt-0.5">✓</span>
+              <p className="text-gray-400 text-xs sm:text-sm">You'll receive an email with the decision</p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-400 mt-0.5">✓</span>
+              <p className="text-gray-400 text-xs sm:text-sm">Once approved, you can start listing products!</p>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <button
+            onClick={() => router.push('/customer-dashboard')}
+            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 sm:py-4 rounded-xl font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+          >
+            Go to Dashboard
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
         {/* Cosmic Background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {/* Nebula Clouds */}
           <div className="absolute top-20 left-10 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute bottom-20 right-10 w-[500px] h-[500px] bg-pink-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-          
-          {/* Stars */}
           <div className="absolute top-[10%] left-[20%] w-1 h-1 bg-white rounded-full animate-pulse"></div>
           <div className="absolute top-[30%] left-[75%] w-1 h-1 bg-blue-200 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
           <div className="absolute top-[50%] left-[8%] w-1.5 h-1.5 bg-pink-200 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
           <div className="absolute top-[70%] left-[60%] w-1 h-1 bg-cyan-200 rounded-full animate-pulse" style={{ animationDelay: '1.5s' }}></div>
           <div className="absolute top-[15%] left-[45%] w-1.5 h-1.5 bg-purple-200 rounded-full animate-pulse" style={{ animationDelay: '2s' }}></div>
           <div className="absolute top-[65%] left-[78%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.8s' }}></div>
-          
-          {/* Planets - Hidden on smallest screens */}
           <div className="hidden sm:block absolute top-[15%] right-[10%]">
             <div className="w-16 sm:w-20 h-16 sm:h-20 bg-gradient-to-br from-orange-400 to-amber-600 rounded-full shadow-lg relative">
               <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/20 rounded-full"></div>
@@ -256,15 +345,15 @@ export default function BecomeVendorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden flex flex-col">
+      {/* Success Modal */}
+      {showSuccessModal && <SuccessModal />}
+
       {/* Cosmic Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Nebula Clouds */}
         <div className="absolute top-20 left-10 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-20 right-10 w-[500px] h-[500px] bg-pink-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
         <div className="absolute top-1/2 left-1/3 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        
-        {/* Twinkling Stars */}
         <div className="absolute top-[10%] left-[20%] w-1 h-1 bg-white rounded-full animate-pulse"></div>
         <div className="absolute top-[30%] left-[75%] w-1 h-1 bg-blue-200 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
         <div className="absolute top-[50%] left-[8%] w-1.5 h-1.5 bg-pink-200 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
@@ -274,8 +363,6 @@ export default function BecomeVendorPage() {
         <div className="absolute top-[25%] left-[90%] w-1 h-1 bg-white rounded-full animate-pulse" style={{ animationDelay: '1.2s' }}></div>
         <div className="absolute top-[80%] left-[15%] w-1.5 h-1.5 bg-blue-200 rounded-full animate-pulse" style={{ animationDelay: '1.8s' }}></div>
         <div className="absolute top-[40%] left-[50%] w-1 h-1 bg-pink-200 rounded-full animate-pulse" style={{ animationDelay: '2.5s' }}></div>
-        
-        {/* Comic-style Planets - Hidden on smallest screens */}
         <div className="hidden sm:block absolute top-[15%] right-[10%]">
           <div className="w-16 sm:w-20 h-16 sm:h-20 bg-gradient-to-br from-orange-400 to-amber-600 rounded-full shadow-lg relative">
             <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/20 rounded-full"></div>
@@ -295,15 +382,12 @@ export default function BecomeVendorPage() {
         </div>
       </div>
 
-      {/* Navigation */}
       <Navigation />
-
-      {/* Add padding to account for fixed navigation */}
       <div className="pt-16 lg:pt-20"></div>
       
-      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-12 relative z-10">
+      <div className="flex-1 container mx-auto px-3 sm:px-4 py-6 sm:py-12 relative z-10">
         <div className="max-w-4xl mx-auto">
-          {/* Hero Header - Mobile Optimized */}
+          {/* Hero Header */}
           <div className="bg-slate-900/60 backdrop-blur-lg border border-slate-700/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6 lg:mb-8 text-center">
             <div className="text-4xl sm:text-5xl lg:text-6xl mb-3 sm:mb-4">{isResubmission ? '🔄' : '🚀'}</div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2 sm:mb-4">
@@ -314,7 +398,7 @@ export default function BecomeVendorPage() {
             </p>
           </div>
 
-          {/* Resubmission Alert - Mobile Optimized */}
+          {/* Resubmission Alert */}
           {isResubmission && previousSubmission && (
             <div className="bg-yellow-500/10 backdrop-blur-lg border-2 border-yellow-500/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 lg:mb-8">
               <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
@@ -345,7 +429,7 @@ export default function BecomeVendorPage() {
             </div>
           )}
 
-          {/* Progress Steps - Mobile Optimized with Horizontal Scroll */}
+          {/* Progress Steps */}
           <div className="mb-6 sm:mb-8 lg:mb-10 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
             <div className="flex items-center min-w-max sm:min-w-0">
               {[
@@ -377,7 +461,7 @@ export default function BecomeVendorPage() {
             </div>
           </div>
 
-          {/* Form Container - Mobile Optimized */}
+          {/* Form Container */}
           <div className="bg-slate-900/60 backdrop-blur-lg border border-slate-700/50 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8">
             {/* Step 1: Personal Information */}
             {step === 1 && (
@@ -410,7 +494,6 @@ export default function BecomeVendorPage() {
                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} 
                     className="w-full bg-slate-800/50 border border-slate-600 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition text-sm sm:text-base" 
                   />
-                  {/* Age Display with Validation */}
                   {calculatedAge !== null && (
                     <div className={`mt-2 p-2 sm:p-3 rounded-lg flex items-center gap-2 ${
                       calculatedAge >= 18 
@@ -563,7 +646,7 @@ export default function BecomeVendorPage() {
               </div>
             )}
 
-            {/* Step 3: ID Verification - Mobile Optimized */}
+            {/* Step 3: ID Verification */}
             {step === 3 && (
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
@@ -571,7 +654,6 @@ export default function BecomeVendorPage() {
                   <h2 className="text-2xl sm:text-3xl font-bold text-white">Identity Verification</h2>
                 </div>
 
-                {/* Security Notice */}
                 <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 sm:p-5 mb-4 sm:mb-6">
                   <div className="flex items-start gap-2 sm:gap-3">
                     <div className="text-2xl sm:text-3xl flex-shrink-0">🔒</div>
@@ -659,7 +741,6 @@ export default function BecomeVendorPage() {
                   )}
                 </div>
 
-                {/* Verification Photo Section - Mobile Optimized */}
                 <div className={`${fieldNeedsCorrection('verification') ? 'ring-2 ring-yellow-500 rounded-xl p-2 sm:p-3' : ''}`}>
                   {fieldNeedsCorrection('verification') && <p className="text-yellow-400 text-xs sm:text-sm mb-2">⚠️ Verification photo needs to be resubmitted</p>}
                   
@@ -771,7 +852,7 @@ export default function BecomeVendorPage() {
               </div>
             )}
 
-            {/* Step 4: Vendor Experience - Mobile Optimized */}
+            {/* Step 4: Vendor Experience */}
             {step === 4 && (
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
@@ -831,7 +912,6 @@ export default function BecomeVendorPage() {
                   )}
                 </div>
 
-                {/* Seller Rules Agreement - NEW */}
                 <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-xl p-4 sm:p-5">
                   <label className="flex items-start gap-2 sm:gap-3 cursor-pointer">
                     <input 
@@ -867,7 +947,6 @@ export default function BecomeVendorPage() {
                   </label>
                 </div>
 
-                {/* Terms of Service Agreement */}
                 <div className="bg-purple-500/10 border-2 border-purple-500/30 rounded-xl p-4 sm:p-5">
                   <label className="flex items-start gap-2 sm:gap-3 cursor-pointer">
                     <input 
@@ -926,7 +1005,6 @@ export default function BecomeVendorPage() {
                   </button>
                 </div>
 
-                {/* Validation reminder */}
                 {(!agreedToTerms || !agreedToSellerRules) && (
                   <p className="text-center text-amber-400 text-xs sm:text-sm mt-3">
                     ⚠️ You must agree to both the Seller Rules and Terms of Service to submit
@@ -938,7 +1016,8 @@ export default function BecomeVendorPage() {
         </div>
       </div>
 
-      {/* Custom CSS */}
+      <Footer />
+
       <style jsx>{`
         .scrollbar-hide {
           -ms-overflow-style: none;
