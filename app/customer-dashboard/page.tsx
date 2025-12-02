@@ -85,9 +85,11 @@ export default function CustomerDashboardPage() {
 
   const fetchMyOrders = async (userId: string) => {
     try {
+      // Fetch orders with snapshot data - no need to join listings table
+      // The snapshot fields (listing_title, listing_game, etc.) are stored directly on the order
       const { data, error } = await supabase
         .from('orders')
-        .select('*, listing:listings(title, game, image_url, category)')
+        .select('*')
         .eq('buyer_id', userId)
         .order('created_at', { ascending: false })
       
@@ -96,7 +98,19 @@ export default function CustomerDashboardPage() {
         return
       }
       
-      setMyOrders(data || [])
+      // Transform orders to use snapshot data, falling back to any joined listing data if available
+      const transformedOrders = (data || []).map(order => ({
+        ...order,
+        // Use snapshot data stored on the order itself
+        listing: {
+          title: order.listing_title || 'Deleted Listing',
+          game: order.listing_game || 'N/A',
+          image_url: order.listing_image_url || null,
+          category: order.listing_category || 'account'
+        }
+      }))
+      
+      setMyOrders(transformedOrders)
     } catch (error) {
       console.error('Error fetching orders:', error)
     }
@@ -441,8 +455,8 @@ export default function CustomerDashboardPage() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-white font-bold text-sm sm:text-base lg:text-lg line-clamp-1">{order.listing?.title || 'Unknown Item'}</h3>
-                            <p className="text-purple-400 text-xs sm:text-sm">{order.listing?.game}</p>
+                            <h3 className="text-white font-bold text-sm sm:text-base lg:text-lg line-clamp-1">{order.listing?.title || 'Deleted Listing'}</h3>
+                            <p className="text-purple-400 text-xs sm:text-sm">{order.listing?.game || 'N/A'}</p>
                             <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2">
                               <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${parseFloat(order.amount).toFixed(2)}</span>
                               <span className="text-gray-500 text-xs sm:text-sm">Qty: {order.quantity}</span>

@@ -1,98 +1,47 @@
 // app/listing/[id]/page.tsx
-import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase-server'
-import { siteConfig, generateProductSchema, generateBreadcrumbSchema } from '@/lib/seo-config'
-import ListingDetailClient from './ListingDetailClient'
 import { notFound } from 'next/navigation'
+import ListingDetailClient from './ListingDetailClient'
+import type { Metadata } from 'next'
 
 interface Props {
   params: Promise<{ id: string }>
 }
 
-// Generate dynamic metadata for each listing
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
-  const supabase = createClient()
+  const supabase = await createClient()
   
+  // Fetch listing without filters for metadata
   const { data: listing } = await supabase
     .from('listings')
-    .select(`
-      id,
-      title,
-      description,
-      price,
-      game,
-      category,
-      platform,
-      image_url,
-      profiles (
-        username,
-        avatar_url,
-        average_rating,
-        total_reviews
-      )
-    `)
+    .select('title, description, game, price, image_url')
     .eq('id', id)
     .single()
 
   if (!listing) {
     return {
-      title: 'Listing Not Found',
-      description: 'The requested listing could not be found.',
+      title: 'Listing Not Found | Nashflare',
+      description: 'This listing could not be found on Nashflare gaming marketplace.'
     }
   }
 
-  const categoryNames: { [key: string]: string } = {
-    account: 'Gaming Account',
-    items: 'In-Game Items',
-    currency: 'Game Currency',
-    key: 'Game Key',
-  }
-
-  const categoryName = categoryNames[listing.category] || listing.category
-  const title = `${listing.title} - ${listing.game} ${categoryName}`
-  const description = listing.description 
-    ? `${listing.description.slice(0, 150)}${listing.description.length > 150 ? '...' : ''} | Buy for $${listing.price} on Nashflare.`
-    : `Buy ${listing.game} ${categoryName.toLowerCase()} for $${listing.price}. Secure transaction with 48-hour buyer protection.`
-
-  const ogImage = listing.image_url || siteConfig.ogImage
-
   return {
-    title,
-    description,
-    keywords: [
-      `buy ${listing.game.toLowerCase()}`,
-      `${listing.game.toLowerCase()} ${categoryName.toLowerCase()}`,
-      listing.platform ? `${listing.platform.toLowerCase()} ${listing.game.toLowerCase()}` : '',
-    ].filter(Boolean),
+    title: `${listing.title} - ${listing.game} | Nashflare`,
+    description: listing.description?.substring(0, 160) || `Buy ${listing.title} for ${listing.game} on Nashflare. Price: $${listing.price}`,
     openGraph: {
-      title,
-      description,
-      url: `${siteConfig.url}/listing/${listing.id}`,
-      siteName: siteConfig.name,
-      images: [{ url: ogImage, width: 1200, height: 630, alt: listing.title }],
-      locale: siteConfig.locale,
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: [ogImage],
-      creator: siteConfig.twitterHandle,
-    },
-    alternates: {
-      canonical: `${siteConfig.url}/listing/${listing.id}`,
+      title: `${listing.title} - ${listing.game}`,
+      description: listing.description?.substring(0, 160) || `Buy ${listing.title} for ${listing.game}`,
+      images: listing.image_url ? [listing.image_url] : [],
     },
   }
 }
 
-// Server component that fetches data
 export default async function ListingPage({ params }: Props) {
   const { id } = await params
-  const supabase = createClient()
-  
-  // First, try to get the listing with profiles joined
+  const supabase = await createClient()
+
+  // Fetch listing WITHOUT status/stock filters to determine unavailability reason
   const { data: listing, error } = await supabase
     .from('listings')
     .select(`
@@ -113,68 +62,57 @@ export default async function ListingPage({ params }: Props) {
     .eq('id', id)
     .single()
 
+  // If listing doesn't exist at all, show not found
   if (error || !listing) {
-    notFound()
+    // Pass null listing with 'not_found' reason
+    return (
+      <ListingDetailClient 
+        initialListing={null} 
+        listingId={id}
+        unavailableReason="not_found"
+      />
+    )
   }
 
-  // If profiles is null (RLS issue or join failed), fetch it separately
-  if (!listing.profiles && listing.seller_id) {
-    console.log('Profiles was null, fetching separately for seller:', listing.seller_id)
-    
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url, rating, average_rating, total_sales, total_reviews, verified, created_at, vendor_rank')
-      .eq('id', listing.seller_id)
-      .single()
-    
-    if (profileData && !profileError) {
-      listing.profiles = profileData
-      console.log('Successfully fetched profile separately:', profileData)
-    } else {
-      console.error('Failed to fetch profile separately:', profileError)
-    }
+  // Check if listing was soft-deleted (if you have this field)
+  if (listing.deleted_at) {
+    return (
+      <ListingDetailClient 
+        initialListing={listing} 
+        listingId={id}
+        unavailableReason="deleted"
+      />
+    )
   }
 
-  // Generate structured data schemas
-  const productSchema = generateProductSchema({
-    id: listing.id,
-    title: listing.title,
-    description: listing.description || '',
-    price: listing.price,
-    image_url: listing.image_url || siteConfig.ogImage,
-    game: listing.game,
-    category: listing.category,
-    stock: listing.stock,
-    seller: {
-      username: listing.profiles?.username || 'Unknown',
-      average_rating: listing.profiles?.average_rating || listing.profiles?.rating || 0,
-      total_reviews: listing.profiles?.total_reviews || 0,
-    }
-  })
+  // Check if listing is inactive/paused
+  if (listing.status !== 'active') {
+    return (
+      <ListingDetailClient 
+        initialListing={listing} 
+        listingId={id}
+        unavailableReason="inactive"
+      />
+    )
+  }
 
-  const breadcrumbSchema = generateBreadcrumbSchema([
-    { name: 'Home', url: siteConfig.url },
-    { name: 'Browse', url: `${siteConfig.url}/browse` },
-    { name: listing.game, url: `${siteConfig.url}/browse?game=${listing.game}` },
-    { name: listing.title, url: `${siteConfig.url}/listing/${listing.id}` },
-  ])
+  // Check if listing is out of stock
+  if (listing.stock <= 0) {
+    return (
+      <ListingDetailClient 
+        initialListing={listing} 
+        listingId={id}
+        unavailableReason="out_of_stock"
+      />
+    )
+  }
 
+  // Listing is available!
   return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(productSchema),
-        }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbSchema),
-        }}
-      />
-      
-      <ListingDetailClient initialListing={listing} listingId={id} />
-    </>
+    <ListingDetailClient 
+      initialListing={listing} 
+      listingId={id}
+      unavailableReason={null}
+    />
   )
 }

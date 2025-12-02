@@ -67,14 +67,377 @@ interface Review {
   } | null
 }
 
+type UnavailableReason = 'out_of_stock' | 'inactive' | 'deleted' | 'not_found' | null
+
 interface Props {
-  initialListing: Listing
+  initialListing: Listing | null
   listingId: string
+  unavailableReason?: UnavailableReason
 }
 
-export default function ListingDetailClient({ initialListing, listingId }: Props) {
+// Unavailable Page Component
+function ListingUnavailablePage({ 
+  listing, 
+  reason 
+}: { 
+  listing: Listing | null
+  reason: 'out_of_stock' | 'inactive' | 'deleted' | 'not_found' 
+}) {
+  const [similarListings, setSimilarListings] = useState<SimilarListing[]>([])
+  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchSimilarListings()
+  }, [listing])
+
+  const fetchSimilarListings = async () => {
+    try {
+      let query = supabase
+        .from('listings')
+        .select('id, title, price, game, image_url, image_urls, category, profiles(username, average_rating)')
+        .eq('status', 'active')
+        .gt('stock', 0)
+        .limit(4)
+
+      // If we have listing info, try to find similar ones
+      if (listing?.game) {
+        query = query.eq('game', listing.game)
+      } else if (listing?.category) {
+        query = query.eq('category', listing.category)
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      // If we didn't get enough results from same game, fetch more general ones
+      if ((!data || data.length < 4) && listing?.category) {
+        const { data: moreData } = await supabase
+          .from('listings')
+          .select('id, title, price, game, image_url, image_urls, category, profiles(username, average_rating)')
+          .eq('status', 'active')
+          .gt('stock', 0)
+          .eq('category', listing.category)
+          .neq('game', listing.game || '')
+          .limit(4 - (data?.length || 0))
+          .order('created_at', { ascending: false })
+
+        setSimilarListings([...(data || []), ...(moreData || [])])
+      } else {
+        setSimilarListings(data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching similar listings:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getReasonContent = () => {
+    switch (reason) {
+      case 'out_of_stock':
+        return {
+          emoji: '📦',
+          title: 'Out of Stock',
+          subtitle: listing?.title || 'This listing',
+          message: 'This item is currently sold out. The seller may restock soon, or you can check out similar listings below.',
+          color: 'yellow',
+          showNotifyButton: true
+        }
+      case 'inactive':
+        return {
+          emoji: '⏸️',
+          title: 'Temporarily Unavailable',
+          subtitle: listing?.title || 'This listing',
+          message: 'The seller has temporarily paused this listing. It may become available again soon.',
+          color: 'blue',
+          showNotifyButton: false
+        }
+      case 'deleted':
+        return {
+          emoji: '🗑️',
+          title: 'Listing Removed',
+          subtitle: 'This listing is no longer available',
+          message: 'The seller has removed this listing from the marketplace. Check out similar items below!',
+          color: 'gray',
+          showNotifyButton: false
+        }
+      case 'not_found':
+      default:
+        return {
+          emoji: '🔍',
+          title: 'Listing Not Found',
+          subtitle: "We couldn't find this listing",
+          message: "This listing may have been removed or the link might be incorrect. Browse our marketplace to find what you're looking for!",
+          color: 'purple',
+          showNotifyButton: false
+        }
+    }
+  }
+
+  const content = getReasonContent()
+  
+  const colorClasses = {
+    yellow: {
+      bg: 'from-yellow-500/10 to-orange-500/10',
+      border: 'border-yellow-500/30',
+      text: 'text-yellow-400',
+      badge: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      button: 'from-yellow-500 to-orange-500 hover:shadow-yellow-500/50'
+    },
+    blue: {
+      bg: 'from-blue-500/10 to-cyan-500/10',
+      border: 'border-blue-500/30',
+      text: 'text-blue-400',
+      badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      button: 'from-blue-500 to-cyan-500 hover:shadow-blue-500/50'
+    },
+    gray: {
+      bg: 'from-gray-500/10 to-slate-500/10',
+      border: 'border-gray-500/30',
+      text: 'text-gray-400',
+      badge: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+      button: 'from-gray-500 to-slate-500 hover:shadow-gray-500/50'
+    },
+    purple: {
+      bg: 'from-purple-500/10 to-pink-500/10',
+      border: 'border-purple-500/30',
+      text: 'text-purple-400',
+      badge: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      button: 'from-purple-500 to-pink-500 hover:shadow-purple-500/50'
+    }
+  }
+
+  const colors = colorClasses[content.color as keyof typeof colorClasses]
+
+  return (
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Background */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[150px] animate-pulse"></div>
+        <div className="absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
+      </div>
+
+      <div className="relative z-10">
+        <Navigation />
+
+        <div className="container mx-auto px-4 pt-24 pb-12">
+          <div className="max-w-4xl mx-auto">
+            {/* Main Unavailable Card */}
+            <div className={`bg-gradient-to-r ${colors.bg} backdrop-blur-xl border-2 ${colors.border} rounded-3xl p-6 sm:p-8 md:p-12 mb-8 text-center`}>
+              {/* Animated Emoji */}
+              <div className="relative inline-block mb-6">
+                <div className={`absolute inset-0 bg-gradient-to-r ${colors.button} rounded-full blur-xl opacity-50 animate-pulse`}></div>
+                <div className="relative text-6xl sm:text-7xl md:text-8xl animate-bounce" style={{ animationDuration: '2s' }}>
+                  {content.emoji}
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="inline-block mb-4">
+                <span className={`px-4 py-2 rounded-full text-sm font-semibold border ${colors.badge}`}>
+                  {content.title}
+                </span>
+              </div>
+
+              {/* Title */}
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">
+                {content.subtitle}
+              </h1>
+
+              {/* Message */}
+              <p className="text-gray-300 text-base sm:text-lg mb-8 max-w-2xl mx-auto">
+                {content.message}
+              </p>
+
+              {/* Listing Info (if available) */}
+              {listing && (reason === 'out_of_stock' || reason === 'inactive') && (
+                <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 sm:p-6 mb-8 max-w-md mx-auto">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex-shrink-0">
+                      {listing.image_url || (listing.image_urls && listing.image_urls[0]) ? (
+                        <img 
+                          src={listing.image_urls?.[0] || listing.image_url} 
+                          alt={listing.title} 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="text-2xl sm:text-3xl">
+                            {listing.category === 'account' ? '🎮' : listing.category === 'items' ? '🎒' : listing.category === 'currency' ? '💰' : '🔑'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-left flex-1 min-w-0">
+                      <h3 className="text-white font-bold truncate text-sm sm:text-base">{listing.title}</h3>
+                      <p className="text-purple-400 text-xs sm:text-sm">{listing.game}</p>
+                      <p className="text-xl sm:text-2xl font-bold text-green-400 mt-1">${listing.price.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  
+                  {reason === 'out_of_stock' && (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <div className="flex items-center justify-center gap-2 text-yellow-400">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span className="font-semibold">0 in stock</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {reason === 'inactive' && (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <div className="flex items-center justify-center gap-2 text-blue-400">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="font-semibold">Paused by seller</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link
+                  href="/browse"
+                  className={`w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r ${colors.button} text-white rounded-xl font-bold text-base sm:text-lg hover:shadow-lg transition-all hover:scale-105`}
+                >
+                  🔍 Browse Marketplace
+                </Link>
+                
+                {listing?.game && (
+                  <Link
+                    href={`/browse?game=${encodeURIComponent(listing.game)}`}
+                    className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-base sm:text-lg border border-white/20 transition-all hover:scale-105"
+                  >
+                    🎮 More {listing.game}
+                  </Link>
+                )}
+              </div>
+
+              {/* Notify Button (for out of stock) */}
+              {content.showNotifyButton && listing && (
+                <div className="mt-6">
+                  <button
+                    onClick={() => alert('Notification feature coming soon! You will be notified when this item is back in stock.')}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg border border-white/10 transition-all text-sm"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    Notify me when available
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Similar Listings */}
+            {similarListings.length > 0 && (
+              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 md:p-8">
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-3">
+                  <span className="text-purple-400">✨</span>
+                  {listing?.game ? `More ${listing.game} Listings` : 'Similar Listings'}
+                </h2>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {similarListings.map((item) => {
+                    const itemImage = item.image_urls?.[0] || item.image_url
+                    const sellerData = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles
+                    
+                    return (
+                      <Link
+                        key={item.id}
+                        href={`/listing/${item.id}`}
+                        className="group bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 hover:-translate-y-1"
+                      >
+                        <div className="aspect-square bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
+                          {itemImage ? (
+                            <img
+                              src={itemImage}
+                              alt={item.title}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className="text-3xl sm:text-4xl">
+                                {item.category === 'account' ? '🎮' : item.category === 'items' ? '🎒' : item.category === 'currency' ? '💰' : '🔑'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-2 sm:p-3">
+                          <h3 className="text-white font-semibold text-xs sm:text-sm truncate group-hover:text-purple-400 transition-colors">
+                            {item.title}
+                          </h3>
+                          <p className="text-purple-400 text-xs mb-1 sm:mb-2">{item.game}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm sm:text-lg font-bold text-green-400">${item.price.toFixed(2)}</span>
+                            {sellerData?.average_rating > 0 && (
+                              <span className="text-xs text-yellow-400 flex items-center gap-0.5">
+                                ★ {sellerData.average_rating.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+
+                <div className="mt-6 text-center">
+                  <Link
+                    href="/browse"
+                    className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+                  >
+                    View all listings
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Help Section */}
+            <div className="mt-8 text-center">
+              <p className="text-gray-400 mb-4">Need help finding something specific?</p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link
+                  href="/browse"
+                  className="text-purple-400 hover:text-purple-300 font-medium transition-colors"
+                >
+                  🔍 Search Marketplace
+                </Link>
+                <span className="hidden sm:inline text-gray-600">•</span>
+                <a
+                  href="mailto:support@nashflare.com"
+                  className="text-purple-400 hover:text-purple-300 font-medium transition-colors"
+                >
+                  📧 Contact Support
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Footer />
+      </div>
+    </div>
+  )
+}
+
+// Main Component
+export default function ListingDetailClient({ initialListing, listingId, unavailableReason }: Props) {
   const router = useRouter()
-  const [listing] = useState<Listing>(initialListing)
+  const [listing] = useState<Listing | null>(initialListing)
   const [reviews, setReviews] = useState<Review[]>([])
   const [similarListings, setSimilarListings] = useState<SimilarListing[]>([])
   const quantity = 1
@@ -86,6 +449,11 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
   const [showMobilePurchase, setShowMobilePurchase] = useState(false)
   
   const supabase = createClient()
+
+  // If there's an unavailable reason, show the unavailable page
+  if (unavailableReason) {
+    return <ListingUnavailablePage listing={initialListing} reason={unavailableReason} />
+  }
 
   // Check if current user is the seller (owner) of this listing
   const isOwnListing = user && listing && listing.seller_id === user.id
@@ -121,6 +489,7 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
           )
         `)
         .eq('status', 'active')
+        .gt('stock', 0)
         .neq('id', listing.id)
         .or(`game.eq.${listing.game},category.eq.${listing.category}`)
         .limit(4)
@@ -310,22 +679,9 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
     }
   }
 
+  // Fallback if somehow we get here without a listing and no unavailable reason
   if (!listing) {
-    return (
-      <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
-        <div className="fixed inset-0 z-0">
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
-        </div>
-        <div className="relative z-10 text-center px-4">
-          <div className="text-5xl sm:text-6xl mb-4">😞</div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-4">Listing Not Found</h1>
-          <p className="text-gray-400 mb-6 text-sm sm:text-base">This listing may have been removed or doesn't exist.</p>
-          <Link href="/browse" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition inline-block">
-            ← Back to Browse
-          </Link>
-        </div>
-      </div>
-    )
+    return <ListingUnavailablePage listing={null} reason="not_found" />
   }
 
   const profileData = listing.profiles

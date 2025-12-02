@@ -7,6 +7,85 @@ import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import { sendPasswordChangedEmail, sendUsernameChangedEmail } from '@/lib/email'
 
+// Custom Modal Component
+interface ModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onConfirm?: () => void
+  title: string
+  message: string
+  type: 'alert' | 'confirm'
+  confirmText?: string
+  cancelText?: string
+}
+
+function CustomModal({ isOpen, onClose, onConfirm, title, message, type, confirmText = 'OK', cancelText = 'Cancel' }: ModalProps) {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={type === 'alert' ? onClose : undefined}
+      />
+      
+      {/* Modal */}
+      <div className="relative bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl shadow-purple-500/20 animate-in fade-in zoom-in duration-200">
+        {/* Icon */}
+        <div className="flex justify-center mb-4">
+          {type === 'confirm' ? (
+            <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center border border-yellow-500/30">
+              <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+          ) : (
+            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center border border-green-500/30">
+              <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {/* Title */}
+        <h3 className="text-xl font-bold text-white text-center mb-2">{title}</h3>
+        
+        {/* Message */}
+        <p className="text-gray-300 text-center mb-6">{message}</p>
+        
+        {/* Buttons */}
+        <div className={`flex gap-3 ${type === 'alert' ? 'justify-center' : 'justify-center'}`}>
+          {type === 'confirm' && (
+            <button
+              onClick={onClose}
+              className="px-6 py-3 bg-slate-700/50 hover:bg-slate-700 text-gray-300 rounded-xl font-semibold transition-all duration-300 border border-white/10 hover:border-white/20"
+            >
+              {cancelText}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              if (type === 'confirm' && onConfirm) {
+                onConfirm()
+              }
+              onClose()
+            }}
+            className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+              type === 'confirm'
+                ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white shadow-lg shadow-red-500/30'
+                : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/30'
+            }`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -14,6 +93,20 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'security' | 'account'>('profile')
   
+  // Modal state
+  const [modal, setModal] = useState<{
+    isOpen: boolean
+    type: 'alert' | 'confirm'
+    title: string
+    message: string
+    onConfirm?: () => void
+  }>({
+    isOpen: false,
+    type: 'alert',
+    title: '',
+    message: ''
+  })
+
   // Profile form state
   const [username, setUsername] = useState('')
   const [usernameError, setUsernameError] = useState('')
@@ -29,8 +122,7 @@ export default function SettingsPage() {
     emailMarketing: false,
     emailSecurityAlerts: true,
     theme: 'dark',
-    compactMode: false,
-    showOnlineStatus: true
+    compactMode: false
   })
   const [preferencesSuccess, setPreferencesSuccess] = useState('')
   
@@ -44,9 +136,36 @@ export default function SettingsPage() {
   // Delete account state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
+  // Account ID reveal state
+  const [showAccountId, setShowAccountId] = useState(false)
   
   const router = useRouter()
   const supabase = createClient()
+
+  // Helper functions for modal
+  const showAlert = (title: string, message: string) => {
+    setModal({
+      isOpen: true,
+      type: 'alert',
+      title,
+      message
+    })
+  }
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title,
+      message,
+      onConfirm
+    })
+  }
+
+  const closeModal = () => {
+    setModal(prev => ({ ...prev, isOpen: false }))
+  }
 
   useEffect(() => {
     checkUser()
@@ -160,7 +279,7 @@ export default function SettingsPage() {
       // Trigger navigation refresh
       window.dispatchEvent(new Event('avatar-updated'))
       
-      alert('✅ Avatar updated successfully!')
+      showAlert('Success', 'Avatar updated successfully!')
     } catch (error: any) {
       console.error('Avatar upload error:', error)
       setAvatarError('Failed to upload avatar: ' + error.message)
@@ -174,42 +293,47 @@ export default function SettingsPage() {
 
   const handleRemoveAvatar = async () => {
     if (!avatarUrl) return
-    if (!confirm('Are you sure you want to remove your avatar?')) return
+    
+    showConfirm(
+      'Remove Avatar',
+      'Are you sure you want to remove your avatar?',
+      async () => {
+        setUploadingAvatar(true)
+        setAvatarError('')
 
-    setUploadingAvatar(true)
-    setAvatarError('')
+        try {
+          // Extract file path from URL
+          const urlParts = avatarUrl.split('/avatars/')
+          if (urlParts.length > 1) {
+            const filePath = urlParts[1]
+            await supabase.storage
+              .from('avatars')
+              .remove([filePath])
+          }
 
-    try {
-      // Extract file path from URL
-      const urlParts = avatarUrl.split('/avatars/')
-      if (urlParts.length > 1) {
-        const filePath = urlParts[1]
-        await supabase.storage
-          .from('avatars')
-          .remove([filePath])
+          // Update profile
+          const { error } = await supabase
+            .from('profiles')
+            .update({ avatar_url: null })
+            .eq('id', user.id)
+
+          if (error) throw error
+
+          setAvatarUrl(null)
+          setProfile({ ...profile, avatar_url: null })
+          
+          // Trigger navigation refresh
+          window.dispatchEvent(new Event('avatar-updated'))
+          
+          showAlert('Success', 'Avatar removed successfully!')
+        } catch (error: any) {
+          console.error('Remove avatar error:', error)
+          setAvatarError('Failed to remove avatar: ' + error.message)
+        } finally {
+          setUploadingAvatar(false)
+        }
       }
-
-      // Update profile
-      const { error } = await supabase
-        .from('profiles')
-        .update({ avatar_url: null })
-        .eq('id', user.id)
-
-      if (error) throw error
-
-      setAvatarUrl(null)
-      setProfile({ ...profile, avatar_url: null })
-      
-      // Trigger navigation refresh
-      window.dispatchEvent(new Event('avatar-updated'))
-      
-      alert('Avatar removed successfully!')
-    } catch (error: any) {
-      console.error('Remove avatar error:', error)
-      setAvatarError('Failed to remove avatar: ' + error.message)
-    } finally {
-      setUploadingAvatar(false)
-    }
+    )
   }
 
   const savePreferences = () => {
@@ -300,7 +424,7 @@ export default function SettingsPage() {
         }
       }
       
-      alert('✅ Profile updated successfully!')
+      showAlert('Success', 'Profile updated successfully!')
     } catch (error: any) {
       console.error('Update profile error:', error)
       setUsernameError('Failed to update profile: ' + error.message)
@@ -414,38 +538,42 @@ export default function SettingsPage() {
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') {
-      alert('Please type DELETE to confirm')
+      showAlert('Confirmation Required', 'Please type DELETE to confirm')
       return
     }
 
-    if (!confirm('⚠️ THIS ACTION CANNOT BE UNDONE!\n\nYour account and all associated data will be permanently deleted.\n\nAre you absolutely sure?')) {
-      return
-    }
+    showConfirm(
+      'Delete Account',
+      'THIS ACTION CANNOT BE UNDONE! Your account and all associated data will be permanently deleted. Are you absolutely sure?',
+      async () => {
+        setSaving(true)
 
-    setSaving(true)
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ 
+              is_banned: true,
+              ban_reason: 'Account deleted by user',
+              banned_at: new Date().toISOString()
+            })
+            .eq('id', user.id)
 
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          is_banned: true,
-          ban_reason: 'Account deleted by user',
-          banned_at: new Date().toISOString()
-        })
-        .eq('id', user.id)
+          if (error) throw error
 
-      if (error) throw error
-
-      await supabase.auth.signOut()
-      
-      alert('Your account has been deleted.')
-      router.push('/')
-    } catch (error: any) {
-      console.error('Delete account error:', error)
-      alert('Failed to delete account: ' + error.message)
-    } finally {
-      setSaving(false)
-    }
+          await supabase.auth.signOut()
+          
+          showAlert('Account Deleted', 'Your account has been deleted.')
+          setTimeout(() => {
+            router.push('/')
+          }, 1500)
+        } catch (error: any) {
+          console.error('Delete account error:', error)
+          showAlert('Error', 'Failed to delete account: ' + error.message)
+        } finally {
+          setSaving(false)
+        }
+      }
+    )
   }
 
   const getRoleBadge = () => {
@@ -478,6 +606,18 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Custom Modal */}
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={closeModal}
+        onConfirm={modal.onConfirm}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        confirmText={modal.type === 'confirm' ? 'Yes, Continue' : 'OK'}
+        cancelText="Cancel"
+      />
+
       {/* 2D Comic Space Background */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
@@ -795,98 +935,69 @@ export default function SettingsPage() {
                       <span>📧</span> Email Notifications
                     </h3>
                     
+                    {/* Coming Soon Notice */}
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 mb-4">
+                      <p className="text-yellow-400 text-xs sm:text-sm flex items-center gap-2">
+                        <span>🚧</span> Email notification preferences coming soon. These options are currently disabled.
+                      </p>
+                    </div>
+                    
                     <div className="space-y-2 sm:space-y-3">
-                      <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                      {/* Order Updates - Disabled */}
+                      <div className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/30 rounded-xl opacity-50 cursor-not-allowed gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium text-sm sm:text-base">Order Updates</p>
-                          <p className="text-gray-400 text-xs sm:text-sm">Get notified about your order status changes</p>
+                          <p className="text-gray-400 font-medium text-sm sm:text-base">Order Updates</p>
+                          <p className="text-gray-500 text-xs sm:text-sm">Get notified about your order status changes</p>
                         </div>
                         <div className="relative flex-shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={preferences.emailOrderUpdates}
-                            onChange={(e) => setPreferences({ ...preferences, emailOrderUpdates: e.target.checked })}
-                            className="sr-only"
-                          />
-                          <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
-                            preferences.emailOrderUpdates ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
-                          }`}>
-                            <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                              preferences.emailOrderUpdates ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
-                            }`}></div>
+                          <div className="w-12 sm:w-14 h-7 sm:h-8 rounded-full bg-slate-700">
+                            <div className="w-5 sm:w-6 h-5 sm:h-6 bg-gray-500 rounded-full shadow-md transform mt-1 translate-x-1"></div>
                           </div>
                         </div>
-                      </label>
+                      </div>
 
-                      <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                      {/* New Messages - Disabled */}
+                      <div className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/30 rounded-xl opacity-50 cursor-not-allowed gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium text-sm sm:text-base">New Messages</p>
-                          <p className="text-gray-400 text-xs sm:text-sm">Get notified when you receive new messages</p>
+                          <p className="text-gray-400 font-medium text-sm sm:text-base">New Messages</p>
+                          <p className="text-gray-500 text-xs sm:text-sm">Get notified when you receive new messages</p>
                         </div>
                         <div className="relative flex-shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={preferences.emailMessages}
-                            onChange={(e) => setPreferences({ ...preferences, emailMessages: e.target.checked })}
-                            className="sr-only"
-                          />
-                          <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
-                            preferences.emailMessages ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
-                          }`}>
-                            <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                              preferences.emailMessages ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
-                            }`}></div>
+                          <div className="w-12 sm:w-14 h-7 sm:h-8 rounded-full bg-slate-700">
+                            <div className="w-5 sm:w-6 h-5 sm:h-6 bg-gray-500 rounded-full shadow-md transform mt-1 translate-x-1"></div>
                           </div>
                         </div>
-                      </label>
+                      </div>
 
-                      <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                      {/* Marketing - Disabled */}
+                      <div className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/30 rounded-xl opacity-50 cursor-not-allowed gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium text-sm sm:text-base">Marketing & Promotions</p>
-                          <p className="text-gray-400 text-xs sm:text-sm">Receive special offers and platform updates</p>
+                          <p className="text-gray-400 font-medium text-sm sm:text-base">Marketing & Promotions</p>
+                          <p className="text-gray-500 text-xs sm:text-sm">Receive special offers and platform updates</p>
                         </div>
                         <div className="relative flex-shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={preferences.emailMarketing}
-                            onChange={(e) => setPreferences({ ...preferences, emailMarketing: e.target.checked })}
-                            className="sr-only"
-                          />
-                          <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
-                            preferences.emailMarketing ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
-                          }`}>
-                            <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                              preferences.emailMarketing ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
-                            }`}></div>
+                          <div className="w-12 sm:w-14 h-7 sm:h-8 rounded-full bg-slate-700">
+                            <div className="w-5 sm:w-6 h-5 sm:h-6 bg-gray-500 rounded-full shadow-md transform mt-1 translate-x-1"></div>
                           </div>
                         </div>
-                      </label>
+                      </div>
 
-                      <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                      {/* Security Alerts - Disabled */}
+                      <div className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/30 rounded-xl opacity-50 cursor-not-allowed gap-3">
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium text-sm sm:text-base">Security Alerts</p>
-                          <p className="text-gray-400 text-xs sm:text-sm">Important security notifications about your account</p>
+                          <p className="text-gray-400 font-medium text-sm sm:text-base">Security Alerts</p>
+                          <p className="text-gray-500 text-xs sm:text-sm">Important security notifications about your account</p>
                         </div>
                         <div className="relative flex-shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={preferences.emailSecurityAlerts}
-                            onChange={(e) => setPreferences({ ...preferences, emailSecurityAlerts: e.target.checked })}
-                            className="sr-only"
-                          />
-                          <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
-                            preferences.emailSecurityAlerts ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
-                          }`}>
-                            <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                              preferences.emailSecurityAlerts ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
-                            }`}></div>
+                          <div className="w-12 sm:w-14 h-7 sm:h-8 rounded-full bg-slate-700">
+                            <div className="w-5 sm:w-6 h-5 sm:h-6 bg-gray-500 rounded-full shadow-md transform mt-1 translate-x-1"></div>
                           </div>
                         </div>
-                      </label>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Theme Preferences */}
+                  {/* Theme Preferences - Active */}
                   <div className="space-y-3 sm:space-y-4 pt-4 border-t border-white/10">
                     <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
                       <span>🎨</span> Display Settings
@@ -922,49 +1033,18 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
+                    {/* Compact Mode - Disabled */}
+                    <div className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/30 rounded-xl opacity-50 cursor-not-allowed gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium text-sm sm:text-base">Compact Mode</p>
-                        <p className="text-gray-400 text-xs sm:text-sm">Reduce spacing for more content on screen</p>
+                        <p className="text-gray-400 font-medium text-sm sm:text-base">Compact Mode</p>
+                        <p className="text-gray-500 text-xs sm:text-sm">Reduce spacing for more content on screen</p>
                       </div>
                       <div className="relative flex-shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={preferences.compactMode}
-                          onChange={(e) => setPreferences({ ...preferences, compactMode: e.target.checked })}
-                          className="sr-only"
-                        />
-                        <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
-                          preferences.compactMode ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
-                        }`}>
-                          <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                            preferences.compactMode ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
-                          }`}></div>
+                        <div className="w-12 sm:w-14 h-7 sm:h-8 rounded-full bg-slate-700">
+                          <div className="w-5 sm:w-6 h-5 sm:h-6 bg-gray-500 rounded-full shadow-md transform mt-1 translate-x-1"></div>
                         </div>
                       </div>
-                    </label>
-
-                    <label className="flex items-center justify-between p-3 sm:p-4 bg-slate-800/50 rounded-xl cursor-pointer group hover:bg-slate-800/80 transition-all duration-300 gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium text-sm sm:text-base">Show Online Status</p>
-                        <p className="text-gray-400 text-xs sm:text-sm">Let others see when you're online</p>
-                      </div>
-                      <div className="relative flex-shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={preferences.showOnlineStatus}
-                          onChange={(e) => setPreferences({ ...preferences, showOnlineStatus: e.target.checked })}
-                          className="sr-only"
-                        />
-                        <div className={`w-12 sm:w-14 h-7 sm:h-8 rounded-full transition-all duration-300 ${
-                          preferences.showOnlineStatus ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-slate-700'
-                        }`}>
-                          <div className={`w-5 sm:w-6 h-5 sm:h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 mt-1 ${
-                            preferences.showOnlineStatus ? 'translate-x-6 sm:translate-x-7' : 'translate-x-1'
-                          }`}></div>
-                        </div>
-                      </div>
-                    </label>
+                    </div>
                   </div>
 
                   {preferencesSuccess && (
@@ -1110,9 +1190,36 @@ export default function SettingsPage() {
                       <span>ℹ️</span> Account Information
                     </h3>
                     <div className="space-y-2 sm:space-y-3">
-                      <div className="flex flex-col sm:flex-row justify-between py-2 border-b border-white/10 gap-1">
+                      {/* Account ID with Reveal */}
+                      <div className="flex flex-col sm:flex-row justify-between py-2 border-b border-white/10 gap-2">
                         <span className="text-gray-400 text-sm sm:text-base">Account ID</span>
-                        <span className="text-white font-mono text-xs sm:text-sm bg-slate-900/50 px-2 py-1 rounded self-start">{user?.id?.substring(0, 8)}...</span>
+                        <div className="flex items-center gap-2">
+                          {showAccountId ? (
+                            <span className="text-white font-mono text-xs sm:text-sm bg-slate-900/50 px-2 py-1 rounded break-all">
+                              {user?.id}
+                            </span>
+                          ) : (
+                            <span className="text-white font-mono text-xs sm:text-sm bg-slate-900/50 px-2 py-1 rounded">
+                              ••••••••-••••-••••-••••-••••••••••••
+                            </span>
+                          )}
+                          <button
+                            onClick={() => setShowAccountId(!showAccountId)}
+                            className="p-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 transition-all duration-300 border border-purple-500/30"
+                            title={showAccountId ? 'Hide Account ID' : 'Show Account ID'}
+                          >
+                            {showAccountId ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
                       </div>
                       <div className="flex flex-col sm:flex-row justify-between py-2 border-b border-white/10 gap-1">
                         <span className="text-gray-400 text-sm sm:text-base">Email</span>
@@ -1137,7 +1244,7 @@ export default function SettingsPage() {
                       Download a copy of your account data including your profile, orders, and messages.
                     </p>
                     <button
-                      onClick={() => alert('Data export feature coming soon!')}
+                      onClick={() => showAlert('Coming Soon', 'Data export feature coming soon!')}
                       className="w-full sm:w-auto bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 px-4 sm:px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 border border-blue-500/30 hover:scale-105 text-sm sm:text-base"
                     >
                       📥 Request Data Export

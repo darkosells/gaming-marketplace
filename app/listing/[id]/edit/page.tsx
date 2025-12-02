@@ -9,6 +9,85 @@ import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import ImageUploader from '@/components/ImageUploader'
 
+// Custom Modal Component
+interface ModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onConfirm?: () => void
+  title: string
+  message: string
+  type: 'alert' | 'confirm'
+  confirmText?: string
+  cancelText?: string
+}
+
+function CustomModal({ isOpen, onClose, onConfirm, title, message, type, confirmText = 'OK', cancelText = 'Cancel' }: ModalProps) {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={type === 'alert' ? onClose : undefined}
+      />
+      
+      {/* Modal */}
+      <div className="relative bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl shadow-purple-500/20 animate-in fade-in zoom-in duration-200">
+        {/* Icon */}
+        <div className="flex justify-center mb-4">
+          {type === 'confirm' ? (
+            <div className="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center border border-yellow-500/30">
+              <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+          ) : (
+            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center border border-green-500/30">
+              <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {/* Title */}
+        <h3 className="text-xl font-bold text-white text-center mb-2">{title}</h3>
+        
+        {/* Message */}
+        <p className="text-gray-300 text-center mb-6">{message}</p>
+        
+        {/* Buttons */}
+        <div className={`flex gap-3 ${type === 'alert' ? 'justify-center' : 'justify-center'}`}>
+          {type === 'confirm' && (
+            <button
+              onClick={onClose}
+              className="px-6 py-3 bg-slate-700/50 hover:bg-slate-700 text-gray-300 rounded-xl font-semibold transition-all duration-300 border border-white/10 hover:border-white/20"
+            >
+              {cancelText}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              if (type === 'confirm' && onConfirm) {
+                onConfirm()
+              }
+              onClose()
+            }}
+            className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+              type === 'confirm'
+                ? 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white shadow-lg shadow-red-500/30'
+                : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/30'
+            }`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Category to Games mapping
 const categoryGamesMap: { [key: string]: string[] } = {
   account: ['GTA 5', 'Fortnite', 'Roblox', 'Valorant', 'League of Legends', 'Clash Royale', 'Clash of Clans', 'Steam'],
@@ -16,6 +95,15 @@ const categoryGamesMap: { [key: string]: string[] } = {
   currency: ['Roblox', 'Fortnite'],
   key: ['Steam', 'Playstation', 'Xbox']
 }
+
+// Platform options (matches browse page filter)
+const platformOptions = [
+  { value: 'PC', label: '🖥️ PC' },
+  { value: 'PlayStation', label: '🎮 PlayStation' },
+  { value: 'Xbox', label: '🟢 Xbox' },
+  { value: 'Nintendo', label: '🔴 Nintendo' },
+  { value: 'Mobile', label: '📱 Mobile' }
+]
 
 // Tags for each game in Account category
 const accountGameTags: { [key: string]: string[] } = {
@@ -58,6 +146,20 @@ export default function EditListingPage() {
   const [deliveryCodes, setDeliveryCodes] = useState<DeliveryCode[]>([])
   const [newCodes, setNewCodes] = useState<string[]>([''])
 
+  // Modal state
+  const [modal, setModal] = useState<{
+    isOpen: boolean
+    type: 'alert' | 'confirm'
+    title: string
+    message: string
+    onConfirm?: () => void
+  }>({
+    isOpen: false,
+    type: 'alert',
+    title: '',
+    message: ''
+  })
+
   // Pagination states
   const [availableCodesPage, setAvailableCodesPage] = useState(1)
   const [usedCodesPage, setUsedCodesPage] = useState(1)
@@ -75,6 +177,30 @@ export default function EditListingPage() {
   const [deliveryType, setDeliveryType] = useState<'manual' | 'automatic'>('manual')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [tagSearchQuery, setTagSearchQuery] = useState('')
+
+  // Helper functions for modal
+  const showAlert = (title: string, message: string) => {
+    setModal({
+      isOpen: true,
+      type: 'alert',
+      title,
+      message
+    })
+  }
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title,
+      message,
+      onConfirm
+    })
+  }
+
+  const closeModal = () => {
+    setModal(prev => ({ ...prev, isOpen: false }))
+  }
 
   useEffect(() => {
     checkAuth()
@@ -127,7 +253,7 @@ export default function EditListingPage() {
 
       // Check if user owns this listing
       if (data.seller_id !== user.id) {
-        alert('You do not have permission to edit this listing')
+        showAlert('Access Denied', 'You do not have permission to edit this listing')
         router.push('/dashboard')
         return
       }
@@ -162,7 +288,7 @@ export default function EditListingPage() {
       }
     } catch (error: any) {
       console.error('Error fetching listing:', error)
-      alert('Failed to load listing')
+      showAlert('Error', 'Failed to load listing')
       router.push('/dashboard')
     } finally {
       setLoading(false)
@@ -204,34 +330,38 @@ export default function EditListingPage() {
   }
 
   const handleDeleteExistingCode = async (codeId: string) => {
-    if (!confirm('Are you sure you want to delete this delivery code?')) return
+    showConfirm(
+      'Delete Delivery Code',
+      'Are you sure you want to delete this delivery code? This action cannot be undone.',
+      async () => {
+        try {
+          const { error } = await supabase
+            .from('delivery_codes')
+            .delete()
+            .eq('id', codeId)
 
-    try {
-      const { error } = await supabase
-        .from('delivery_codes')
-        .delete()
-        .eq('id', codeId)
+          if (error) throw error
 
-      if (error) throw error
+          // Update stock count after deleting a code
+          const newUnusedCount = unusedCodes.filter(c => c.id !== codeId).length
+          await supabase
+            .from('listings')
+            .update({ stock: newUnusedCount })
+            .eq('id', params.id)
 
-      // Update stock count after deleting a code
-      const newUnusedCount = unusedCodes.filter(c => c.id !== codeId).length
-      await supabase
-        .from('listings')
-        .update({ stock: newUnusedCount })
-        .eq('id', params.id)
-
-      alert('Delivery code deleted successfully!')
-      await fetchDeliveryCodes()
-    } catch (error: any) {
-      console.error('Error deleting code:', error)
-      alert('Failed to delete delivery code: ' + error.message)
-    }
+          showAlert('Success', 'Delivery code deleted successfully!')
+          await fetchDeliveryCodes()
+        } catch (error: any) {
+          console.error('Error deleting code:', error)
+          showAlert('Error', 'Failed to delete delivery code: ' + error.message)
+        }
+      }
+    )
   }
 
   const handleUpdateExistingCode = async (codeId: string, newText: string) => {
     if (!newText.trim()) {
-      alert('Code text cannot be empty')
+      showAlert('Validation Error', 'Code text cannot be empty')
       return
     }
 
@@ -243,11 +373,11 @@ export default function EditListingPage() {
 
       if (error) throw error
 
-      alert('Delivery code updated successfully!')
+      showAlert('Success', 'Delivery code updated successfully!')
       await fetchDeliveryCodes()
     } catch (error: any) {
       console.error('Error updating code:', error)
-      alert('Failed to update delivery code: ' + error.message)
+      showAlert('Error', 'Failed to update delivery code: ' + error.message)
     }
   }
 
@@ -310,29 +440,29 @@ export default function EditListingPage() {
     e.preventDefault()
 
     if (!title || !game || !description || !price || !platform) {
-      alert('Please fill in all required fields')
+      showAlert('Validation Error', 'Please fill in all required fields')
       return
     }
 
     if (title.length < 10) {
-      alert('Title must be at least 10 characters long')
+      showAlert('Validation Error', 'Title must be at least 10 characters long')
       return
     }
 
     if (description.length < 20) {
-      alert('Description must be at least 20 characters long')
+      showAlert('Validation Error', 'Description must be at least 20 characters long')
       return
     }
 
     // Check if selected game is valid for category
     const validGames = categoryGamesMap[category] || []
     if (!validGames.includes(game)) {
-      alert(`"${game}" is not a valid game for the ${getCategoryLabel(category)} category. Please select a valid game.`)
+      showAlert('Validation Error', `"${game}" is not a valid game for the ${getCategoryLabel(category)} category. Please select a valid game.`)
       return
     }
 
     if (deliveryType === 'manual' && !stock) {
-      alert('Please enter stock quantity')
+      showAlert('Validation Error', 'Please enter stock quantity')
       return
     }
 
@@ -400,36 +530,44 @@ export default function EditListingPage() {
         await fetchDeliveryCodes()
       }
 
-      alert('Listing updated successfully!')
-      router.push('/dashboard')
+      showAlert('Success', 'Listing updated successfully!')
+      // Navigate after modal closes
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 1500)
     } catch (error: any) {
       console.error('Error updating listing:', error)
-      alert('Failed to update listing: ' + error.message)
+      showAlert('Error', 'Failed to update listing: ' + error.message)
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to remove this listing? This will hide it from the marketplace but preserve order history.')) {
-      return
-    }
+    showConfirm(
+      'Remove Listing',
+      'Are you sure you want to remove this listing? This will hide it from the marketplace but preserve order history.',
+      async () => {
+        try {
+          // Always use soft delete (set status to 'removed') to avoid foreign key issues
+          const { error } = await supabase
+            .from('listings')
+            .update({ status: 'removed' })
+            .eq('id', params.id)
 
-    try {
-      // Always use soft delete (set status to 'removed') to avoid foreign key issues
-      const { error } = await supabase
-        .from('listings')
-        .update({ status: 'removed' })
-        .eq('id', params.id)
+          if (error) throw error
 
-      if (error) throw error
-
-      alert('Listing removed successfully! It has been hidden from the marketplace.')
-      router.push('/dashboard')
-    } catch (error: any) {
-      console.error('Error removing listing:', error)
-      alert('Failed to remove listing: ' + error.message)
-    }
+          showAlert('Success', 'Listing removed successfully! It has been hidden from the marketplace.')
+          // Navigate after modal closes
+          setTimeout(() => {
+            router.push('/dashboard')
+          }, 1500)
+        } catch (error: any) {
+          console.error('Error removing listing:', error)
+          showAlert('Error', 'Failed to remove listing: ' + error.message)
+        }
+      }
+    )
   }
 
   const handleViewOrder = (orderId: string) => {
@@ -481,6 +619,18 @@ export default function EditListingPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Custom Modal */}
+      <CustomModal
+        isOpen={modal.isOpen}
+        onClose={closeModal}
+        onConfirm={modal.onConfirm}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        confirmText={modal.type === 'confirm' ? 'Yes, Continue' : 'OK'}
+        cancelText="Cancel"
+      />
+
       {/* Cosmic Space Background */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
@@ -732,14 +882,24 @@ export default function EditListingPage() {
                       <label className="block text-white mb-2 font-semibold">
                         Platform <span className="text-red-400">*</span>
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={platform}
                         onChange={(e) => setPlatform(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition"
-                        placeholder="PC, PS5, Xbox..."
+                        className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 appearance-none cursor-pointer transition"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 1rem center',
+                          backgroundSize: '1.5em 1.5em',
+                          paddingRight: '3rem'
+                        }}
                         required
-                      />
+                      >
+                        <option value="">Select a platform</option>
+                        {platformOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
