@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 
 // PayPal Client ID - Replace with your Sandbox Client ID
 // Get it from: https://developer.paypal.com/dashboard/applications/sandbox
@@ -777,10 +778,12 @@ export default function CheckoutPage() {
                             </span>
                           </p>
                         </div>
-                        <div 
-                          ref={paypalButtonsRef} 
-                          className="paypal-buttons-container min-h-[150px]"
-                        ></div>
+                        <div className="paypal-buttons-wrapper bg-slate-800/50 rounded-xl p-4 sm:p-6">
+                          <div 
+                            ref={paypalButtonsRef} 
+                            className="paypal-buttons-container min-h-[150px] max-w-[500px] mx-auto"
+                          ></div>
+                        </div>
                         <p className="text-center text-gray-500 text-xs mt-3">
                           🔒 Secured by PayPal
                         </p>
@@ -903,8 +906,10 @@ export default function CheckoutPage() {
                 )}
 
                 {selectedPayment === 'paypal' && (
-                  <div className="text-center text-gray-400 text-sm mb-6">
-                    <p>👆 Use the PayPal buttons above to complete your payment</p>
+                  <div className="text-center py-4 px-3 bg-blue-500/10 border border-blue-500/30 rounded-xl mb-6">
+                    <div className="text-blue-400 text-2xl mb-2">👈</div>
+                    <p className="text-blue-300 text-sm font-medium">Complete payment using the PayPal buttons</p>
+                    <p className="text-gray-400 text-xs mt-1">Select PayPal, Credit or Debit Card</p>
                   </div>
                 )}
 
@@ -991,7 +996,7 @@ export default function CheckoutPage() {
                 📋 Summary
               </button>
               <div className="bg-blue-500/20 text-blue-400 px-4 py-3 rounded-xl font-semibold text-sm whitespace-nowrap">
-                👆 Use PayPal Above
+                👆 Pay with PayPal
               </div>
             </div>
           </div>
@@ -1076,6 +1081,14 @@ export default function CheckoutPage() {
         }
         .paypal-buttons-container iframe {
           z-index: 1 !important;
+        }
+        .paypal-buttons-wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .paypal-buttons-container > div {
+          width: 100% !important;
         }
       `}</style>
     </div>
