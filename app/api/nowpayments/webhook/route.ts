@@ -6,24 +6,12 @@ const NOWPAYMENTS_IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET!
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// Verify IPN signature
 function verifySignature(payload: any, receivedSignature: string, secret: string): boolean {
   const sortedParams = JSON.stringify(payload, Object.keys(payload).sort())
   const hmac = crypto.createHmac('sha512', secret)
   hmac.update(sortedParams)
   const computedSignature = hmac.digest('hex')
   return computedSignature === receivedSignature
-}
-
-// Decode order data from base64
-function decodeOrderData(encodedOrderId: string): any {
-  try {
-    const decoded = Buffer.from(encodedOrderId, 'base64').toString('utf-8')
-    return JSON.parse(decoded)
-  } catch (error) {
-    console.error('Failed to decode order data:', error)
-    return null
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -33,7 +21,6 @@ export async function POST(request: NextRequest) {
 
     console.log('NOWPayments webhook received:', payload)
 
-    // Verify signature if IPN secret is configured
     if (NOWPAYMENTS_IPN_SECRET && receivedSignature) {
       const isValid = verifySignature(payload, receivedSignature, NOWPAYMENTS_IPN_SECRET)
       if (!isValid) {
@@ -44,29 +31,20 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-    const encodedOrderId = payload.order_id
+    const sessionId = payload.order_id // This is the short session ID
     const paymentStatus = payload.payment_status
     const paymentId = payload.payment_id
 
-    if (!encodedOrderId) {
+    if (!sessionId) {
       console.log('No order_id in webhook payload, skipping')
       return NextResponse.json({ received: true })
     }
 
-    // Decode order data from the order_id field
-    const orderData = decodeOrderData(encodedOrderId)
-    if (!orderData) {
-      console.error('Failed to decode order data')
-      return NextResponse.json({ error: 'Invalid order data' }, { status: 400 })
-    }
-
-    console.log(`Processing payment status: ${paymentStatus}`)
-    console.log('Order data:', orderData)
+    console.log(`Processing payment status: ${paymentStatus} for session: ${sessionId}`)
 
     switch (paymentStatus) {
       case 'finished':
-        // Payment completed - NOW create the order!
-        console.log('Payment finished - creating order')
+        console.log('Payment finished - creating order from session')
         
         // Check if order already exists (duplicate webhook protection)
         const { data: existingOrder } = await supabase
@@ -80,15 +58,27 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ received: true, message: 'Order already exists' })
         }
 
-        // Create the order now that payment is confirmed
+        // Get the checkout session data
+        const { data: session, error: sessionError } = await supabase
+          .from('crypto_checkout_sessions')
+          .select('*')
+          .eq('id', sessionId)
+          .single()
+
+        if (sessionError || !session) {
+          console.error('Checkout session not found:', sessionId)
+          return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+        }
+
+        // Create the real order now
         const { data: newOrder, error: orderError } = await supabase
           .from('orders')
           .insert({
-            listing_id: orderData.listing_id,
-            buyer_id: orderData.buyer_id,
-            seller_id: orderData.seller_id,
-            amount: orderData.amount,
-            quantity: orderData.quantity,
+            listing_id: session.listing_id,
+            buyer_id: session.buyer_id,
+            seller_id: session.seller_id,
+            amount: session.amount,
+            quantity: session.quantity,
             status: 'paid',
             payment_status: 'paid',
             payment_method: 'crypto',
@@ -109,21 +99,26 @@ export async function POST(request: NextRequest) {
         const { data: listing } = await supabase
           .from('listings')
           .select('stock')
-          .eq('id', orderData.listing_id)
+          .eq('id', session.listing_id)
           .single()
 
         if (listing) {
-          const newStock = Math.max(0, listing.stock - orderData.quantity)
+          const newStock = Math.max(0, listing.stock - session.quantity)
           await supabase
             .from('listings')
             .update({ 
               stock: newStock,
               status: newStock <= 0 ? 'sold' : 'active'
             })
-            .eq('id', orderData.listing_id)
+            .eq('id', session.listing_id)
           
           console.log(`Stock reduced: ${listing.stock} -> ${newStock}`)
         }
+
+        // Delete the checkout session (cleanup)
+        await supabase.from('crypto_checkout_sessions').delete().eq('id', sessionId)
+        console.log('Checkout session cleaned up')
+        
         break
 
       case 'confirmed':
@@ -139,7 +134,8 @@ export async function POST(request: NextRequest) {
       case 'failed':
       case 'expired':
       case 'refunded':
-        console.log(`Payment ${paymentStatus} - no order created`)
+        console.log(`Payment ${paymentStatus} - deleting session`)
+        await supabase.from('crypto_checkout_sessions').delete().eq('id', sessionId)
         break
 
       case 'waiting':

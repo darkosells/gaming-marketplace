@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const NOWPAYMENTS_API_KEY = process.env.NOWPAYMENTS_API_KEY!
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// Use sandbox for testing, production for live
-// Set NOWPAYMENTS_SANDBOX=true in Vercel env vars to use sandbox
 const NOWPAYMENTS_API_URL = process.env.NOWPAYMENTS_SANDBOX === 'true'
   ? 'https://api-sandbox.nowpayments.io/v1'
   : 'https://api.nowpayments.io/v1'
@@ -37,7 +38,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Log which mode we're using
     const isSandbox = process.env.NOWPAYMENTS_SANDBOX === 'true'
     console.log(`NOWPayments mode: ${isSandbox ? 'SANDBOX' : 'PRODUCTION'}`)
     console.log(`API URL: ${NOWPAYMENTS_API_URL}`)
@@ -47,33 +47,46 @@ export async function POST(request: NextRequest) {
     const serviceFee = subtotal * 0.05
     const total = subtotal + serviceFee
 
-    // Get the site URL for redirects
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://nashflare.com'
 
-    // DON'T create order yet - only create when payment is confirmed via webhook
-    // Store all order details in the invoice order_id field as JSON
-    const orderData = {
-      listing_id: body.listingId,
-      buyer_id: body.buyerId,
-      seller_id: body.sellerId,
-      amount: subtotal,
-      quantity: body.quantity,
-      listing_title: body.listingTitle
+    // Create temporary checkout session (NOT a real order)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    
+    const { data: session, error: sessionError } = await supabase
+      .from('crypto_checkout_sessions')
+      .insert({
+        listing_id: body.listingId,
+        buyer_id: body.buyerId,
+        seller_id: body.sellerId,
+        amount: subtotal,
+        quantity: body.quantity,
+        listing_title: body.listingTitle
+      })
+      .select('id')
+      .single()
+
+    if (sessionError || !session) {
+      console.error('Failed to create checkout session:', sessionError)
+      return NextResponse.json(
+        { error: 'Failed to initialize checkout' },
+        { status: 500 }
+      )
     }
 
-    // Create NOWPayments invoice
-    // We encode order data in order_id field (NOWPayments allows up to 512 chars)
+    console.log('Checkout session created:', session.id)
+
+    // Use short session ID for NOWPayments (not encoded JSON)
     const invoiceData = {
       price_amount: total,
-      price_currency: 'usd',
-      order_id: Buffer.from(JSON.stringify(orderData)).toString('base64'),
+      price_currency: 'USD',
+      order_id: session.id,
       order_description: `Nashflare - ${body.listingTitle}`.substring(0, 150),
       ipn_callback_url: `${siteUrl}/api/nowpayments/webhook`,
       success_url: `${siteUrl}/orders?payment=crypto_pending`,
       cancel_url: `${siteUrl}/checkout?payment=cancelled`
     }
 
-    console.log('Creating NOWPayments invoice:', { ...invoiceData, order_id: '[encoded]' })
+    console.log('Creating NOWPayments invoice:', invoiceData)
 
     const response = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
       method: 'POST',
@@ -89,6 +102,10 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       console.error('NOWPayments API error:', result)
+      
+      // Clean up the session since invoice creation failed
+      await supabase.from('crypto_checkout_sessions').delete().eq('id', session.id)
+      
       return NextResponse.json(
         { error: result.message || 'Failed to create crypto payment' },
         { status: response.status }
