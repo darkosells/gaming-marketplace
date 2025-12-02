@@ -4,6 +4,9 @@ export type VendorTab = 'listings' | 'orders' | 'purchases' | 'balance' | 'inven
 export type InventoryFilter = 'all' | 'low' | 'out' | 'over'
 export type InventorySort = 'stock' | 'value' | 'usage'
 
+// NEW: Updated withdrawal method type to include Payoneer and Wise
+export type WithdrawalMethod = 'bitcoin' | 'skrill' | 'payoneer' | 'wise' | ''
+
 // NEW: Vendor Rank Types
 export type VendorRank = 'nova' | 'star' | 'galaxy' | 'supernova'
 
@@ -87,11 +90,12 @@ export interface Order {
   }
 }
 
+// UPDATED: Withdrawal interface with new methods
 export interface Withdrawal {
   id: string
   user_id: string
   amount: number
-  method: 'bitcoin' | 'skrill'
+  method: 'bitcoin' | 'skrill' | 'payoneer' | 'wise'
   address: string
   fee_percentage: number
   fee_flat: number
@@ -122,6 +126,81 @@ export interface WithdrawalFees {
   flatFee: number
   totalFee: number
   netAmount: number
+}
+
+// NEW: Withdrawal method configuration
+export interface WithdrawalMethodConfig {
+  id: WithdrawalMethod
+  name: string
+  icon: string
+  minAmount: number
+  feePercentage: number
+  flatFee: number
+  addressLabel: string
+  addressPlaceholder: string
+  color: string
+  bgColor: string
+  currency?: string
+  note?: string
+}
+
+// NEW: Withdrawal methods configuration map
+export const WITHDRAWAL_METHODS: Record<Exclude<WithdrawalMethod, ''>, WithdrawalMethodConfig> = {
+  bitcoin: {
+    id: 'bitcoin',
+    name: 'Bitcoin',
+    icon: '₿',
+    minAmount: 100,
+    feePercentage: 6,
+    flatFee: 20,
+    addressLabel: 'Bitcoin Wallet Address',
+    addressPlaceholder: 'Enter your Bitcoin wallet address',
+    color: 'orange-500',
+    bgColor: 'orange-500/10',
+    note: 'Main BTC network only'
+  },
+  skrill: {
+    id: 'skrill',
+    name: 'Skrill',
+    icon: '💳',
+    minAmount: 10,
+    feePercentage: 5,
+    flatFee: 1,
+    addressLabel: 'Skrill Email',
+    addressPlaceholder: 'Enter your Skrill email address',
+    color: 'purple-500',
+    bgColor: 'purple-500/10',
+    currency: 'EUR',
+    note: 'Sent in Euros'
+  },
+  payoneer: {
+    id: 'payoneer',
+    name: 'Payoneer',
+    icon: '🅿️',
+    minAmount: 20,
+    feePercentage: 2,
+    flatFee: 1.50,
+    addressLabel: 'Payoneer Email',
+    addressPlaceholder: 'Enter your Payoneer email address',
+    color: 'red-500',
+    bgColor: 'red-500/10',
+    currency: 'USD',
+    note: 'Sent in USD'
+  },
+  wise: {
+    id: 'wise',
+    name: 'Wise',
+    icon: '🌐',
+    minAmount: 10,
+    feePercentage: 1,
+    flatFee: 0.50,
+    addressLabel: 'Wise Email',
+    addressPlaceholder: 'Enter your Wise email address',
+    color: 'green-500',
+    bgColor: 'green-500/10',
+    currency: 'USD',
+    note: 'Low fees, fast transfer'
+  }
 }
 
 // Filter state types

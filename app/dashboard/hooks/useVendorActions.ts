@@ -1,7 +1,40 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import type { Listing, WithdrawalFees } from '../types'
+import type { Listing, WithdrawalFees, WithdrawalMethod, WITHDRAWAL_METHODS } from '../types'
+
+// Import the withdrawal methods config
+const WITHDRAWAL_CONFIG: Record<Exclude<WithdrawalMethod, ''>, {
+  minAmount: number
+  feePercentage: number
+  flatFee: number
+  addressLabel: string
+}> = {
+  bitcoin: {
+    minAmount: 100,
+    feePercentage: 6,
+    flatFee: 20,
+    addressLabel: 'Bitcoin wallet address'
+  },
+  skrill: {
+    minAmount: 10,
+    feePercentage: 5,
+    flatFee: 1,
+    addressLabel: 'Skrill email'
+  },
+  payoneer: {
+    minAmount: 20,
+    feePercentage: 2,
+    flatFee: 1.50,
+    addressLabel: 'Payoneer email'
+  },
+  wise: {
+    minAmount: 10,
+    feePercentage: 1,
+    flatFee: 0.50,
+    addressLabel: 'Wise email'
+  }
+}
 
 // Generate human-readable reference number: WD-YYYYMMDD-XXXXXX
 const generateReferenceNumber = (): string => {
@@ -21,11 +54,33 @@ const generateReferenceNumber = (): string => {
   return `WD-${dateStr}-${code}`
 }
 
-// Modal types for withdrawal
+// Get method display name
+const getMethodDisplayName = (method: Exclude<WithdrawalMethod, ''>): string => {
+  const names: Record<Exclude<WithdrawalMethod, ''>, string> = {
+    bitcoin: 'Bitcoin',
+    skrill: 'Skrill',
+    payoneer: 'Payoneer',
+    wise: 'Wise'
+  }
+  return names[method]
+}
+
+// Get method icon
+const getMethodIcon = (method: Exclude<WithdrawalMethod, ''>): string => {
+  const icons: Record<Exclude<WithdrawalMethod, ''>, string> = {
+    bitcoin: '₿',
+    skrill: '💳',
+    payoneer: '🅿️',
+    wise: '🌐'
+  }
+  return icons[method]
+}
+
+// Modal types for withdrawal - UPDATED
 export interface WithdrawalConfirmModal {
   isOpen: boolean
   amount: number
-  method: 'bitcoin' | 'skrill'
+  method: Exclude<WithdrawalMethod, ''>
   address: string
   fees: WithdrawalFees
 }
@@ -38,7 +93,7 @@ export interface WithdrawalNotificationModal {
   referenceNumber?: string
 }
 
-// ========== WITHDRAWAL ACTIONS ==========
+// ========== WITHDRAWAL ACTIONS - UPDATED ==========
 export function useWithdrawalActions(
   user: any,
   netRevenue: number,
@@ -46,7 +101,7 @@ export function useWithdrawalActions(
   supabase: any
 ) {
   const [showWithdrawalForm, setShowWithdrawalForm] = useState(false)
-  const [withdrawalMethod, setWithdrawalMethod] = useState<'bitcoin' | 'skrill' | ''>('')
+  const [withdrawalMethod, setWithdrawalMethod] = useState<WithdrawalMethod>('')
   const [withdrawalAmount, setWithdrawalAmount] = useState('')
   const [withdrawalAddress, setWithdrawalAddress] = useState('')
   const [withdrawalProcessing, setWithdrawalProcessing] = useState(false)
@@ -68,20 +123,14 @@ export function useWithdrawalActions(
     referenceNumber: undefined
   })
 
-  const calculateWithdrawalFees = useCallback((amount: number, method: 'bitcoin' | 'skrill'): WithdrawalFees => {
-    if (method === 'bitcoin') {
-      const percentageFee = amount * 0.06
-      const flatFee = 20
-      const totalFee = percentageFee + flatFee
-      const netAmount = amount - totalFee
-      return { percentageFee, flatFee, totalFee, netAmount }
-    } else {
-      const percentageFee = amount * 0.05
-      const flatFee = 1
-      const totalFee = percentageFee + flatFee
-      const netAmount = amount - totalFee
-      return { percentageFee, flatFee, totalFee, netAmount }
-    }
+  // UPDATED: Calculate fees for all withdrawal methods
+  const calculateWithdrawalFees = useCallback((amount: number, method: Exclude<WithdrawalMethod, ''>): WithdrawalFees => {
+    const config = WITHDRAWAL_CONFIG[method]
+    const percentageFee = amount * (config.feePercentage / 100)
+    const flatFee = config.flatFee
+    const totalFee = percentageFee + flatFee
+    const netAmount = amount - totalFee
+    return { percentageFee, flatFee, totalFee, netAmount }
   }, [])
 
   const showNotification = useCallback((
@@ -107,7 +156,7 @@ export function useWithdrawalActions(
     setConfirmModal(prev => ({ ...prev, isOpen: false }))
   }, [])
 
-  // Validate and show confirmation modal
+  // UPDATED: Validate and show confirmation modal with support for all methods
   const handleWithdrawalSubmit = useCallback(async () => {
     if (!withdrawalMethod) {
       showNotification('warning', 'Method Required', 'Please select a withdrawal method.')
@@ -115,18 +164,16 @@ export function useWithdrawalActions(
     }
 
     const amount = parseFloat(withdrawalAmount)
+    const config = WITHDRAWAL_CONFIG[withdrawalMethod]
 
     if (isNaN(amount) || amount <= 0) {
       showNotification('warning', 'Invalid Amount', 'Please enter a valid withdrawal amount.')
       return
     }
 
-    if (withdrawalMethod === 'bitcoin' && amount < 100) {
-      showNotification('warning', 'Minimum Not Met', 'Minimum withdrawal amount for Bitcoin is $100.')
-      return
-    }
-    if (withdrawalMethod === 'skrill' && amount < 10) {
-      showNotification('warning', 'Minimum Not Met', 'Minimum withdrawal amount for Skrill is $10.')
+    // Check minimum amount for selected method
+    if (amount < config.minAmount) {
+      showNotification('warning', 'Minimum Not Met', `Minimum withdrawal amount for ${getMethodDisplayName(withdrawalMethod)} is $${config.minAmount}.`)
       return
     }
 
@@ -136,21 +183,38 @@ export function useWithdrawalActions(
     }
 
     if (!withdrawalAddress.trim()) {
-      showNotification('warning', 'Address Required', `Please enter your ${withdrawalMethod === 'bitcoin' ? 'Bitcoin wallet address' : 'Skrill email'}.`)
+      showNotification('warning', 'Address Required', `Please enter your ${config.addressLabel}.`)
       return
     }
 
-    if (withdrawalMethod === 'bitcoin' && withdrawalAddress.length < 26) {
-      showNotification('warning', 'Invalid Address', 'Please enter a valid Bitcoin wallet address.')
-      return
-    }
-
-    if (withdrawalMethod === 'skrill' && !withdrawalAddress.includes('@')) {
-      showNotification('warning', 'Invalid Email', 'Please enter a valid Skrill email address.')
-      return
+    // Validate address format based on method
+    if (withdrawalMethod === 'bitcoin') {
+      // Bitcoin address validation (basic length check)
+      if (withdrawalAddress.length < 26 || withdrawalAddress.length > 62) {
+        showNotification('warning', 'Invalid Address', 'Please enter a valid Bitcoin wallet address.')
+        return
+      }
+      // Check for valid Bitcoin address prefixes
+      if (!withdrawalAddress.match(/^(1|3|bc1)/)) {
+        showNotification('warning', 'Invalid Address', 'Please enter a valid Bitcoin wallet address (should start with 1, 3, or bc1).')
+        return
+      }
+    } else {
+      // Email validation for Skrill, Payoneer, and Wise
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(withdrawalAddress)) {
+        showNotification('warning', 'Invalid Email', `Please enter a valid ${getMethodDisplayName(withdrawalMethod)} email address.`)
+        return
+      }
     }
 
     const fees = calculateWithdrawalFees(amount, withdrawalMethod)
+
+    // Check if net amount is positive
+    if (fees.netAmount <= 0) {
+      showNotification('error', 'Amount Too Low', 'The withdrawal amount is too low after fees. Please enter a higher amount.')
+      return
+    }
 
     // Show confirmation modal
     setConfirmModal({
@@ -162,13 +226,14 @@ export function useWithdrawalActions(
     })
   }, [withdrawalMethod, withdrawalAmount, withdrawalAddress, netRevenue, calculateWithdrawalFees, showNotification])
 
-  // Actually process the withdrawal after confirmation
+  // UPDATED: Process withdrawal with support for all methods
   const processWithdrawal = useCallback(async () => {
     setWithdrawalProcessing(true)
     closeConfirmModal()
 
     try {
       const referenceNumber = generateReferenceNumber()
+      const config = WITHDRAWAL_CONFIG[confirmModal.method]
       
       const { error } = await supabase
         .from('withdrawals')
@@ -177,8 +242,8 @@ export function useWithdrawalActions(
           amount: confirmModal.amount,
           method: confirmModal.method,
           address: confirmModal.address,
-          fee_percentage: confirmModal.method === 'bitcoin' ? 6 : 5,
-          fee_flat: confirmModal.method === 'bitcoin' ? 20 : 1,
+          fee_percentage: config.feePercentage,
+          fee_flat: config.flatFee,
           fee_total: confirmModal.fees.totalFee,
           net_amount: confirmModal.fees.netAmount,
           status: 'pending',
@@ -190,7 +255,7 @@ export function useWithdrawalActions(
       showNotification(
         'success',
         'Withdrawal Submitted!',
-        'Your request is now pending review. You will be notified once it is processed.',
+        `Your ${getMethodDisplayName(confirmModal.method)} withdrawal request is now pending review. You will be notified once it is processed.`,
         referenceNumber
       )
 
@@ -233,7 +298,11 @@ export function useWithdrawalActions(
     closeConfirmModal,
     notificationModal,
     closeNotification,
-    showNotification
+    showNotification,
+    // Helper exports
+    getMethodDisplayName,
+    getMethodIcon,
+    WITHDRAWAL_CONFIG
   }
 }
 
