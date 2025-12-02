@@ -7,9 +7,8 @@ import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 
-// PayPal Client ID - Replace with your Sandbox Client ID
-// Get it from: https://developer.paypal.com/dashboard/applications/sandbox
-const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || 'YOUR_SANDBOX_CLIENT_ID'
+// PayPal Client ID from environment variables
+const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || ''
 
 interface CartItem {
   listing_id: string
@@ -61,7 +60,6 @@ export default function CheckoutPage() {
   
   // Form validation
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({})
-  const [agreedToTerms, setAgreedToTerms] = useState(false)
   
   const validateForm = () => {
     const errors: {[key: string]: string} = {}
@@ -140,8 +138,8 @@ export default function CheckoutPage() {
 
   // Load PayPal SDK
   useEffect(() => {
-    if (PAYPAL_CLIENT_ID === 'YOUR_SANDBOX_CLIENT_ID') {
-      setPaypalError('PayPal Client ID not configured. Please add NEXT_PUBLIC_PAYPAL_CLIENT_ID to your environment variables.')
+    if (!PAYPAL_CLIENT_ID) {
+      setPaypalError('PayPal is not configured. Please contact support.')
       return
     }
 
@@ -163,7 +161,7 @@ export default function CheckoutPage() {
     }
     
     script.onerror = () => {
-      setPaypalError('Failed to load PayPal SDK. Please check your internet connection.')
+      setPaypalError('Failed to load PayPal. Please check your internet connection.')
     }
     
     document.body.appendChild(script)
@@ -345,8 +343,6 @@ export default function CheckoutPage() {
         
         onClose: () => {
           console.log('PayPal popup closed')
-          // Only show message if we were processing and didn't complete
-          // The onApprove should handle successful payments
         }
       }).render(paypalButtonsRef.current)
       
@@ -416,7 +412,7 @@ export default function CheckoutPage() {
       // Don't throw - order is created, stock update failure is non-critical
     }
 
-    // Clear cart
+    // Clear cart only after successful order creation
     localStorage.removeItem('cart')
     window.dispatchEvent(new Event('cart-updated'))
 
@@ -472,56 +468,6 @@ export default function CheckoutPage() {
     }
   }
 
-  // Handle test order creation (simulate payment)
-  const handleTestOrder = async () => {
-    if (!cartItem || !user) return
-
-    if (!validateForm()) {
-      return
-    }
-
-    setProcessing(true)
-
-    try {
-      const totalPrice = cartItem.listing.price * cartItem.quantity
-
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          listing_id: cartItem.listing.id,
-          buyer_id: user.id,
-          seller_id: cartItem.listing.seller_id,
-          amount: totalPrice,
-          quantity: cartItem.quantity,
-          status: 'pending',
-          payment_status: 'pending',
-          payment_method: 'test'
-        })
-        .select()
-        .single()
-
-      if (orderError) {
-        console.error('Order creation error:', orderError)
-        throw new Error(orderError.message || 'Failed to create order')
-      }
-
-      if (!order) {
-        throw new Error('Order was not created')
-      }
-
-      localStorage.removeItem('cart')
-      window.dispatchEvent(new Event('cart-updated'))
-
-      router.push(`/order/${order.id}`)
-
-    } catch (error: any) {
-      console.error('Error creating order:', error)
-      alert('Failed to create order: ' + (error.message || 'Unknown error occurred'))
-    } finally {
-      setProcessing(false)
-    }
-  }
-
   // Handle crypto payment via NOWPayments
   const handleCryptoPayment = async () => {
     if (!cartItem || !user) return
@@ -556,9 +502,8 @@ export default function CheckoutPage() {
         throw new Error(result.error || 'Failed to create crypto payment')
       }
 
-      // Clear cart before redirecting
-      localStorage.removeItem('cart')
-      window.dispatchEvent(new Event('cart-updated'))
+      // DON'T clear cart here - only clear after successful payment via webhook
+      // The cart will remain if user cancels, so they can try again easily
 
       // Redirect to NOWPayments hosted checkout
       window.location.href = result.invoiceUrl
@@ -582,12 +527,6 @@ export default function CheckoutPage() {
     // For crypto, use NOWPayments
     if (selectedPayment === 'crypto') {
       await handleCryptoPayment()
-      return
-    }
-
-    // For test mode, create test order
-    if (selectedPayment === 'test') {
-      await handleTestOrder()
       return
     }
 
@@ -943,39 +882,6 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   </label>
-
-                  {/* Test/Simulation Mode */}
-                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
-                    selectedPayment === 'test' 
-                      ? 'bg-green-500/20 border-green-500/50' 
-                      : 'bg-slate-800/50 border-white/10 hover:border-green-500/30'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="payment"
-                      value="test"
-                      checked={selectedPayment === 'test'}
-                      onChange={(e) => setSelectedPayment(e.target.value)}
-                      className="sr-only"
-                    />
-                    <div className={`w-5 h-5 rounded-full border-2 mr-3 sm:mr-4 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0 ${
-                      selectedPayment === 'test' ? 'border-green-500' : 'border-gray-500'
-                    }`}>
-                      {selectedPayment === 'test' && (
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
-                        <span>Test Mode</span>
-                        <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-bold rounded">DEV</span>
-                      </p>
-                      <p className="text-gray-400 text-xs sm:text-sm">Simulate payment for testing purposes</p>
-                    </div>
-                    <div className="flex gap-2 ml-2 flex-shrink-0">
-                      <span className="text-xl sm:text-2xl">🧪</span>
-                    </div>
-                  </label>
                 </div>
 
                 {/* PayPal Buttons Container */}
@@ -1052,19 +958,6 @@ export default function CheckoutPage() {
                         </p>
                       </>
                     )}
-                  </div>
-                )}
-
-                {/* Info box for other payment methods */}
-                {selectedPayment === 'test' && (
-                  <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-green-500/10 rounded-xl border border-green-500/30">
-                    <p className="text-green-300 text-xs sm:text-sm flex items-start gap-2">
-                      <span className="text-base sm:text-lg flex-shrink-0">ℹ️</span>
-                      <span>
-                        <span className="font-semibold">Test Mode Active:</span> Your order will be created and you can simulate the payment on the order details page. 
-                        No real payment will be processed.
-                      </span>
-                    </p>
                   </div>
                 )}
 
@@ -1237,49 +1130,26 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {/* Desktop Place Order Button - Only show for non-PayPal methods */}
-                {selectedPayment !== 'paypal' && (
+                {/* Desktop Place Order Button - Only show for crypto */}
+                {selectedPayment === 'crypto' && (
                   <>
                     <button
                       onClick={handlePlaceOrder}
-                      disabled={processing || cryptoLoading || !isFormValid || !selectedPayment}
-                      className={`w-full py-4 rounded-xl font-semibold transition-all duration-300 mb-4 ${
-                        !selectedPayment
-                          ? 'bg-gray-600 text-gray-300'
-                          : selectedPayment === 'test'
-                          ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg hover:shadow-green-500/50 hover:scale-105'
-                          : selectedPayment === 'crypto'
-                          ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg hover:shadow-orange-500/50 hover:scale-105'
-                          : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:shadow-purple-500/50'
-                      } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
+                      disabled={cryptoLoading || !isFormValid}
+                      className="w-full py-4 rounded-xl font-semibold transition-all duration-300 mb-4 bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg hover:shadow-orange-500/50 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
-                      {processing || cryptoLoading ? (
+                      {cryptoLoading ? (
                         <span className="flex items-center justify-center gap-2">
                           <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          {cryptoLoading ? 'Preparing Checkout...' : 'Creating Order...'}
+                          Preparing Checkout...
                         </span>
-                      ) : !selectedPayment ? (
-                        '💳 Select Payment Method'
-                      ) : selectedPayment === 'test' ? (
-                        '🚀 Create Test Order'
-                      ) : selectedPayment === 'crypto' ? (
-                        `₿ Pay $${total.toFixed(2)} with Crypto`
                       ) : (
-                        'Place Order'
+                        `₿ Pay $${total.toFixed(2)} with Crypto`
                       )}
                     </button>
-
-                    {selectedPayment === 'test' && (
-                      <p className="text-center text-gray-500 text-xs mb-6">
-                        You'll simulate payment on the order page
-                      </p>
-                    )}
-                    
-                    {selectedPayment === 'crypto' && (
-                      <p className="text-center text-gray-500 text-xs mb-6">
-                        You'll be redirected to NOWPayments
-                      </p>
-                    )}
+                    <p className="text-center text-gray-500 text-xs mb-6">
+                      You'll be redirected to NOWPayments
+                    </p>
                   </>
                 )}
 
@@ -1351,8 +1221,8 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Mobile Fixed Bottom Bar - Only show for non-PayPal methods */}
-        {selectedPayment !== 'paypal' && (
+        {/* Mobile Fixed Bottom Bar - Only show for crypto */}
+        {selectedPayment === 'crypto' && (
           <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3">
@@ -1371,30 +1241,16 @@ export default function CheckoutPage() {
               </div>
               <button
                 onClick={handlePlaceOrder}
-                disabled={processing || cryptoLoading || !selectedPayment}
-                className={`w-full py-3 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] ${
-                  !selectedPayment
-                    ? 'bg-gray-600 text-gray-300'
-                    : selectedPayment === 'test'
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg'
-                    : selectedPayment === 'crypto'
-                    ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg'
-                    : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={cryptoLoading || !isFormValid}
+                className="w-full py-3 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {processing || cryptoLoading ? (
+                {cryptoLoading ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    {cryptoLoading ? 'Preparing...' : 'Creating...'}
+                    Preparing...
                   </span>
-                ) : !selectedPayment ? (
-                  '💳 Select Payment Method'
-                ) : selectedPayment === 'test' ? (
-                  '🚀 Create Test Order'
-                ) : selectedPayment === 'crypto' ? (
-                  `₿ Pay $${total.toFixed(2)} with Crypto`
                 ) : (
-                  '👆 Pay with PayPal'
+                  `₿ Pay $${total.toFixed(2)} with Crypto`
                 )}
               </button>
             </div>
@@ -1419,6 +1275,29 @@ export default function CheckoutPage() {
               </button>
               <div className="bg-blue-500/20 text-blue-400 px-4 py-3 rounded-xl font-semibold text-sm whitespace-nowrap">
                 👆 Pay with PayPal
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile - No payment selected */}
+        {!selectedPayment && (
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <p className="text-xs text-gray-400 mb-0.5">Total</p>
+                <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                  ${total.toFixed(2)}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowMobileSummary(true)}
+                className="bg-white/10 text-white px-4 py-3 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[48px] text-sm whitespace-nowrap"
+              >
+                📋 Summary
+              </button>
+              <div className="bg-purple-500/20 text-purple-400 px-4 py-3 rounded-xl font-semibold text-sm whitespace-nowrap">
+                💳 Select Payment
               </div>
             </div>
           </div>

@@ -33,12 +33,12 @@ export default function OrderDetailPage() {
   const [showDeliveryInfo, setShowDeliveryInfo] = useState(false)
   const [copiedDelivery, setCopiedDelivery] = useState(false)
   
-  // NEW: Security confirmation states
+  // Security confirmation states
   const [showSecurityWarning, setShowSecurityWarning] = useState(false)
   const [hasConfirmedSecurity, setHasConfirmedSecurity] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   
-  // NEW: 24-hour delivery window states
+  // 24-hour delivery window states
   const [deliveryDeadline, setDeliveryDeadline] = useState<string | null>(null)
   const [deliveryDeadlinePassed, setDeliveryDeadlinePassed] = useState(false)
 
@@ -61,7 +61,7 @@ export default function OrderDetailPage() {
     }
   }
 
-  // NEW: Log delivery access to database
+  // Log delivery access to database
   const logDeliveryAccess = async (accessType: 'reveal' | 'copy' | 'view_in_chat') => {
     if (!user || !order) return
     
@@ -82,7 +82,7 @@ export default function OrderDetailPage() {
     }
   }
 
-  // NEW: Handle reveal with security confirmation
+  // Handle reveal with security confirmation
   const handleRevealDeliveryInfo = async () => {
     if (!hasConfirmedSecurity) {
       setShowSecurityWarning(true)
@@ -94,7 +94,7 @@ export default function OrderDetailPage() {
     setShowDeliveryInfo(true)
   }
 
-  // NEW: Confirm security warning and reveal
+  // Confirm security warning and reveal
   const confirmSecurityAndReveal = async () => {
     setHasConfirmedSecurity(true)
     setShowSecurityWarning(false)
@@ -106,12 +106,12 @@ export default function OrderDetailPage() {
     toast('info', 'Access Logged', 'This reveal has been logged for security')
   }
 
-  // NEW: Hide delivery info
+  // Hide delivery info
   const hideDeliveryInfo = () => {
     setShowDeliveryInfo(false)
   }
 
-  // UPDATED: Copy delivery info with logging
+  // Copy delivery info with logging
   const copyDeliveryInfo = async () => {
     if (!deliveryInfo) return
     try {
@@ -131,7 +131,7 @@ export default function OrderDetailPage() {
   useEffect(() => { mounted.current = true; checkAuth(); return () => { mounted.current = false } }, [])
   useEffect(() => { user && profile && fetchOrder() }, [user, profile])
   
-  // 48-hour timer for delivered orders (existing)
+  // 48-hour timer for delivered orders
   useEffect(() => {
     if (order?.status === 'delivered' && order.delivered_at) {
       const iv = setInterval(() => {
@@ -142,7 +142,7 @@ export default function OrderDetailPage() {
     }
   }, [order])
 
-  // NEW: 24-hour delivery window timer for manual delivery orders in 'paid' status
+  // 24-hour delivery window timer for manual delivery orders in 'paid' status
   useEffect(() => {
     if (order?.status === 'paid' && order.listing?.delivery_type === 'manual') {
       const paidTime = order.paid_at || order.created_at
@@ -441,7 +441,7 @@ export default function OrderDetailPage() {
     finally { setActionLoading(false) }
   }
 
-  // UPDATED: Open chat with logging
+  // Open chat with logging
   const openChat = async () => {
     if (!order) return
     try {
@@ -460,17 +460,6 @@ export default function OrderDetailPage() {
       router.push(`/messages?conversation=${cid}`)
     } catch { toast('error', 'Failed', 'Cannot open chat') }
   }
-
-  const simPay = () => confirm('Simulate Payment', '⚠️ TEST: Simulate payment?', async () => {
-    setModal(p => ({ ...p, show: false })); setActionLoading(true)
-    try {
-      await supabase.from('orders').update({ payment_status: 'paid', status: 'paid', paid_at: new Date().toISOString() }).eq('id', id)
-      const [b, s] = await Promise.all([supabase.from('profiles').select('email, username').eq('id', order.buyer_id).single(), supabase.from('profiles').select('email, username').eq('id', order.seller_id).single()])
-      b.data?.email && s.data?.email && await sendOrderEmails({ id: order.id, listing_title: order.listing.title, quantity: order.quantity, total_amount: order.amount * 1.05, seller_amount: order.amount * 0.95, buyer_email: b.data.email, seller_email: s.data.email, buyer_username: b.data.username, seller_username: s.data.username, site_url: getSiteUrl() })
-      toast('success', 'Paid!', 'Order marked as paid'); fetchOrder()
-    } catch (e: any) { toast('error', 'Failed', e.message) }
-    finally { setActionLoading(false) }
-  })
 
   if (error) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="text-center"><div className="text-6xl mb-4">⚠️</div><h1 className="text-3xl font-bold text-white mb-4">Error</h1><p className="text-gray-400 mb-6">{error}</p><button onClick={() => location.reload()} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold">Refresh</button></div></div>
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent"></div></div>
@@ -510,7 +499,7 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* NEW: Security Warning Modal for Delivery Info Reveal */}
+      {/* Security Warning Modal for Delivery Info Reveal */}
       {showSecurityWarning && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[95] p-4">
           <div className="bg-slate-900/95 border-2 border-orange-500/50 rounded-2xl p-6 max-w-md w-full animate-fade-in">
@@ -665,14 +654,14 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {/* 48-Hour Timer for DELIVERED orders (existing) */}
+          {/* 48-Hour Timer for DELIVERED orders */}
           {order.status === 'delivered' && timeRemaining && isBuyer && (
             <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-2 border-yellow-500/50 rounded-2xl p-6 mb-6 animate-pulse">
               <div className="flex items-center gap-4"><div className="w-16 h-16 bg-yellow-500/20 rounded-xl flex items-center justify-center"><span className="text-4xl">⏱️</span></div><div><h3 className="text-xl font-bold text-yellow-400">Action Required</h3><p className="text-2xl font-mono font-bold text-white">{timeRemaining}</p><p className="text-gray-300 text-sm">Confirm or dispute. Auto-completes after 48h.</p></div></div>
             </div>
           )}
 
-          {/* NEW: 24-Hour Delivery Window Timer for PAID manual orders - VENDOR VIEW */}
+          {/* 24-Hour Delivery Window Timer for PAID manual orders - VENDOR VIEW */}
           {order.status === 'paid' && isManualDelivery && isSeller && deliveryDeadline && (
             <div className={`border-2 rounded-2xl p-6 mb-6 ${
               deliveryDeadlinePassed 
@@ -713,7 +702,7 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* NEW: 24-Hour Delivery Window Timer for PAID manual orders - BUYER VIEW */}
+          {/* 24-Hour Delivery Window Timer for PAID manual orders - BUYER VIEW */}
           {order.status === 'paid' && isManualDelivery && isBuyer && deliveryDeadline && (
             <div className={`border-2 rounded-2xl p-6 mb-6 ${
               deliveryDeadlinePassed 
@@ -765,7 +754,7 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* UPDATED: DELIVERY INFORMATION DISPLAY - For Buyers - With Security Features */}
+          {/* DELIVERY INFORMATION DISPLAY - For Buyers - With Security Features */}
           {(isBuyer || isAdmin) && (order.status === 'delivered' || order.status === 'completed' || order.status === 'dispute_raised') && (
             <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-2 border-green-500/50 rounded-2xl p-6 mb-6">
               <div className="flex items-start justify-between gap-4 mb-4">
@@ -780,7 +769,7 @@ export default function OrderDetailPage() {
                 </div>
                 {deliveryInfo && (
                   <div className="flex items-center gap-2">
-                    {/* UPDATED: Show/Hide button with security check */}
+                    {/* Show/Hide button with security check */}
                     <button
                       onClick={showDeliveryInfo ? hideDeliveryInfo : handleRevealDeliveryInfo}
                       className={`px-4 py-2 rounded-lg border transition-all duration-200 text-sm font-medium ${
@@ -957,25 +946,24 @@ export default function OrderDetailPage() {
             <h3 className="text-xl font-bold text-white mb-4">⚡ Actions</h3>
 
             <div className="space-y-3">
-              {/* SIMULATE PAYMENT - For Testing Only */}
+              {/* Pending Payment Info */}
               {order.status === 'pending' && order.payment_status === 'pending' && (
-                <div className="bg-yellow-500/10 border-2 border-yellow-500/50 rounded-xl p-6">
-                  <div className="flex items-center gap-3 mb-4">
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6">
+                  <div className="flex items-center gap-3 mb-2">
                     <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center">
-                      <span className="text-2xl">⚠️</span>
+                      <span className="text-2xl">⏳</span>
                     </div>
                     <div>
-                      <h4 className="text-xl font-bold text-yellow-400">Test Mode</h4>
-                      <p className="text-sm text-gray-300">Simulate payment to continue testing</p>
+                      <h4 className="text-xl font-bold text-yellow-400">Awaiting Payment</h4>
+                      <p className="text-sm text-gray-300">This order is waiting for payment confirmation</p>
                     </div>
                   </div>
-                  <button
-                    onClick={simPay}
-                    disabled={actionLoading}
-                    className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 hover:shadow-lg hover:shadow-yellow-500/50 transition-all"
-                  >
-                    💳 Simulate Payment
-                  </button>
+                  <p className="text-yellow-300 text-sm mt-3">
+                    {isBuyer 
+                      ? 'Please complete your payment to proceed with this order. If you\'ve already paid, please wait for confirmation.'
+                      : 'The buyer needs to complete payment before you can deliver this order.'
+                    }
+                  </p>
                 </div>
               )}
 
@@ -1013,7 +1001,7 @@ export default function OrderDetailPage() {
                 </div>
               )}
 
-              {/* NEW: BUYER ACTION - Dispute for Non-Delivery (when 24h passed and still 'paid') */}
+              {/* BUYER ACTION - Dispute for Non-Delivery (when 24h passed and still 'paid') */}
               {isBuyer && order.status === 'paid' && isManualDelivery && deliveryDeadlinePassed && !showDispute && (
                 <div className="bg-red-500/10 border-2 border-red-500/50 rounded-xl p-6">
                   <div className="flex items-center gap-3 mb-4">

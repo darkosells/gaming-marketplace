@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 
 interface CartItem {
   listing_id: string
@@ -415,11 +416,7 @@ export default function CartPage() {
         )}
 
         {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-6 sm:py-8 mt-8 sm:mt-12">
-          <div className="container mx-auto px-3 sm:px-4 text-center text-gray-500 text-xs sm:text-sm">
-            <p>&copy; 2025 Nashflare. All rights reserved.</p>
-          </div>
-        </footer>
+        <Footer />
       </div>
 
       {/* Custom Styles */}
