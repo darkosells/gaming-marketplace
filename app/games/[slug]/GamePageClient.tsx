@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 import { getGameBySlug } from '@/lib/games-config'
 
 interface Props {
@@ -693,7 +694,7 @@ export default function GamePageClient({ slug }: Props) {
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
-                                  24 Hours 
+                                  24 Hour
                                 </span>
                               )}
                             </div>
@@ -751,11 +752,7 @@ export default function GamePageClient({ slug }: Props) {
           </div>
         </main>
 
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12" role="contentinfo">
-          <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; {new Date().getFullYear()} Nashflare. All rights reserved.</p>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   )

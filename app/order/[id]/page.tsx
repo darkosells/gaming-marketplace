@@ -18,6 +18,15 @@ const STATUS_CONFIG: Record<string, any> = {
   refunded: { bg: 'bg-orange-500/20', border: 'border-orange-500/30', text: 'text-orange-400', icon: '💰', label: 'Refunded' }
 }
 
+// Helper function to parse timestamp as UTC
+const parseAsUTC = (timestamp: string): Date => {
+  // If timestamp doesn't have timezone info, treat it as UTC
+  if (timestamp && !timestamp.includes('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
+    return new Date(timestamp + 'Z')
+  }
+  return new Date(timestamp)
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams(), router = useRouter(), supabase = createClient(), mounted = useRef(true)
   const [user, setUser] = useState<any>(null), [profile, setProfile] = useState<any>(null), [order, setOrder] = useState<any>(null)
@@ -41,6 +50,9 @@ export default function OrderDetailPage() {
   // 24-hour delivery window states
   const [deliveryDeadline, setDeliveryDeadline] = useState<string | null>(null)
   const [deliveryDeadlinePassed, setDeliveryDeadlinePassed] = useState(false)
+  
+  // Track if 48 hours have passed
+  const [autoCompleteReady, setAutoCompleteReady] = useState(false)
 
   const toast = (type: string, title: string, msg: string) => {
     const t = { id: Date.now().toString(), type, title, msg }
@@ -131,38 +143,69 @@ export default function OrderDetailPage() {
   useEffect(() => { mounted.current = true; checkAuth(); return () => { mounted.current = false } }, [])
   useEffect(() => { user && profile && fetchOrder() }, [user, profile])
   
-  // 48-hour timer for delivered orders
+  // FIXED: 48-hour timer for delivered orders with proper UTC handling
   useEffect(() => {
     if (order?.status === 'delivered' && order.delivered_at) {
-      const iv = setInterval(() => {
-        const h = 48 - (Date.now() - new Date(order.delivered_at).getTime()) / 3600000
-        h <= 0 ? (setTimeRemaining('Auto-completing...'), clearInterval(iv)) : setTimeRemaining(`${Math.floor(h)}h ${Math.floor((h % 1) * 60)}m ${Math.floor(((h % 1) * 60 % 1) * 60)}s`)
-      }, 1000)
+      const updateTimer = () => {
+        // Parse delivered_at as UTC to avoid timezone issues
+        const deliveredTime = parseAsUTC(order.delivered_at).getTime()
+        const now = Date.now()
+        const elapsed = now - deliveredTime
+        const remaining = (48 * 60 * 60 * 1000) - elapsed // 48 hours in milliseconds
+        
+        if (remaining <= 0) {
+          setTimeRemaining(null)
+          setAutoCompleteReady(true)
+        } else {
+          setAutoCompleteReady(false)
+          const hours = Math.floor(remaining / (1000 * 60 * 60))
+          const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))
+          const seconds = Math.floor((remaining % (1000 * 60)) / 1000)
+          setTimeRemaining(`${hours}h ${minutes}m ${seconds}s`)
+        }
+      }
+      
+      // Run immediately
+      updateTimer()
+      
+      // Then update every second
+      const iv = setInterval(updateTimer, 1000)
       return () => clearInterval(iv)
+    } else {
+      setTimeRemaining(null)
+      setAutoCompleteReady(false)
     }
   }, [order])
 
-  // 24-hour delivery window timer for manual delivery orders in 'paid' status
+  // FIXED: 24-hour delivery window timer for manual delivery orders in 'paid' status
   useEffect(() => {
     if (order?.status === 'paid' && order.listing?.delivery_type === 'manual') {
       const paidTime = order.paid_at || order.created_at
       
-      const iv = setInterval(() => {
-        const hoursElapsed = (Date.now() - new Date(paidTime).getTime()) / 3600000
-        const hoursRemaining = 24 - hoursElapsed
+      const updateDeliveryTimer = () => {
+        // Parse as UTC
+        const paidTimestamp = parseAsUTC(paidTime).getTime()
+        const now = Date.now()
+        const elapsed = now - paidTimestamp
+        const remaining = (24 * 60 * 60 * 1000) - elapsed // 24 hours in milliseconds
         
-        if (hoursRemaining <= 0) {
+        if (remaining <= 0) {
           setDeliveryDeadline('Deadline passed')
           setDeliveryDeadlinePassed(true)
         } else {
-          const h = Math.floor(hoursRemaining)
-          const m = Math.floor((hoursRemaining % 1) * 60)
-          const s = Math.floor(((hoursRemaining % 1) * 60 % 1) * 60)
-          setDeliveryDeadline(`${h}h ${m}m ${s}s`)
+          const hours = Math.floor(remaining / (1000 * 60 * 60))
+          const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))
+          const seconds = Math.floor((remaining % (1000 * 60)) / 1000)
+          setDeliveryDeadline(`${hours}h ${minutes}m ${seconds}s`)
           setDeliveryDeadlinePassed(false)
         }
-      }, 1000)
+      }
       
+      // Run immediately
+      updateDeliveryTimer()
+      
+      // Then update every second
+      const iv = setInterval(updateDeliveryTimer, 1000)
       return () => clearInterval(iv)
     } else {
       setDeliveryDeadline(null)
@@ -654,10 +697,34 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {/* 48-Hour Timer for DELIVERED orders */}
-          {order.status === 'delivered' && timeRemaining && isBuyer && (
-            <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-2 border-yellow-500/50 rounded-2xl p-6 mb-6 animate-pulse">
-              <div className="flex items-center gap-4"><div className="w-16 h-16 bg-yellow-500/20 rounded-xl flex items-center justify-center"><span className="text-4xl">⏱️</span></div><div><h3 className="text-xl font-bold text-yellow-400">Action Required</h3><p className="text-2xl font-mono font-bold text-white">{timeRemaining}</p><p className="text-gray-300 text-sm">Confirm or dispute. Auto-completes after 48h.</p></div></div>
+          {/* FIXED: 48-Hour Timer for DELIVERED orders - Now shows proper countdown or "Ready" state */}
+          {order.status === 'delivered' && isBuyer && (
+            <div className={`border-2 rounded-2xl p-6 mb-6 ${
+              autoCompleteReady 
+                ? 'bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/50'
+                : 'bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/50 animate-pulse'
+            }`}>
+              <div className="flex items-center gap-4">
+                <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
+                  autoCompleteReady ? 'bg-green-500/20' : 'bg-yellow-500/20'
+                }`}>
+                  <span className="text-4xl">{autoCompleteReady ? '✅' : '⏱️'}</span>
+                </div>
+                <div>
+                  <h3 className={`text-xl font-bold ${autoCompleteReady ? 'text-green-400' : 'text-yellow-400'}`}>
+                    {autoCompleteReady ? 'Ready to Auto-Complete' : 'Action Required'}
+                  </h3>
+                  <p className="text-2xl font-mono font-bold text-white">
+                    {autoCompleteReady ? 'Processing...' : timeRemaining}
+                  </p>
+                  <p className="text-gray-300 text-sm">
+                    {autoCompleteReady 
+                      ? 'This order will be auto-completed shortly. You can still confirm manually or raise a dispute.'
+                      : 'Confirm or dispute. Auto-completes after 48h.'
+                    }
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
