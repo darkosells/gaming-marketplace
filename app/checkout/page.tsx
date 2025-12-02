@@ -82,7 +82,7 @@ export default function CheckoutPage() {
     }
 
     const script = document.createElement('script')
-    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`
+    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture&commit=true&disable-funding=paylater`
     script.async = true
     
     script.onload = () => {
@@ -127,8 +127,9 @@ export default function CheckoutPage() {
         // Create PayPal order
         createOrder: (data: any, actions: any) => {
           return actions.order.create({
+            intent: 'CAPTURE',
             purchase_units: [{
-              description: `Nashflare - ${cartItem.listing.title}`,
+              description: `Nashflare - ${cartItem.listing.title}`.substring(0, 127),
               amount: {
                 currency_code: 'USD',
                 value: total.toFixed(2),
@@ -144,8 +145,8 @@ export default function CheckoutPage() {
                 }
               },
               items: [{
-                name: cartItem.listing.title,
-                description: `${cartItem.listing.game} - ${cartItem.listing.category}`,
+                name: cartItem.listing.title.substring(0, 127),
+                description: `${cartItem.listing.game} - ${cartItem.listing.category}`.substring(0, 127),
                 unit_amount: {
                   currency_code: 'USD',
                   value: cartItem.listing.price.toFixed(2)
@@ -156,7 +157,8 @@ export default function CheckoutPage() {
             }],
             application_context: {
               brand_name: 'Nashflare',
-              shipping_preference: 'NO_SHIPPING'
+              shipping_preference: 'NO_SHIPPING',
+              user_action: 'PAY_NOW'
             }
           })
         },
@@ -164,20 +166,42 @@ export default function CheckoutPage() {
         // Capture payment on approval
         onApprove: async (data: any, actions: any) => {
           setProcessing(true)
+          setPaypalError(null)
           
           try {
             // Capture the payment
-            const details = await actions.order.capture()
+            console.log('Capturing PayPal payment...', data)
+            
+            let details
+            try {
+              details = await actions.order.capture()
+            } catch (captureError: any) {
+              // If window closed error, the payment might still have gone through
+              // Check if we have the order ID and try to proceed
+              console.error('Capture error:', captureError)
+              
+              if (captureError.message?.includes('Window closed') || captureError.message?.includes('window closed')) {
+                // Payment may have completed - show a different message
+                setPaypalError('Payment window closed. If you were charged, please contact support with your PayPal transaction ID. Otherwise, try again.')
+                setProcessing(false)
+                return
+              }
+              throw captureError
+            }
+            
+            console.log('PayPal capture response:', details)
             
             if (details.status === 'COMPLETED') {
+              console.log('Payment completed, creating database order...')
               // Create order in our database
               await createDatabaseOrder(details.id, 'paypal', 'paid')
             } else {
-              throw new Error('Payment was not completed')
+              console.error('Payment status not COMPLETED:', details.status)
+              throw new Error(`Payment status: ${details.status}`)
             }
           } catch (error: any) {
-            console.error('PayPal capture error:', error)
-            setPaypalError('Payment failed. Please try again.')
+            console.error('PayPal/Order error:', error)
+            setPaypalError(error.message || 'Payment failed. Please try again.')
             setProcessing(false)
           }
         },
@@ -215,6 +239,7 @@ export default function CheckoutPage() {
     }
 
     const totalPrice = cartItem.listing.price * cartItem.quantity
+    console.log('Creating order with:', { paymentId, paymentMethod, paymentStatus, totalPrice })
 
     // Create the order with paid status
     const { data: order, error: orderError } = await supabase
@@ -228,7 +253,7 @@ export default function CheckoutPage() {
         status: paymentStatus === 'paid' ? 'paid' : 'pending',
         payment_status: paymentStatus,
         payment_method: paymentMethod,
-        payment_id: paymentId, // Store PayPal transaction ID
+        payment_id: paymentId,
         paid_at: paymentStatus === 'paid' ? new Date().toISOString() : null
       })
       .select()
@@ -236,12 +261,14 @@ export default function CheckoutPage() {
 
     if (orderError) {
       console.error('Order creation error:', orderError)
-      throw new Error(orderError.message || 'Failed to create order')
+      throw new Error(`Database error: ${orderError.message}`)
     }
 
     if (!order) {
-      throw new Error('Order was not created')
+      throw new Error('Order was not created - no data returned')
     }
+
+    console.log('Order created successfully:', order.id)
 
     // Reduce stock for the listing
     const { error: stockError } = await supabase
@@ -781,7 +808,7 @@ export default function CheckoutPage() {
                         <div className="paypal-buttons-wrapper bg-slate-800/50 rounded-xl p-4 sm:p-6">
                           <div 
                             ref={paypalButtonsRef} 
-                            className="paypal-buttons-container min-h-[150px] max-w-[500px] mx-auto"
+                            className="paypal-buttons-container min-h-[150px] w-full"
                           ></div>
                         </div>
                         <p className="text-center text-gray-500 text-xs mt-3">
@@ -1003,11 +1030,7 @@ export default function CheckoutPage() {
         )}
 
         {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-6 sm:py-8 mt-8 sm:mt-12">
-          <div className="container mx-auto px-3 sm:px-4 text-center text-gray-500 text-xs sm:text-sm">
-            <p>&copy; 2024 Nashflare. All rights reserved.</p>
-          </div>
-        </footer>
+        <Footer />
       </div>
 
       {/* Coming Soon Modal */}
@@ -1078,17 +1101,13 @@ export default function CheckoutPage() {
         /* PayPal button container styling */
         .paypal-buttons-container {
           min-height: 150px;
+          width: 100%;
         }
         .paypal-buttons-container iframe {
           z-index: 1 !important;
         }
         .paypal-buttons-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-        .paypal-buttons-container > div {
-          width: 100% !important;
+          width: 100%;
         }
       `}</style>
     </div>
