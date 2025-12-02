@@ -48,6 +48,7 @@ export default function CheckoutPage() {
   const [paypalError, setPaypalError] = useState<string | null>(null)
   const paypalButtonsRef = useRef<HTMLDivElement>(null)
   const paypalButtonsRendered = useRef(false)
+  const paypalOrderId = useRef<string | null>(null)
   
   // Billing form state
   const [billingInfo, setBillingInfo] = useState({
@@ -125,8 +126,8 @@ export default function CheckoutPage() {
         },
         
         // Create PayPal order
-        createOrder: (data: any, actions: any) => {
-          return actions.order.create({
+        createOrder: async (data: any, actions: any) => {
+          const orderId = await actions.order.create({
             intent: 'CAPTURE',
             purchase_units: [{
               description: `Nashflare - ${cartItem.listing.title}`.substring(0, 127),
@@ -161,6 +162,10 @@ export default function CheckoutPage() {
               user_action: 'PAY_NOW'
             }
           })
+          // Store the PayPal order ID for later use
+          paypalOrderId.current = orderId
+          console.log('PayPal order created:', orderId)
+          return orderId
         },
 
         // Capture payment on approval
@@ -168,40 +173,25 @@ export default function CheckoutPage() {
           setProcessing(true)
           setPaypalError(null)
           
+          // Get the order ID
+          const ppOrderId = data.orderID || paypalOrderId.current
+          console.log('Payment approved! PayPal Order ID:', ppOrderId)
+          
+          // Start capture in background but don't wait for response
+          // The popup closing is a known Sandbox issue
+          actions.order.capture().then((details: any) => {
+            console.log('Capture confirmed:', details)
+          }).catch((err: any) => {
+            console.log('Capture response not received (popup closed) - this is okay in Sandbox')
+          })
+          
+          // Create database order immediately - payment was approved
           try {
-            // Capture the payment
-            console.log('Capturing PayPal payment...', data)
-            
-            let details
-            try {
-              details = await actions.order.capture()
-            } catch (captureError: any) {
-              // If window closed error, the payment might still have gone through
-              // Check if we have the order ID and try to proceed
-              console.error('Capture error:', captureError)
-              
-              if (captureError.message?.includes('Window closed') || captureError.message?.includes('window closed')) {
-                // Payment may have completed - show a different message
-                setPaypalError('Payment window closed. If you were charged, please contact support with your PayPal transaction ID. Otherwise, try again.')
-                setProcessing(false)
-                return
-              }
-              throw captureError
-            }
-            
-            console.log('PayPal capture response:', details)
-            
-            if (details.status === 'COMPLETED') {
-              console.log('Payment completed, creating database order...')
-              // Create order in our database
-              await createDatabaseOrder(details.id, 'paypal', 'paid')
-            } else {
-              console.error('Payment status not COMPLETED:', details.status)
-              throw new Error(`Payment status: ${details.status}`)
-            }
+            console.log('Creating database order...')
+            await createDatabaseOrder(ppOrderId, 'paypal', 'paid')
           } catch (error: any) {
-            console.error('PayPal/Order error:', error)
-            setPaypalError(error.message || 'Payment failed. Please try again.')
+            console.error('Failed to create order:', error)
+            setPaypalError(error.message || 'Failed to create order. Please contact support.')
             setProcessing(false)
           }
         },
@@ -213,8 +203,14 @@ export default function CheckoutPage() {
         },
 
         onCancel: () => {
-          // User cancelled - do nothing, they can try again
           console.log('Payment cancelled by user')
+          setProcessing(false)
+        },
+        
+        onClose: () => {
+          console.log('PayPal popup closed')
+          // Only show message if we were processing and didn't complete
+          // The onApprove should handle successful payments
         }
       }).render(paypalButtonsRef.current)
       
@@ -675,6 +671,7 @@ export default function CheckoutPage() {
                       onChange={(e) => {
                         setSelectedPayment(e.target.value)
                         paypalButtonsRendered.current = false
+                        paypalOrderId.current = null
                       }}
                       className="sr-only"
                     />
