@@ -505,7 +505,7 @@ export default function CheckoutPage() {
     }
   }
 
-  // Handle crypto payment via Coinbase Commerce
+  // Handle crypto payment via NOWPayments
   const handleCryptoPayment = async () => {
     if (!cartItem || !user) return
 
@@ -517,7 +517,7 @@ export default function CheckoutPage() {
     setCryptoError(null)
 
     try {
-      const response = await fetch('/api/coinbase/create-charge', {
+      const response = await fetch('/api/nowpayments/create-invoice', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -543,8 +543,8 @@ export default function CheckoutPage() {
       localStorage.removeItem('cart')
       window.dispatchEvent(new Event('cart-updated'))
 
-      // Redirect to Coinbase Commerce hosted checkout
-      window.location.href = result.hostedUrl
+      // Redirect to NOWPayments hosted checkout
+      window.location.href = result.invoiceUrl
 
     } catch (error: any) {
       console.error('Crypto payment error:', error)
@@ -556,7 +556,7 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async () => {
     if (!cartItem || !user) return
 
-    // For crypto, use Coinbase Commerce
+    // For crypto, use NOWPayments
     if (selectedPayment === 'crypto') {
       await handleCryptoPayment()
       return
@@ -884,7 +884,7 @@ export default function CheckoutPage() {
                     </div>
                   </label>
 
-                  {/* Cryptocurrency via Coinbase Commerce */}
+                  {/* Cryptocurrency via NOWPayments */}
                   <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
                     selectedPayment === 'crypto' 
                       ? 'bg-orange-500/20 border-orange-500/50' 
@@ -1082,7 +1082,7 @@ export default function CheckoutPage() {
                           <div className="w-12 h-12 border-4 border-orange-400/30 border-t-orange-400 rounded-full animate-spin"></div>
                           <div className="text-center">
                             <p className="text-orange-400 font-semibold text-lg">Preparing Crypto Checkout...</p>
-                            <p className="text-gray-400 text-sm mt-1">You'll be redirected to Coinbase Commerce</p>
+                            <p className="text-gray-400 text-sm mt-1">You'll be redirected to NOWPayments</p>
                           </div>
                         </div>
                       </div>
@@ -1092,7 +1092,7 @@ export default function CheckoutPage() {
                           <p className="text-orange-300 text-xs sm:text-sm flex items-start gap-2">
                             <span className="text-lg flex-shrink-0">₿</span>
                             <span>
-                              <span className="font-semibold">Pay with Cryptocurrency:</span> Click the button below to pay with Bitcoin, Ethereum, USDC, or other supported cryptocurrencies via Coinbase Commerce.
+                              <span className="font-semibold">Pay with Cryptocurrency:</span> Click the button below to pay with Bitcoin, Ethereum, USDC, or 150+ other cryptocurrencies via NOWPayments.
                             </span>
                           </p>
                         </div>
@@ -1135,7 +1135,7 @@ export default function CheckoutPage() {
                         </button>
 
                         <p className="text-center text-gray-500 text-xs mt-3">
-                          🔒 Secured by Coinbase Commerce • Instant confirmation
+                          🔒 Secured by NOWPayments • 150+ cryptocurrencies
                         </p>
 
                         {/* How it works */}
@@ -1144,7 +1144,7 @@ export default function CheckoutPage() {
                           <ol className="text-gray-500 text-xs space-y-1">
                             <li className="flex items-start gap-2">
                               <span className="text-orange-400">1.</span>
-                              <span>Click the button to open Coinbase Commerce</span>
+                              <span>Click the button to open NOWPayments</span>
                             </li>
                             <li className="flex items-start gap-2">
                               <span className="text-orange-400">2.</span>
@@ -1250,7 +1250,7 @@ export default function CheckoutPage() {
                     
                     {selectedPayment === 'crypto' && (
                       <p className="text-center text-gray-500 text-xs mb-6">
-                        You'll be redirected to Coinbase Commerce
+                        You'll be redirected to NOWPayments
                       </p>
                     )}
                   </>

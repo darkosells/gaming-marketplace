@@ -2,57 +2,58 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
-const COINBASE_WEBHOOK_SECRET = process.env.COINBASE_WEBHOOK_SECRET!
+const NOWPAYMENTS_IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET!
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// Verify webhook signature
-function verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
-  const hmac = crypto.createHmac('sha256', secret)
-  hmac.update(payload)
+// Verify IPN signature
+function verifySignature(payload: any, receivedSignature: string, secret: string): boolean {
+  // Sort parameters alphabetically
+  const sortedParams = JSON.stringify(payload, Object.keys(payload).sort())
+  
+  // Create HMAC SHA-512 signature
+  const hmac = crypto.createHmac('sha512', secret)
+  hmac.update(sortedParams)
   const computedSignature = hmac.digest('hex')
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(computedSignature)
-  )
+  
+  return computedSignature === receivedSignature
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const payload = await request.text()
-    const signature = request.headers.get('x-cc-webhook-signature')
+    const payload = await request.json()
+    const receivedSignature = request.headers.get('x-nowpayments-sig')
 
-    // Verify signature if secret is configured
-    if (COINBASE_WEBHOOK_SECRET && signature) {
-      const isValid = verifyWebhookSignature(payload, signature, COINBASE_WEBHOOK_SECRET)
+    console.log('NOWPayments webhook received:', payload)
+
+    // Verify signature if IPN secret is configured
+    if (NOWPAYMENTS_IPN_SECRET && receivedSignature) {
+      const isValid = verifySignature(payload, receivedSignature, NOWPAYMENTS_IPN_SECRET)
       if (!isValid) {
-        console.error('Invalid webhook signature')
+        console.error('Invalid IPN signature')
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
     }
 
-    const event = JSON.parse(payload)
-    console.log('Coinbase webhook received:', event.type)
-
     // Create Supabase client with service role for admin access
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-    const eventData = event.data
-    const orderId = eventData.metadata?.order_id
+    const orderId = payload.order_id
+    const paymentStatus = payload.payment_status
 
     if (!orderId) {
-      console.log('No order_id in webhook metadata, skipping')
+      console.log('No order_id in webhook payload, skipping')
       return NextResponse.json({ received: true })
     }
 
-    // Handle different event types (both charge and checkout events)
-    const eventType = event.type.replace('charge:', '').replace('checkout:', '')
-    
-    switch (eventType) {
-      case 'confirmed':
-      case 'completed':
-        // Payment confirmed on blockchain
-        console.log(`Payment confirmed for order ${orderId}`)
+    console.log(`Processing payment status: ${paymentStatus} for order: ${orderId}`)
+
+    // Handle different payment statuses
+    // NOWPayments statuses: waiting, confirming, confirmed, sending, partially_paid, finished, failed, refunded, expired
+    switch (paymentStatus) {
+      case 'finished':
+        // Payment completed successfully
+        console.log(`Payment finished for order ${orderId}`)
         
         // Update order to paid
         const { error: updateError } = await supabase
@@ -93,58 +94,63 @@ export async function POST(request: NextRequest) {
                   status: newStock <= 0 ? 'sold' : 'active'
                 })
                 .eq('id', order.listing_id)
+              
+              console.log(`Stock reduced for listing ${order.listing_id}: ${listing.stock} -> ${newStock}`)
             }
           }
         }
         break
 
-      case 'pending':
-        // Payment detected but not yet confirmed
-        console.log(`Payment pending for order ${orderId}`)
+      case 'confirmed':
+      case 'sending':
+        // Payment confirmed on blockchain, being processed
+        console.log(`Payment confirmed/sending for order ${orderId}`)
         await supabase
           .from('orders')
           .update({ payment_status: 'processing' })
           .eq('id', orderId)
         break
 
+      case 'confirming':
+        // Transaction detected, waiting for confirmations
+        console.log(`Payment confirming for order ${orderId}`)
+        await supabase
+          .from('orders')
+          .update({ payment_status: 'confirming' })
+          .eq('id', orderId)
+        break
+
+      case 'partially_paid':
+        // Customer sent less than required
+        console.log(`Payment partially paid for order ${orderId}`)
+        await supabase
+          .from('orders')
+          .update({ payment_status: 'partial' })
+          .eq('id', orderId)
+        break
+
       case 'failed':
       case 'expired':
-        // Payment failed or expired
-        console.log(`Payment failed/expired for order ${orderId}`)
+      case 'refunded':
+        // Payment failed, expired, or refunded
+        console.log(`Payment ${paymentStatus} for order ${orderId}`)
         await supabase
           .from('orders')
           .update({ 
             status: 'cancelled',
-            payment_status: 'failed' 
+            payment_status: paymentStatus 
           })
           .eq('id', orderId)
         break
 
-      case 'delayed':
-      case 'underpaid':
-        // Payment delayed (underpaid or taking long to confirm)
-        console.log(`Payment delayed/underpaid for order ${orderId}`)
-        await supabase
-          .from('orders')
-          .update({ payment_status: 'delayed' })
-          .eq('id', orderId)
-        break
-
-      case 'resolved':
-        // Previously delayed payment now resolved
-        console.log(`Payment resolved for order ${orderId}`)
-        await supabase
-          .from('orders')
-          .update({
-            status: 'paid',
-            payment_status: 'paid',
-            paid_at: new Date().toISOString()
-          })
-          .eq('id', orderId)
+      case 'waiting':
+        // Waiting for customer to send payment
+        console.log(`Payment waiting for order ${orderId}`)
+        // No action needed, order already in pending state
         break
 
       default:
-        console.log(`Unhandled event type: ${event.type}`)
+        console.log(`Unhandled payment status: ${paymentStatus}`)
     }
 
     return NextResponse.json({ received: true })
@@ -158,7 +164,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Coinbase may send GET requests to verify endpoint
+// NOWPayments may send GET requests to verify endpoint
 export async function GET() {
-  return NextResponse.json({ status: 'Webhook endpoint active' })
+  return NextResponse.json({ status: 'NOWPayments webhook endpoint active' })
 }
