@@ -14,6 +14,7 @@ import { useWithdrawalActions, useBulkActions } from './hooks/useVendorActions'
 // Tab Components
 import ListingsTab from './components/tabs/ListingsTab'
 import OrdersTab from './components/tabs/OrdersTab'
+import PurchasesTab from './components/tabs/PurchasesTab'
 import BalanceTab from './components/tabs/BalanceTab'
 import InventoryTab from './components/tabs/InventoryTab'
 import GuideTab from './components/tabs/GuideTab'
@@ -42,6 +43,7 @@ export default function VendorDashboardPage() {
     error,
     myListings,
     myOrders,
+    myPurchases,
     withdrawals,
     inventoryStats,
     activeListings,
@@ -294,6 +296,16 @@ export default function VendorDashboardPage() {
               >
                 🛒 <span className="hidden sm:inline">My </span>Orders ({myOrders.length})
               </button>
+              {/* NEW: My Purchases Tab */}
+              <button
+                onClick={() => setActiveTab('purchases')}
+                className={`px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-sm lg:text-base whitespace-nowrap ${activeTab === 'purchases'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+              >
+                🛍️ <span className="hidden sm:inline">My </span>Purchases ({myPurchases.length})
+              </button>
               <button
                 onClick={() => setActiveTab('balance')}
                 className={`px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-sm lg:text-base whitespace-nowrap ${activeTab === 'balance'
@@ -312,7 +324,7 @@ export default function VendorDashboardPage() {
               >
                 📊 Inventory
               </button>
-              {/* NEW: Seller Rank Tab */}
+              {/* Seller Rank Tab */}
               <button
                 onClick={() => setActiveTab('rank')}
                 className={`px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-sm lg:text-base whitespace-nowrap ${activeTab === 'rank'
@@ -416,6 +428,14 @@ export default function VendorDashboardPage() {
               />
             )}
 
+            {/* NEW: Purchases Tab Content */}
+            {activeTab === 'purchases' && (
+              <PurchasesTab
+                myPurchases={myPurchases}
+                activeTab={activeTab}
+              />
+            )}
+
             {activeTab === 'balance' && (
               <BalanceTab
                 totalEarnings={totalEarnings}
@@ -440,7 +460,7 @@ export default function VendorDashboardPage() {
               />
             )}
 
-            {/* NEW: Rank Tab Content */}
+            {/* Rank Tab Content */}
             {activeTab === 'rank' && (
               <VendorRankCard
                 currentRank={rankData.currentRank}

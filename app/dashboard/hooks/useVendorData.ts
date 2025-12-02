@@ -12,6 +12,7 @@ export function useVendorData() {
   const [error, setError] = useState<string | null>(null)
   const [myListings, setMyListings] = useState<Listing[]>([])
   const [myOrders, setMyOrders] = useState<Order[]>([])
+  const [myPurchases, setMyPurchases] = useState<Order[]>([]) // NEW: Purchases state
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [inventoryStats, setInventoryStats] = useState<InventoryStats>({
     lowStock: [],
@@ -80,6 +81,48 @@ export function useVendorData() {
       setMyOrders(mappedOrders)
     } catch (error) {
       console.error('Error fetching orders:', error)
+    }
+  }, [supabase])
+
+  // NEW: Fetch purchases (orders where vendor is the buyer)
+  const fetchMyPurchases = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          seller:profiles!seller_id (
+            username
+          ),
+          listing:listings (
+            title,
+            game,
+            image_url,
+            category
+          )
+        `)
+        .eq('buyer_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Fetch purchases error:', error)
+        return
+      }
+      
+      // Map to ensure consistent structure
+      const mappedPurchases = (data || []).map(order => ({
+        ...order,
+        listing: order.listing || {
+          title: order.listing_title || 'Unknown Item',
+          game: order.listing_game || 'N/A',
+          category: order.listing_category || 'account',
+          image_url: order.listing_image_url
+        }
+      }))
+
+      setMyPurchases(mappedPurchases)
+    } catch (error) {
+      console.error('Error fetching purchases:', error)
     }
   }, [supabase])
 
@@ -156,7 +199,7 @@ export function useVendorData() {
 
       setUser(user)
 
-      // UPDATED: Fetch profile with rank fields included
+      // Fetch profile with rank fields included
       const profilePromise = supabase
         .from('profiles')
         .select(`
@@ -197,9 +240,11 @@ export function useVendorData() {
         return
       }
 
+      // UPDATED: Include fetchMyPurchases in parallel fetch
       const results = await Promise.allSettled([
         fetchMyListings(user.id),
         fetchMyOrders(user.id),
+        fetchMyPurchases(user.id), // NEW: Fetch purchases
         fetchWithdrawals(user.id)
       ])
 
@@ -220,7 +265,7 @@ export function useVendorData() {
         router.push('/login')
       }
     }
-  }, [supabase, router, fetchMyListings, fetchMyOrders, fetchWithdrawals])
+  }, [supabase, router, fetchMyListings, fetchMyOrders, fetchMyPurchases, fetchWithdrawals])
 
   useEffect(() => {
     checkUser()
@@ -235,7 +280,7 @@ export function useVendorData() {
   const completedOrders = myOrders.filter(o => o.status === 'completed')
   const grossRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(String(o.amount)), 0)
   
-  // UPDATED: Use dynamic commission rate from profile (rank-based) instead of hardcoded 0.05
+  // Use dynamic commission rate from profile (rank-based) instead of hardcoded 0.05
   const commissionRate = profile?.commission_rate ?? 5.00
   const totalCommission = grossRevenue * (commissionRate / 100)
   const totalEarnings = grossRevenue * (1 - commissionRate / 100)
@@ -249,12 +294,18 @@ export function useVendorData() {
     o.status === 'delivered' ||
     o.status === 'dispute_raised'
   )
-  // UPDATED: Use dynamic commission rate for pending earnings
+  // Use dynamic commission rate for pending earnings
   const pendingEarnings = pendingOrders.reduce((sum, o) => sum + (parseFloat(String(o.amount)) * (1 - commissionRate / 100)), 0)
   const uniqueGames = Array.from(new Set(myListings.map(l => l.game))).sort()
   const uniqueOrderGames = Array.from(new Set(myOrders.map(o => o.listing?.game || o.listing_game).filter((g): g is string => Boolean(g)))).sort()
 
-  // NEW: Rank data for VendorRankCard
+  // NEW: Purchase derived values
+  const completedPurchases = myPurchases.filter(p => p.status === 'completed')
+  const pendingPurchases = myPurchases.filter(p => 
+    p.status === 'pending' || p.status === 'paid' || p.status === 'delivered'
+  )
+
+  // Rank data for VendorRankCard
   const rankData: RankData = {
     currentRank: (profile?.vendor_rank || 'nova') as VendorRank,
     commissionRate: profile?.commission_rate ?? 5.00,
@@ -267,7 +318,7 @@ export function useVendorData() {
     ? Math.floor((Date.now() - new Date(profile.vendor_since).getTime()) / (1000 * 60 * 60 * 24))
     : 0
 
-  // NEW: Rank progress data for VendorRankCard
+  // Rank progress data for VendorRankCard
   const rankProgress: RankProgress = {
     completedOrders: completedOrders.length,
     averageRating: profile?.average_rating ?? 0,
@@ -283,6 +334,7 @@ export function useVendorData() {
     error,
     myListings,
     myOrders,
+    myPurchases, // NEW: Export purchases
     withdrawals,
     inventoryStats,
     activeListings,
@@ -296,11 +348,15 @@ export function useVendorData() {
     pendingEarnings,
     uniqueGames,
     uniqueOrderGames,
+    // NEW: Purchase exports
+    completedPurchases,
+    pendingPurchases,
     fetchMyListings,
     fetchMyOrders,
+    fetchMyPurchases, // NEW: Export fetch function
     fetchWithdrawals,
     supabase,
-    // NEW: Rank exports
+    // Rank exports
     rankData,
     rankProgress
   }

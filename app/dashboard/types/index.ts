@@ -1,6 +1,6 @@
 // Vendor Dashboard Types
 
-export type VendorTab = 'listings' | 'orders' | 'balance' | 'inventory' | 'guide' | 'rank'
+export type VendorTab = 'listings' | 'orders' | 'purchases' | 'balance' | 'inventory' | 'guide' | 'rank'
 export type InventoryFilter = 'all' | 'low' | 'out' | 'over'
 export type InventorySort = 'stock' | 'value' | 'usage'
 
@@ -74,6 +74,9 @@ export interface Order {
   listing_category?: string
   listing_image_url?: string
   buyer?: {
+    username: string
+  }
+  seller?: {
     username: string
   }
   listing?: {

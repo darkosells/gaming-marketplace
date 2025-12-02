@@ -87,6 +87,9 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
   
   const supabase = createClient()
 
+  // Check if current user is the seller (owner) of this listing
+  const isOwnListing = user && listing && listing.seller_id === user.id
+
   useEffect(() => {
     checkUser()
     fetchReviews()
@@ -186,6 +189,17 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
     
     if (!listing) return
 
+    // Prevent buying own product
+    if (listing.seller_id === user.id) {
+      setModalMessage({
+        title: 'Cannot Buy Own Product',
+        message: 'You cannot purchase your own listing. This is your product!',
+        type: 'warning'
+      })
+      setShowModal(true)
+      return
+    }
+
     const cart = {
       listing_id: listing.id,
       quantity: quantity,
@@ -205,6 +219,17 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
     }
 
     if (!listing) return
+
+    // Prevent adding own product to cart
+    if (listing.seller_id === user.id) {
+      setModalMessage({
+        title: 'Cannot Add to Cart',
+        message: 'You cannot add your own listing to cart. This is your product!',
+        type: 'warning'
+      })
+      setShowModal(true)
+      return
+    }
 
     const existingCart = localStorage.getItem('cart')
     if (existingCart) {
@@ -374,6 +399,19 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
 
             {/* Content */}
             <div className="p-4 space-y-4">
+              {/* Own Listing Warning */}
+              {isOwnListing && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">⚠️</span>
+                    <div>
+                      <p className="text-yellow-300 font-semibold">This is your listing</p>
+                      <p className="text-yellow-300/70 text-sm">You cannot purchase your own product</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <p className="text-gray-400 text-sm mb-2">Price</p>
                 <p className="text-4xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
@@ -403,41 +441,53 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
               <div className="space-y-3">
                 <button
                   onClick={handleBuyNow}
-                  disabled={listing.stock === 0}
+                  disabled={listing.stock === 0 || isOwnListing}
                   className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed min-h-[52px]"
                 >
-                  {listing.stock === 0 ? '❌ Out of Stock' : '🚀 Buy Now'}
+                  {isOwnListing ? '🚫 Your Listing' : listing.stock === 0 ? '❌ Out of Stock' : '🚀 Buy Now'}
                 </button>
                 <button
                   onClick={handleAddToCart}
-                  disabled={listing.stock === 0}
+                  disabled={listing.stock === 0 || isOwnListing}
                   className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-xl font-bold text-lg border-2 border-white/20 hover:border-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed min-h-[52px]"
                 >
-                  🛒 Add to Cart
+                  {isOwnListing ? '🚫 Cannot Add' : '🛒 Add to Cart'}
                 </button>
-                <button
-                  onClick={handleContactSeller}
-                  className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 py-4 rounded-xl font-bold text-lg border-2 border-blue-500/50 transition-all duration-300 min-h-[52px]"
-                >
-                  💬 Contact Seller
-                </button>
+                {!isOwnListing && (
+                  <button
+                    onClick={handleContactSeller}
+                    className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 py-4 rounded-xl font-bold text-lg border-2 border-blue-500/50 transition-all duration-300 min-h-[52px]"
+                  >
+                    💬 Contact Seller
+                  </button>
+                )}
+                {isOwnListing && (
+                  <Link
+                    href="/dashboard?tab=listings"
+                    className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 py-4 rounded-xl font-bold text-lg border-2 border-purple-500/50 transition-all duration-300 min-h-[52px] flex items-center justify-center"
+                  >
+                    ✏️ Edit in Dashboard
+                  </Link>
+                )}
               </div>
 
               {/* Trust Badges */}
-              <div className="space-y-3 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border border-green-500/20">
-                <div className="flex items-center space-x-3 text-sm text-gray-300">
-                  <span className="text-green-400 text-xl">✓</span>
-                  <span>Secure Payment</span>
+              {!isOwnListing && (
+                <div className="space-y-3 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border border-green-500/20">
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400 text-xl">✓</span>
+                    <span>Secure Payment</span>
+                  </div>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400 text-xl">✓</span>
+                    <span>48h Buyer Protection</span>
+                  </div>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400 text-xl">✓</span>
+                    <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-3 text-sm text-gray-300">
-                  <span className="text-green-400 text-xl">✓</span>
-                  <span>48h Buyer Protection</span>
-                </div>
-                <div className="flex items-center space-x-3 text-sm text-gray-300">
-                  <span className="text-green-400 text-xl">✓</span>
-                  <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -499,6 +549,27 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
         </div>
 
         <div className="container mx-auto px-3 sm:px-4 pb-8 sm:pb-12">
+          {/* Own Listing Banner */}
+          {isOwnListing && (
+            <div className="mb-4 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-2xl p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">👋</span>
+                  <div>
+                    <p className="text-yellow-300 font-bold text-lg">This is your listing!</p>
+                    <p className="text-yellow-300/70 text-sm">You're viewing your own product as it appears to buyers</p>
+                  </div>
+                </div>
+                <Link
+                  href="/dashboard?tab=listings"
+                  className="bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 px-4 py-2 rounded-xl font-semibold border border-yellow-500/50 transition whitespace-nowrap text-sm"
+                >
+                  ✏️ Edit Listing
+                </Link>
+              </div>
+            </div>
+          )}
+
           <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {/* Left Column - Product Info */}
             <div className="lg:col-span-2 space-y-4 sm:space-y-6">
@@ -559,6 +630,14 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                       </span>
                     )}
                   </div>
+                  {/* Own Listing Badge */}
+                  {isOwnListing && (
+                    <div className="absolute top-2 sm:top-4 right-2 sm:right-4">
+                      <span className="bg-yellow-500/80 backdrop-blur-lg px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold">
+                        👤 Your Listing
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Product Details */}
@@ -810,6 +889,19 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
             <div className="hidden lg:block space-y-6">
               {/* Purchase Card */}
               <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-all duration-300">
+                {/* Own Listing Warning */}
+                {isOwnListing && (
+                  <div className="mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">⚠️</span>
+                      <div>
+                        <p className="text-yellow-300 font-semibold">Your Listing</p>
+                        <p className="text-yellow-300/70 text-sm">You cannot purchase this</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="mb-6">
                   <p className="text-gray-400 text-sm mb-2">Price</p>
                   <p className="text-5xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
@@ -839,41 +931,53 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                 <div className="space-y-3">
                   <button
                     onClick={handleBuyNow}
-                    disabled={listing.stock === 0}
-                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02]"
+                    disabled={listing.stock === 0 || isOwnListing}
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] disabled:hover:scale-100"
                   >
-                    {listing.stock === 0 ? '❌ Out of Stock' : '🚀 Buy Now'}
+                    {isOwnListing ? '🚫 Your Listing' : listing.stock === 0 ? '❌ Out of Stock' : '🚀 Buy Now'}
                   </button>
                   <button
                     onClick={handleAddToCart}
-                    disabled={listing.stock === 0}
-                    className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-xl font-bold text-lg border-2 border-white/20 hover:border-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02]"
+                    disabled={listing.stock === 0 || isOwnListing}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-xl font-bold text-lg border-2 border-white/20 hover:border-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] disabled:hover:scale-100"
                   >
-                    🛒 Add to Cart
+                    {isOwnListing ? '🚫 Cannot Add' : '🛒 Add to Cart'}
                   </button>
-                  <button
-                    onClick={handleContactSeller}
-                    className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 py-4 rounded-xl font-bold text-lg border-2 border-blue-500/50 transition-all duration-300 hover:scale-[1.02]"
-                  >
-                    💬 Contact Seller
-                  </button>
+                  {!isOwnListing && (
+                    <button
+                      onClick={handleContactSeller}
+                      className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 py-4 rounded-xl font-bold text-lg border-2 border-blue-500/50 transition-all duration-300 hover:scale-[1.02]"
+                    >
+                      💬 Contact Seller
+                    </button>
+                  )}
+                  {isOwnListing && (
+                    <Link
+                      href="/dashboard?tab=listings"
+                      className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 py-4 rounded-xl font-bold text-lg border-2 border-purple-500/50 transition-all duration-300 hover:scale-[1.02] flex items-center justify-center"
+                    >
+                      ✏️ Edit in Dashboard
+                    </Link>
+                  )}
                 </div>
 
                 {/* Trust Badges */}
-                <div className="mt-6 space-y-3 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border border-green-500/20">
-                  <div className="flex items-center space-x-3 text-sm text-gray-300">
-                    <span className="text-green-400 text-xl">✓</span>
-                    <span>Secure Payment</span>
+                {!isOwnListing && (
+                  <div className="mt-6 space-y-3 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border border-green-500/20">
+                    <div className="flex items-center space-x-3 text-sm text-gray-300">
+                      <span className="text-green-400 text-xl">✓</span>
+                      <span>Secure Payment</span>
+                    </div>
+                    <div className="flex items-center space-x-3 text-sm text-gray-300">
+                      <span className="text-green-400 text-xl">✓</span>
+                      <span>48h Buyer Protection</span>
+                    </div>
+                    <div className="flex items-center space-x-3 text-sm text-gray-300">
+                      <span className="text-green-400 text-xl">✓</span>
+                      <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-3 text-sm text-gray-300">
-                    <span className="text-green-400 text-xl">✓</span>
-                    <span>48h Buyer Protection</span>
-                  </div>
-                  <div className="flex items-center space-x-3 text-sm text-gray-300">
-                    <span className="text-green-400 text-xl">✓</span>
-                    <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Seller Info Card (Desktop) */}
@@ -904,6 +1008,9 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                       </Link>
                       {sellerVerified && (
                         <span className="text-blue-400 text-xl flex-shrink-0" title="Verified Seller">✓</span>
+                      )}
+                      {isOwnListing && (
+                        <span className="bg-yellow-500/20 text-yellow-300 text-xs px-2 py-0.5 rounded-full font-semibold">You</span>
                       )}
                     </div>
                     <p className="text-sm text-gray-400">Member since {sellerJoinDate}</p>
@@ -975,12 +1082,15 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
+                  <div className="flex items-center space-x-2 mb-1 flex-wrap gap-1">
                     <Link href={`/seller/${sellerId}`} className="text-white font-bold text-base sm:text-lg hover:text-purple-400 transition truncate">
                       {sellerUsername}
                     </Link>
                     {sellerVerified && (
                       <span className="text-blue-400 text-lg sm:text-xl flex-shrink-0" title="Verified Seller">✓</span>
+                    )}
+                    {isOwnListing && (
+                      <span className="bg-yellow-500/20 text-yellow-300 text-xs px-2 py-0.5 rounded-full font-semibold">You</span>
                     )}
                   </div>
                   <p className="text-xs sm:text-sm text-gray-400 truncate">Member since {sellerJoinDate}</p>
@@ -1036,13 +1146,22 @@ export default function ListingDetailClient({ initialListing, listingId }: Props
                 ${listing.price.toFixed(2)}
               </p>
             </div>
-            <button
-              onClick={() => setShowMobilePurchase(true)}
-              disabled={listing.stock === 0}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap min-h-[48px] text-sm sm:text-base"
-            >
-              {listing.stock === 0 ? '❌ Out of Stock' : '🚀 Purchase'}
-            </button>
+            {isOwnListing ? (
+              <Link
+                href="/dashboard?tab=listings"
+                className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold hover:shadow-lg transition-all duration-300 whitespace-nowrap min-h-[48px] text-sm sm:text-base flex items-center"
+              >
+                ✏️ Edit Listing
+              </Link>
+            ) : (
+              <button
+                onClick={() => setShowMobilePurchase(true)}
+                disabled={listing.stock === 0}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap min-h-[48px] text-sm sm:text-base"
+              >
+                {listing.stock === 0 ? '❌ Out of Stock' : '🚀 Purchase'}
+              </button>
+            )}
           </div>
         </div>
 
