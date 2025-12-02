@@ -95,6 +95,11 @@ export default function Footer() {
                   Cookie Policy
                 </Link>
               </li>
+              <li>
+                <Link href="/seller-rules" className="hover:text-white transition">
+                  Seller Rules
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

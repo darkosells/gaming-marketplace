@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 
 export default function SellerRulesPage() {
   const [activeSection, setActiveSection] = useState<string | null>(null)
@@ -54,10 +55,17 @@ export default function SellerRulesPage() {
           subtitle: 'Withdrawal Policies',
           items: [
             'Funds are available for withdrawal after the 48-hour buyer protection period',
-            'Minimum withdrawal amount: $10.00',
             'Withdrawals are processed within 1-3 business days',
-            'Available withdrawal methods: Bitcoin, Skrill (more coming soon)',
-            'Withdrawal fees may apply depending on the payment method'
+            'Four withdrawal methods are available with different fees and minimums'
+          ]
+        },
+        {
+          subtitle: 'Withdrawal Methods & Fees',
+          items: [
+            '₿ Bitcoin: Minimum $100 | Fee: 6% + $20 | Processed in 24-48 hours',
+            '💳 Skrill: Minimum $10 | Fee: 5% + $1 | Sent in EUR, 1-2 business days',
+            '🅿️ Payoneer: Minimum $20 | Fee: 2% + $1.50 | Sent in USD, 1-2 business days',
+            '🌐 Wise: Minimum $10 | Fee: 1% + $0.50 | Sent in USD, typically 1 business day (Lowest fees!)'
           ]
         }
       ]
@@ -377,6 +385,43 @@ export default function SellerRulesPage() {
             </div>
           </div>
 
+          {/* Withdrawal Methods Quick Reference */}
+          <div className="bg-slate-900/60 backdrop-blur-lg border border-slate-700/50 rounded-xl p-4 sm:p-5 mb-6 sm:mb-8">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <span className="text-xl">💸</span>
+              Withdrawal Methods at a Glance
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 text-center">
+                <div className="text-2xl mb-1">₿</div>
+                <p className="text-white font-medium text-sm">Bitcoin</p>
+                <p className="text-gray-400 text-xs">6% + $20</p>
+                <p className="text-gray-500 text-[10px]">Min $100</p>
+              </div>
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 text-center">
+                <div className="text-2xl mb-1">💳</div>
+                <p className="text-white font-medium text-sm">Skrill</p>
+                <p className="text-gray-400 text-xs">5% + $1</p>
+                <p className="text-gray-500 text-[10px]">Min $10</p>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-center">
+                <div className="text-2xl mb-1">🅿️</div>
+                <p className="text-white font-medium text-sm">Payoneer</p>
+                <p className="text-gray-400 text-xs">2% + $1.50</p>
+                <p className="text-gray-500 text-[10px]">Min $20</p>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center relative">
+                <div className="absolute -top-2 -right-2 bg-green-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold">
+                  BEST
+                </div>
+                <div className="text-2xl mb-1">🌐</div>
+                <p className="text-white font-medium text-sm">Wise</p>
+                <p className="text-gray-400 text-xs">1% + $0.50</p>
+                <p className="text-gray-500 text-[10px]">Min $10</p>
+              </div>
+            </div>
+          </div>
+
           {/* Important Notice */}
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 sm:p-5 mb-6 sm:mb-8">
             <div className="flex items-start gap-3">
@@ -463,6 +508,9 @@ export default function SellerRulesPage() {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }
