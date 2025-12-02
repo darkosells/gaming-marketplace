@@ -297,9 +297,6 @@ export default function CartPage() {
                       <div className="flex items-center gap-2 mb-3 sm:mb-4 bg-white/5 rounded-lg px-3 py-2 border border-white/10">
                         <span className="text-gray-400 text-xs sm:text-sm">Quantity:</span>
                         <span className="text-white font-semibold text-sm sm:text-base">1</span>
-                        <span className="text-xs text-gray-500 ml-auto">
-                          ({cartItem.listing.stock} in stock)
-                        </span>
                       </div>
 
                       <div className="flex items-center justify-between">

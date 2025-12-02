@@ -146,8 +146,8 @@ export default function GamePageClient({ slug }: Props) {
           if (Math.abs(ratingDiff) > 0.5) return ratingDiff
           
           // 3. Instant delivery priority (if ratings are similar)
-          if (a.delivery_type === 'instant' && b.delivery_type !== 'instant') return -1
-          if (b.delivery_type === 'instant' && a.delivery_type !== 'instant') return 1
+          if (a.delivery_type === 'automatic' && b.delivery_type !== 'automatic') return -1
+          if (b.delivery_type === 'automatic' && a.delivery_type !== 'automatic') return 1
           
           // 4. Number of reviews (more reviews = more established seller)
           const reviewsA = a.profiles?.total_reviews || 0
@@ -469,8 +469,8 @@ export default function GamePageClient({ slug }: Props) {
                     }}
                   >
                     <option value="all">All Types</option>
-                    <option value="instant">⚡ Instant Delivery</option>
-                    <option value="manual">📦 Manual Delivery (up to 48h)</option>
+                    <option value="automatic">⚡ Instant Delivery</option>
+                    <option value="manual">📦 Manual Delivery (up to 24h)</option>
                   </select>
                 </div>
 
@@ -611,7 +611,7 @@ export default function GamePageClient({ slug }: Props) {
                       <span
                         className="inline-flex items-center gap-1 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-xs text-blue-300"
                       >
-                        {selectedDeliveryType === 'instant' ? '⚡ Instant' : '📦 Manual'}
+                        {selectedDeliveryType === 'automatic' ? '⚡ Instant' : '📦 Manual'}
                       </span>
                     )}
                   </div>
@@ -667,7 +667,8 @@ export default function GamePageClient({ slug }: Props) {
                                 </span>
                               </div>
                             )}
-                            <div className="absolute top-3 left-3 flex flex-col gap-2">
+                            {/* Category Badge - Top Left */}
+                            <div className="absolute top-3 left-3">
                               <span className="bg-black/60 backdrop-blur-lg px-3 py-1.5 rounded-full text-xs text-white font-semibold border border-white/10">
                                 {listing.category === 'account'
                                   ? '🎮 Account'
@@ -677,22 +678,25 @@ export default function GamePageClient({ slug }: Props) {
                                   ? '💰 Currency'
                                   : '🔑 Key'}
                               </span>
-                              {listing.delivery_type === 'instant' && (
+                            </div>
+                            {/* Delivery Type Badge - Top Right */}
+                            <div className="absolute top-3 right-3">
+                              {listing.delivery_type === 'automatic' ? (
                                 <span className="bg-green-500/80 backdrop-blur-lg px-3 py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                   </svg>
                                   Instant
                                 </span>
+                              ) : (
+                                <span className="bg-blue-500/80 backdrop-blur-lg px-3 py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  24 Hours 
+                                </span>
                               )}
                             </div>
-                            {listing.stock <= 3 && listing.stock > 0 && (
-                              <div className="absolute top-3 right-3">
-                                <span className="bg-orange-500/80 backdrop-blur-lg px-3 py-1.5 rounded-full text-xs text-white font-semibold">
-                                  Only {listing.stock} left!
-                                </span>
-                              </div>
-                            )}
                           </div>
                           <div className="relative p-5">
                             <h3 className="text-white font-bold text-lg mb-2 group-hover:text-purple-400 transition line-clamp-1">
