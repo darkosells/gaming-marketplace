@@ -42,13 +42,11 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [selectedPayment, setSelectedPayment] = useState('paypal') // Default to PayPal now
-  const [showComingSoon, setShowComingSoon] = useState(false)
   const [showMobileSummary, setShowMobileSummary] = useState(false)
   const [paypalLoaded, setPaypalLoaded] = useState(false)
   const [paypalError, setPaypalError] = useState<string | null>(null)
-  const paypalButtonsRef = useRef<HTMLDivElement>(null)
-  const paypalButtonsRendered = useRef(false)
-  const paypalOrderId = useRef<string | null>(null)
+  const [cryptoLoading, setCryptoLoading] = useState(false)
+  const [cryptoError, setCryptoError] = useState<string | null>(null)
   
   // Billing form state
   const [billingInfo, setBillingInfo] = useState({
@@ -60,6 +58,79 @@ export default function CheckoutPage() {
     country: '',
     zipCode: ''
   })
+  
+  // Form validation
+  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({})
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
+  
+  const validateForm = () => {
+    const errors: {[key: string]: string} = {}
+    
+    if (!billingInfo.firstName.trim()) {
+      errors.firstName = 'First name is required'
+    }
+    if (!billingInfo.lastName.trim()) {
+      errors.lastName = 'Last name is required'
+    }
+    if (!billingInfo.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billingInfo.email)) {
+      errors.email = 'Please enter a valid email'
+    }
+    
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+  
+  const isFormValid = billingInfo.firstName.trim() && 
+                      billingInfo.lastName.trim() && 
+                      billingInfo.email.trim() &&
+                      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billingInfo.email)
+  
+  // Convert PayPal errors to user-friendly messages
+  const getPayPalErrorMessage = (error: any): string => {
+    const errorString = error?.message || error?.toString() || ''
+    
+    if (errorString.includes('INSTRUMENT_DECLINED')) {
+      return 'Your payment method was declined. Please try a different card or payment method.'
+    }
+    if (errorString.includes('PAYER_ACTION_REQUIRED')) {
+      return 'Additional action required. Please complete the verification in PayPal.'
+    }
+    if (errorString.includes('ORDER_NOT_APPROVED')) {
+      return 'Payment was not approved. Please try again.'
+    }
+    if (errorString.includes('PERMISSION_DENIED')) {
+      return 'Payment permission denied. Please contact support.'
+    }
+    if (errorString.includes('INTERNAL_SERVER_ERROR') || errorString.includes('500')) {
+      return 'PayPal is experiencing issues. Please try again in a few minutes.'
+    }
+    if (errorString.includes('RESOURCE_NOT_FOUND')) {
+      return 'Payment session expired. Please refresh and try again.'
+    }
+    if (errorString.includes('INVALID_CURRENCY_CODE')) {
+      return 'Currency not supported. Please contact support.'
+    }
+    if (errorString.includes('Window closed') || errorString.includes('popup')) {
+      return 'Payment window was closed. Please try again.'
+    }
+    if (errorString.includes('Network') || errorString.includes('fetch')) {
+      return 'Network error. Please check your internet connection and try again.'
+    }
+    
+    return error?.message || 'Payment failed. Please try again or use a different payment method.'
+  }
+  
+  const paypalButtonsRef = useRef<HTMLDivElement>(null)
+  const paypalButtonsRendered = useRef(false)
+  const paypalOrderId = useRef<string | null>(null)
+  const billingInfoRef = useRef(billingInfo)
+  
+  // Keep billingInfoRef in sync with state
+  useEffect(() => {
+    billingInfoRef.current = billingInfo
+  }, [billingInfo])
 
   const supabase = createClient()
 
@@ -125,10 +196,36 @@ export default function CheckoutPage() {
           height: 50
         },
         
+        // Check form before allowing PayPal
+        onClick: (data: any, actions: any) => {
+          if (!validateForm()) {
+            setPaypalError('Please fill in all required billing fields before paying.')
+            return actions.reject()
+          }
+          setPaypalError(null)
+          return actions.resolve()
+        },
+        
         // Create PayPal order
         createOrder: async (data: any, actions: any) => {
+          // Use ref to get latest billing info values
+          const billing = billingInfoRef.current
+          
           const orderId = await actions.order.create({
             intent: 'CAPTURE',
+            payer: {
+              name: {
+                given_name: billing.firstName || undefined,
+                surname: billing.lastName || undefined,
+              },
+              email_address: billing.email || undefined,
+              address: billing.address ? {
+                address_line_1: billing.address,
+                admin_area_2: billing.city || undefined,
+                postal_code: billing.zipCode || undefined,
+                country_code: billing.country || undefined,
+              } : undefined,
+            },
             purchase_units: [{
               description: `Nashflare - ${cartItem.listing.title}`.substring(0, 127),
               amount: {
@@ -173,6 +270,12 @@ export default function CheckoutPage() {
           setProcessing(true)
           setPaypalError(null)
           
+          // Set a timeout to prevent infinite processing state (60 seconds)
+          const processingTimeout = setTimeout(() => {
+            setPaypalError('Payment is taking too long. Please check your PayPal account or try again.')
+            setProcessing(false)
+          }, 60000)
+          
           const ppOrderId = data.orderID || paypalOrderId.current
           console.log('Payment approved! PayPal Order ID:', ppOrderId)
           
@@ -186,6 +289,8 @@ export default function CheckoutPage() {
               },
               body: JSON.stringify({ orderId: ppOrderId }),
             })
+            
+            clearTimeout(processingTimeout)
             
             const captureResult = await captureResponse.json()
             console.log('Server capture result:', captureResult)
@@ -203,15 +308,16 @@ export default function CheckoutPage() {
             }
             
           } catch (error: any) {
+            clearTimeout(processingTimeout)
             console.error('Payment capture error:', error)
-            setPaypalError(error.message || 'Payment failed. Please try again.')
+            setPaypalError(getPayPalErrorMessage(error))
             setProcessing(false)
           }
         },
 
         onError: (err: any) => {
           console.error('PayPal error:', err)
-          setPaypalError('An error occurred with PayPal. Please try again.')
+          setPaypalError(getPayPalErrorMessage(err))
           setProcessing(false)
         },
 
@@ -353,8 +459,7 @@ export default function CheckoutPage() {
   const handleTestOrder = async () => {
     if (!cartItem || !user) return
 
-    if (!billingInfo.firstName || !billingInfo.lastName || !billingInfo.email) {
-      alert('Please fill in all required billing information')
+    if (!validateForm()) {
       return
     }
 
@@ -400,12 +505,60 @@ export default function CheckoutPage() {
     }
   }
 
+  // Handle crypto payment via Coinbase Commerce
+  const handleCryptoPayment = async () => {
+    if (!cartItem || !user) return
+
+    if (!validateForm()) {
+      return
+    }
+
+    setCryptoLoading(true)
+    setCryptoError(null)
+
+    try {
+      const response = await fetch('/api/coinbase/create-charge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          listingId: cartItem.listing.id,
+          listingTitle: cartItem.listing.title,
+          amount: cartItem.listing.price * cartItem.quantity,
+          quantity: cartItem.quantity,
+          buyerId: user.id,
+          sellerId: cartItem.listing.seller_id,
+          billingEmail: billingInfo.email
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to create crypto payment')
+      }
+
+      // Clear cart before redirecting
+      localStorage.removeItem('cart')
+      window.dispatchEvent(new Event('cart-updated'))
+
+      // Redirect to Coinbase Commerce hosted checkout
+      window.location.href = result.hostedUrl
+
+    } catch (error: any) {
+      console.error('Crypto payment error:', error)
+      setCryptoError(error.message || 'Failed to initiate crypto payment. Please try again.')
+      setCryptoLoading(false)
+    }
+  }
+
   const handlePlaceOrder = async () => {
     if (!cartItem || !user) return
 
-    // For crypto, show coming soon
+    // For crypto, use Coinbase Commerce
     if (selectedPayment === 'crypto') {
-      setShowComingSoon(true)
+      await handleCryptoPayment()
       return
     }
 
@@ -582,33 +735,45 @@ export default function CheckoutPage() {
                     <input
                       type="text"
                       value={billingInfo.firstName}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, firstName: e.target.value })}
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      onChange={(e) => {
+                        setBillingInfo({ ...billingInfo, firstName: e.target.value })
+                        if (formErrors.firstName) setFormErrors({ ...formErrors, firstName: '' })
+                      }}
+                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border ${formErrors.firstName ? 'border-red-500' : 'border-white/10'} text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition`}
                       placeholder="John"
                       required
                     />
+                    {formErrors.firstName && <p className="text-red-400 text-xs mt-1">{formErrors.firstName}</p>}
                   </div>
                   <div>
                     <label className="block text-white font-medium mb-2 text-xs sm:text-sm">Last Name *</label>
                     <input
                       type="text"
                       value={billingInfo.lastName}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, lastName: e.target.value })}
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      onChange={(e) => {
+                        setBillingInfo({ ...billingInfo, lastName: e.target.value })
+                        if (formErrors.lastName) setFormErrors({ ...formErrors, lastName: '' })
+                      }}
+                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border ${formErrors.lastName ? 'border-red-500' : 'border-white/10'} text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition`}
                       placeholder="Doe"
                       required
                     />
+                    {formErrors.lastName && <p className="text-red-400 text-xs mt-1">{formErrors.lastName}</p>}
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-white font-medium mb-2 text-xs sm:text-sm">Email *</label>
                     <input
                       type="email"
                       value={billingInfo.email}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, email: e.target.value })}
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
+                      onChange={(e) => {
+                        setBillingInfo({ ...billingInfo, email: e.target.value })
+                        if (formErrors.email) setFormErrors({ ...formErrors, email: '' })
+                      }}
+                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border ${formErrors.email ? 'border-red-500' : 'border-white/10'} text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition`}
                       placeholder="john@example.com"
                       required
                     />
+                    {formErrors.email && <p className="text-red-400 text-xs mt-1">{formErrors.email}</p>}
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-white font-medium mb-2 text-xs sm:text-sm">Address</label>
@@ -659,6 +824,12 @@ export default function CheckoutPage() {
                       placeholder="10001"
                     />
                   </div>
+                </div>
+                
+                {/* Email confirmation note */}
+                <div className="mt-4 flex items-start gap-2 text-gray-400 text-xs">
+                  <span className="text-green-400">✉️</span>
+                  <span>Order confirmation will be sent to <span className="text-white">{billingInfo.email || 'your email'}</span></span>
                 </div>
               </div>
 
@@ -713,11 +884,11 @@ export default function CheckoutPage() {
                     </div>
                   </label>
 
-                  {/* Cryptocurrency (Coming Soon) */}
+                  {/* Cryptocurrency via Coinbase Commerce */}
                   <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
                     selectedPayment === 'crypto' 
-                      ? 'bg-purple-500/20 border-purple-500/50' 
-                      : 'bg-slate-800/50 border-white/10 hover:border-purple-500/30'
+                      ? 'bg-orange-500/20 border-orange-500/50' 
+                      : 'bg-slate-800/50 border-white/10 hover:border-orange-500/30'
                   }`}>
                     <input
                       type="radio"
@@ -728,21 +899,25 @@ export default function CheckoutPage() {
                       className="sr-only"
                     />
                     <div className={`w-5 h-5 rounded-full border-2 mr-3 sm:mr-4 flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0 ${
-                      selectedPayment === 'crypto' ? 'border-purple-500' : 'border-gray-500'
+                      selectedPayment === 'crypto' ? 'border-orange-500' : 'border-gray-500'
                     }`}>
                       {selectedPayment === 'crypto' && (
-                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                        <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
                         <span>Cryptocurrency</span>
-                        <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded whitespace-nowrap">COMING SOON</span>
                       </p>
-                      <p className="text-gray-400 text-xs sm:text-sm">Bitcoin, Ethereum, USDT via Coinbase Commerce</p>
+                      <p className="text-gray-400 text-xs sm:text-sm">Bitcoin, Ethereum, USDC, Litecoin & more</p>
                     </div>
-                    <div className="flex gap-2 ml-2 flex-shrink-0">
-                      <span className="text-xl sm:text-2xl">₿</span>
+                    <div className="flex gap-1 sm:gap-2 ml-2 flex-shrink-0">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-lg flex items-center justify-center">
+                        <span className="text-white font-bold text-xs">₿</span>
+                      </div>
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                        <span className="text-white font-bold text-xs">Ξ</span>
+                      </div>
                     </div>
                   </label>
 
@@ -783,12 +958,37 @@ export default function CheckoutPage() {
                 {/* PayPal Buttons Container */}
                 {selectedPayment === 'paypal' && (
                   <div className="mt-6">
+                    {/* Form validation warning */}
+                    {!isFormValid && (
+                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl mb-4">
+                        <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
+                          <span className="text-lg flex-shrink-0">⚠️</span>
+                          <span>
+                            <span className="font-semibold">Please complete billing info:</span> Fill in your name and email above before paying.
+                          </span>
+                        </p>
+                      </div>
+                    )}
+                    
                     {paypalError ? (
                       <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
-                        <p className="text-red-400 text-sm flex items-start gap-2">
-                          <span className="text-lg flex-shrink-0">⚠️</span>
-                          <span>{paypalError}</span>
-                        </p>
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl flex-shrink-0">❌</span>
+                          <div className="flex-1">
+                            <p className="text-red-400 font-semibold mb-1">Payment Failed</p>
+                            <p className="text-red-300 text-sm">{paypalError}</p>
+                            <button
+                              onClick={() => {
+                                setPaypalError(null)
+                                paypalButtonsRendered.current = false
+                                renderPayPalButtons()
+                              }}
+                              className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg text-red-300 text-sm font-medium transition-all"
+                            >
+                              🔄 Try Again
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ) : !paypalLoaded ? (
                       <div className="p-4 bg-slate-800/50 rounded-xl flex items-center justify-center">
@@ -798,31 +998,34 @@ export default function CheckoutPage() {
                         </div>
                       </div>
                     ) : processing ? (
-                      <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl flex items-center justify-center">
-                        <div className="flex items-center gap-3 text-blue-400">
-                          <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
-                          <span>Processing payment...</span>
+                      <div className="p-6 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                        <div className="flex flex-col items-center justify-center gap-4">
+                          <div className="w-12 h-12 border-4 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
+                          <div className="text-center">
+                            <p className="text-blue-400 font-semibold text-lg">Processing Payment...</p>
+                            <p className="text-gray-400 text-sm mt-1">Please wait while we confirm your payment</p>
+                          </div>
                         </div>
                       </div>
                     ) : (
                       <>
                         <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl mb-4">
                           <p className="text-blue-300 text-xs sm:text-sm flex items-start gap-2">
-                            <span className="text-lg flex-shrink-0">ℹ️</span>
+                            <span className="text-lg flex-shrink-0">🔒</span>
                             <span>
                               <span className="font-semibold">Secure Payment:</span> Click the PayPal button below to complete your purchase. 
                               You can pay with your PayPal balance or any credit/debit card.
                             </span>
                           </p>
                         </div>
-                        <div className="paypal-buttons-wrapper bg-slate-800/50 rounded-xl p-4 sm:p-6">
+                        <div className={`paypal-buttons-wrapper bg-slate-800/50 rounded-xl p-4 sm:p-6 ${!isFormValid ? 'opacity-50 pointer-events-none' : ''}`}>
                           <div 
                             ref={paypalButtonsRef} 
                             className="paypal-buttons-container min-h-[150px] w-full"
                           ></div>
                         </div>
                         <p className="text-center text-gray-500 text-xs mt-3">
-                          🔒 Secured by PayPal
+                          🔒 Secured by PayPal • 256-bit SSL encryption
                         </p>
                       </>
                     )}
@@ -842,18 +1045,119 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {/* Crypto Payment Section */}
                 {selectedPayment === 'crypto' && (
-                  <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/30">
-                    <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
-                      <span className="text-base sm:text-lg flex-shrink-0">🚧</span>
-                      <span>
-                        <span className="font-semibold">Coming Soon:</span> Cryptocurrency payments via Coinbase Commerce are being integrated. 
-                        Want to be notified when this goes live? Email us at{' '}
-                        <a href="mailto:contact@nashflare.com" className="text-yellow-200 underline hover:text-white transition">
-                          contact@nashflare.com
-                        </a>
-                      </span>
-                    </p>
+                  <div className="mt-6">
+                    {/* Form validation warning */}
+                    {!isFormValid && (
+                      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl mb-4">
+                        <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
+                          <span className="text-lg flex-shrink-0">⚠️</span>
+                          <span>
+                            <span className="font-semibold">Please complete billing info:</span> Fill in your name and email above before paying.
+                          </span>
+                        </p>
+                      </div>
+                    )}
+
+                    {cryptoError ? (
+                      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl flex-shrink-0">❌</span>
+                          <div className="flex-1">
+                            <p className="text-red-400 font-semibold mb-1">Payment Failed</p>
+                            <p className="text-red-300 text-sm">{cryptoError}</p>
+                            <button
+                              onClick={() => setCryptoError(null)}
+                              className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg text-red-300 text-sm font-medium transition-all"
+                            >
+                              🔄 Try Again
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : cryptoLoading ? (
+                      <div className="p-6 bg-orange-500/10 border border-orange-500/30 rounded-xl">
+                        <div className="flex flex-col items-center justify-center gap-4">
+                          <div className="w-12 h-12 border-4 border-orange-400/30 border-t-orange-400 rounded-full animate-spin"></div>
+                          <div className="text-center">
+                            <p className="text-orange-400 font-semibold text-lg">Preparing Crypto Checkout...</p>
+                            <p className="text-gray-400 text-sm mt-1">You'll be redirected to Coinbase Commerce</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-xl mb-4">
+                          <p className="text-orange-300 text-xs sm:text-sm flex items-start gap-2">
+                            <span className="text-lg flex-shrink-0">₿</span>
+                            <span>
+                              <span className="font-semibold">Pay with Cryptocurrency:</span> Click the button below to pay with Bitcoin, Ethereum, USDC, or other supported cryptocurrencies via Coinbase Commerce.
+                            </span>
+                          </p>
+                        </div>
+
+                        {/* Supported Cryptocurrencies */}
+                        <div className="bg-slate-800/50 rounded-xl p-4 sm:p-6 mb-4">
+                          <p className="text-gray-400 text-xs mb-3 text-center">Supported Cryptocurrencies</p>
+                          <div className="flex justify-center gap-3 flex-wrap">
+                            <div className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                              <span className="text-orange-400 font-bold">₿</span>
+                              <span className="text-white text-sm">Bitcoin</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                              <span className="text-blue-400 font-bold">Ξ</span>
+                              <span className="text-white text-sm">Ethereum</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-2 bg-blue-400/10 rounded-lg border border-blue-400/30">
+                              <span className="text-blue-300 font-bold">$</span>
+                              <span className="text-white text-sm">USDC</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-2 bg-gray-500/10 rounded-lg border border-gray-500/30">
+                              <span className="text-gray-300 font-bold">Ł</span>
+                              <span className="text-white text-sm">Litecoin</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Pay Button */}
+                        <button
+                          onClick={handleCryptoPayment}
+                          disabled={!isFormValid || cryptoLoading}
+                          className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 ${
+                            isFormValid
+                              ? 'bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:scale-[1.02]'
+                              : 'bg-slate-700 text-gray-400 cursor-not-allowed'
+                          }`}
+                        >
+                          <span className="text-xl">₿</span>
+                          <span>Pay ${total.toFixed(2)} with Crypto</span>
+                        </button>
+
+                        <p className="text-center text-gray-500 text-xs mt-3">
+                          🔒 Secured by Coinbase Commerce • Instant confirmation
+                        </p>
+
+                        {/* How it works */}
+                        <div className="mt-4 p-3 bg-slate-800/30 rounded-xl">
+                          <p className="text-gray-400 text-xs mb-2 font-semibold">How it works:</p>
+                          <ol className="text-gray-500 text-xs space-y-1">
+                            <li className="flex items-start gap-2">
+                              <span className="text-orange-400">1.</span>
+                              <span>Click the button to open Coinbase Commerce</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-orange-400">2.</span>
+                              <span>Choose your cryptocurrency and send payment</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <span className="text-orange-400">3.</span>
+                              <span>Once confirmed, you'll receive your order</span>
+                            </li>
+                          </ol>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -915,7 +1219,7 @@ export default function CheckoutPage() {
                   <>
                     <button
                       onClick={handlePlaceOrder}
-                      disabled={processing || selectedPayment === 'crypto'}
+                      disabled={processing || cryptoLoading}
                       className={`w-full py-4 rounded-xl font-semibold transition-all duration-300 mb-4 ${
                         selectedPayment === 'test'
                           ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg hover:shadow-green-500/50 hover:scale-105'
@@ -943,10 +1247,38 @@ export default function CheckoutPage() {
                 )}
 
                 {selectedPayment === 'paypal' && (
-                  <div className="text-center py-4 px-3 bg-blue-500/10 border border-blue-500/30 rounded-xl mb-6">
-                    <div className="text-blue-400 text-2xl mb-2">👈</div>
-                    <p className="text-blue-300 text-sm font-medium">Complete payment using the PayPal buttons</p>
-                    <p className="text-gray-400 text-xs mt-1">Select PayPal, Credit or Debit Card</p>
+                  <div className={`text-center py-4 px-3 ${isFormValid ? 'bg-blue-500/10 border-blue-500/30' : 'bg-yellow-500/10 border-yellow-500/30'} border rounded-xl mb-6`}>
+                    {isFormValid ? (
+                      <>
+                        <div className="text-blue-400 text-2xl mb-2">👈</div>
+                        <p className="text-blue-300 text-sm font-medium">Complete payment using the PayPal buttons</p>
+                        <p className="text-gray-400 text-xs mt-1">Select PayPal, Credit or Debit Card</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-yellow-400 text-2xl mb-2">📝</div>
+                        <p className="text-yellow-300 text-sm font-medium">Fill in billing info first</p>
+                        <p className="text-gray-400 text-xs mt-1">Name and email are required</p>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {selectedPayment === 'crypto' && (
+                  <div className={`text-center py-4 px-3 ${isFormValid ? 'bg-orange-500/10 border-orange-500/30' : 'bg-yellow-500/10 border-yellow-500/30'} border rounded-xl mb-6`}>
+                    {isFormValid ? (
+                      <>
+                        <div className="text-orange-400 text-2xl mb-2">₿</div>
+                        <p className="text-orange-300 text-sm font-medium">Click the button to pay with crypto</p>
+                        <p className="text-gray-400 text-xs mt-1">Bitcoin, Ethereum, USDC & more</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-yellow-400 text-2xl mb-2">📝</div>
+                        <p className="text-yellow-300 text-sm font-medium">Fill in billing info first</p>
+                        <p className="text-gray-400 text-xs mt-1">Name and email are required</p>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -994,22 +1326,26 @@ export default function CheckoutPage() {
               </div>
               <button
                 onClick={handlePlaceOrder}
-                disabled={processing || selectedPayment === 'crypto'}
+                disabled={processing || cryptoLoading}
                 className={`w-full py-3 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] ${
                   selectedPayment === 'test'
                     ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg'
+                    : selectedPayment === 'crypto'
+                    ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg'
                     : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {processing ? (
+                {processing || cryptoLoading ? (
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Creating...
+                    {cryptoLoading ? 'Preparing...' : 'Creating...'}
                   </span>
                 ) : selectedPayment === 'test' ? (
                   '🚀 Create Test Order'
+                ) : selectedPayment === 'crypto' ? (
+                  `₿ Pay $${total.toFixed(2)} with Crypto`
                 ) : (
-                  '⏳ Coming Soon'
+                  '👆 Pay with PayPal'
                 )}
               </button>
             </div>
@@ -1042,53 +1378,6 @@ export default function CheckoutPage() {
         {/* Footer */}
         <Footer />
       </div>
-
-      {/* Coming Soon Modal */}
-      {showComingSoon && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 rounded-2xl max-w-md w-full border border-white/20 shadow-2xl p-6 sm:p-8 text-center">
-            <div className="text-5xl sm:text-6xl mb-4 sm:mb-6">🚧</div>
-            <h3 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4">Payment Coming Soon!</h3>
-            <p className="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-base">
-              Cryptocurrency payments via Coinbase Commerce are currently being integrated.
-            </p>
-            <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">
-              Want to be notified when this payment method goes live?<br />
-              Email us at{' '}
-              <a href="mailto:contact@nashflare.com" className="text-purple-400 hover:text-purple-300 underline">
-                contact@nashflare.com
-              </a>
-            </p>
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  setShowComingSoon(false)
-                  setSelectedPayment('paypal')
-                  paypalButtonsRendered.current = false
-                }}
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-blue-500/50 transition-all min-h-[48px]"
-              >
-                Pay with PayPal Instead
-              </button>
-              <button
-                onClick={() => {
-                  setShowComingSoon(false)
-                  setSelectedPayment('test')
-                }}
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-green-500/50 transition-all min-h-[48px]"
-              >
-                Use Test Mode Instead
-              </button>
-              <button
-                onClick={() => setShowComingSoon(false)}
-                className="w-full bg-white/10 text-white py-3 rounded-xl font-semibold hover:bg-white/20 transition-all min-h-[48px]"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Custom Styles */}
       <style jsx global>{`
