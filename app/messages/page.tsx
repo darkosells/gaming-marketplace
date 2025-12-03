@@ -14,11 +14,21 @@ interface Conversation {
   seller_id: string
   last_message: string
   last_message_at: string
+  // Listing data (may be null if deleted)
   listing: {
     title: string
     image_url: string
     game: string
-  }
+  } | null
+  // Order data with snapshot fields
+  order: {
+    status: string
+    amount: number
+    listing_title: string | null
+    listing_game: string | null
+    listing_image_url: string | null
+    listing_category: string | null
+  } | null
   buyer: {
     username: string
     avatar_url: string | null
@@ -26,10 +36,6 @@ interface Conversation {
   seller: {
     username: string
     avatar_url: string | null
-  }
-  order: {
-    status: string
-    amount: number
   }
   unread_count?: number
 }
@@ -63,6 +69,37 @@ interface TypingUser {
   user_id: string
   username: string
   timestamp: number
+}
+
+// Helper function to get listing info from conversation (uses snapshot as fallback)
+const getListingInfo = (conv: Conversation) => {
+  // If listing still exists, use it
+  if (conv.listing?.title) {
+    return {
+      title: conv.listing.title,
+      image_url: conv.listing.image_url,
+      game: conv.listing.game,
+      category: 'account' // Default if not available
+    }
+  }
+  
+  // Otherwise use snapshot from order
+  if (conv.order?.listing_title) {
+    return {
+      title: conv.order.listing_title,
+      image_url: conv.order.listing_image_url,
+      game: conv.order.listing_game || 'N/A',
+      category: conv.order.listing_category || 'account'
+    }
+  }
+  
+  // Fallback
+  return {
+    title: 'Deleted Listing',
+    image_url: null,
+    game: 'N/A',
+    category: 'account'
+  }
 }
 
 // Component that uses useSearchParams
@@ -99,18 +136,18 @@ function MessagesContent() {
   const [pendingListingId, setPendingListingId] = useState<string | null>(null)
   const [pendingSellerId, setPendingSellerId] = useState<string | null>(null)
   
-  // NEW: Delivery code reveal states
+  // Delivery code reveal states
   const [revealedDeliveryMessages, setRevealedDeliveryMessages] = useState<Set<string>>(new Set())
   const [showDeliverySecurityModal, setShowDeliverySecurityModal] = useState(false)
   const [pendingRevealMessageId, setPendingRevealMessageId] = useState<string | null>(null)
   
-  // NEW: Rate limiting states
+  // Rate limiting states
   const [messageTimestamps, setMessageTimestamps] = useState<number[]>([])
   const [conversationTimestamps, setConversationTimestamps] = useState<number[]>([])
   const [rateLimitError, setRateLimitError] = useState<string | null>(null)
   
   // Rate limit constants
-  const MESSAGE_COOLDOWN_MS = 1000 // 1 second between messages
+  const MESSAGE_COOLDOWN_MS = 1000
   const MAX_MESSAGES_PER_MINUTE = 20
   const MAX_CONVERSATIONS_PER_HOUR = 5
   
@@ -144,7 +181,7 @@ function MessagesContent() {
     /free.*nitro/i,
   ]
 
-  // NEW: Check if message contains delivery info
+  // Check if message contains delivery info
   const isDeliveryMessage = (message: Message): boolean => {
     if (message.message_type !== 'system') return false
     const content = message.content || ''
@@ -167,60 +204,32 @@ function MessagesContent() {
     )
   }
 
-  // NEW: Extract delivery content from message
-  const extractDeliveryContent = (content: string): { header: string; credentials: string; footer: string } => {
-    // Try to split the message into parts
-    let header = ''
-    let credentials = ''
-    let footer = ''
+  // Extract and clean delivery content from message (removes duplicate headers/footers)
+  const extractDeliveryContent = (content: string): { credentials: string } => {
+    let cleanedContent = content
     
-    // Pattern 1: Look for separator lines
-    const parts = content.split(/━{5,}/)
-    if (parts.length >= 3) {
-      header = parts[0].trim()
-      credentials = parts[1].trim()
-      footer = parts.slice(2).join('━━━━━━━━━━━━━━━━━━━━━━━━━').trim()
-    } else if (parts.length === 2) {
-      header = parts[0].trim()
-      credentials = ''
-      footer = parts[1].trim()
-    } else {
-      // Try to find credentials pattern
-      const lines = content.split('\n')
-      let inCredentials = false
-      
-      for (const line of lines) {
-        if (line.includes('DELIVERY') || line.includes('📦')) {
-          header += line + '\n'
-          inCredentials = true
-        } else if (line.includes('✅') || line.includes('⏰') || line.includes('⚠️')) {
-          footer += line + '\n'
-          inCredentials = false
-        } else if (inCredentials && (
-          line.includes('Username') || 
-          line.includes('Password') || 
-          line.includes('Email') ||
-          line.includes('Code') ||
-          line.includes('Key') ||
-          line.includes(':')
-        )) {
-          credentials += line + '\n'
-        } else if (inCredentials) {
-          credentials += line + '\n'
-        } else {
-          header += line + '\n'
-        }
-      }
-    }
+    // Remove "DELIVERY INFORMATION" headers/footers and their emojis
+    cleanedContent = cleanedContent.replace(/🔑\s*DELIVERY\s*INFORMATION\s*/gi, '')
+    cleanedContent = cleanedContent.replace(/🔐\s*DELIVERY\s*INFORMATION\s*/gi, '')
+    cleanedContent = cleanedContent.replace(/📦\s*DELIVERY\s*INFORMATION\s*/gi, '')
+    cleanedContent = cleanedContent.replace(/DELIVERY\s*INFORMATION/gi, '')
     
-    return { 
-      header: header || 'Delivery Information', 
-      credentials: credentials || content, 
-      footer 
-    }
+    // Remove separator lines
+    cleanedContent = cleanedContent.replace(/━{3,}/g, '')
+    
+    // Remove common footer messages
+    cleanedContent = cleanedContent.replace(/✅.*?delivered.*?automatically.*$/gim, '')
+    cleanedContent = cleanedContent.replace(/⏰.*?48.*?hour.*?protection.*$/gim, '')
+    cleanedContent = cleanedContent.replace(/⚠️.*?verify.*?credentials.*$/gim, '')
+    
+    // Clean up extra whitespace and newlines
+    cleanedContent = cleanedContent.replace(/\n{3,}/g, '\n\n')
+    cleanedContent = cleanedContent.trim()
+    
+    return { credentials: cleanedContent }
   }
 
-  // NEW: Log delivery access
+  // Log delivery access
   const logDeliveryAccess = async (messageId: string, orderId: string | null) => {
     if (!user || !selectedConversation) return
     
@@ -237,28 +246,23 @@ function MessagesContent() {
     }
   }
 
-  // NEW: Handle reveal button click
+  // Handle reveal button click
   const handleRevealDeliveryMessage = (messageId: string) => {
     setPendingRevealMessageId(messageId)
     setShowDeliverySecurityModal(true)
   }
 
-  // NEW: Confirm and reveal delivery message
+  // Confirm and reveal delivery message
   const confirmAndRevealDelivery = async () => {
     if (!pendingRevealMessageId) return
     
-    // Log the access
     await logDeliveryAccess(pendingRevealMessageId, selectedConversation?.order_id || null)
-    
-    // Add to revealed set
     setRevealedDeliveryMessages(prev => new Set(prev).add(pendingRevealMessageId))
-    
-    // Close modal
     setShowDeliverySecurityModal(false)
     setPendingRevealMessageId(null)
   }
 
-  // NEW: Hide delivery message
+  // Hide delivery message
   const hideDeliveryMessage = (messageId: string) => {
     setRevealedDeliveryMessages(prev => {
       const newSet = new Set(prev)
@@ -295,7 +299,6 @@ function MessagesContent() {
       fetchMessages()
       markConversationAsRead(selectedConversation.id)
       
-      // Reset revealed messages when switching conversations
       setRevealedDeliveryMessages(new Set())
       
       const otherUserId = selectedConversation.buyer_id === user.id 
@@ -486,6 +489,7 @@ function MessagesContent() {
 
   const fetchConversations = async () => {
     try {
+      // Fetch conversations with order snapshot data for fallback
       const { data, error } = await supabase
         .from('conversations')
         .select(`
@@ -493,7 +497,7 @@ function MessagesContent() {
           listing:listings(title, image_url, game),
           buyer:profiles!conversations_buyer_id_fkey(username, avatar_url),
           seller:profiles!conversations_seller_id_fkey(username, avatar_url),
-          order:orders(status, amount)
+          order:orders(status, amount, listing_title, listing_game, listing_image_url, listing_category)
         `)
         .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
         .order('last_message_at', { ascending: false })
@@ -560,7 +564,7 @@ function MessagesContent() {
             listing:listings(title, image_url, game),
             buyer:profiles!conversations_buyer_id_fkey(username, avatar_url),
             seller:profiles!conversations_seller_id_fkey(username, avatar_url),
-            order:orders(status, amount)
+            order:orders(status, amount, listing_title, listing_game, listing_image_url, listing_category)
           `)
           .eq('id', conversationId)
           .single()
@@ -702,14 +706,11 @@ function MessagesContent() {
     return null
   }
 
-  // NEW: Rate limiting check for messages
+  // Rate limiting check for messages
   const checkMessageRateLimit = (): { allowed: boolean; error?: string } => {
     const now = Date.now()
-    
-    // Clean up old timestamps (older than 1 minute)
     const recentTimestamps = messageTimestamps.filter(ts => now - ts < 60000)
     
-    // Check cooldown (1 second between messages)
     if (recentTimestamps.length > 0) {
       const lastMessageTime = recentTimestamps[recentTimestamps.length - 1]
       if (now - lastMessageTime < MESSAGE_COOLDOWN_MS) {
@@ -717,7 +718,6 @@ function MessagesContent() {
       }
     }
     
-    // Check messages per minute limit
     if (recentTimestamps.length >= MAX_MESSAGES_PER_MINUTE) {
       return { allowed: false, error: 'Too many messages. Please wait a minute before sending more.' }
     }
@@ -725,24 +725,20 @@ function MessagesContent() {
     return { allowed: true }
   }
 
-  // NEW: Record message timestamp
+  // Record message timestamp
   const recordMessageSent = () => {
     const now = Date.now()
     setMessageTimestamps(prev => {
-      // Keep only timestamps from last minute
       const recent = prev.filter(ts => now - ts < 60000)
       return [...recent, now]
     })
   }
 
-  // NEW: Rate limiting check for conversation creation
+  // Rate limiting check for conversation creation
   const checkConversationRateLimit = (): { allowed: boolean; error?: string } => {
     const now = Date.now()
-    
-    // Clean up old timestamps (older than 1 hour)
     const recentTimestamps = conversationTimestamps.filter(ts => now - ts < 3600000)
     
-    // Check conversations per hour limit
     if (recentTimestamps.length >= MAX_CONVERSATIONS_PER_HOUR) {
       const oldestTimestamp = recentTimestamps[0]
       const minutesUntilReset = Math.ceil((3600000 - (now - oldestTimestamp)) / 60000)
@@ -755,17 +751,16 @@ function MessagesContent() {
     return { allowed: true }
   }
 
-  // NEW: Record conversation creation timestamp
+  // Record conversation creation timestamp
   const recordConversationCreated = () => {
     const now = Date.now()
     setConversationTimestamps(prev => {
-      // Keep only timestamps from last hour
       const recent = prev.filter(ts => now - ts < 3600000)
       return [...recent, now]
     })
   }
 
-  // NEW: Clear rate limit error after delay
+  // Clear rate limit error after delay
   useEffect(() => {
     if (rateLimitError) {
       const timer = setTimeout(() => setRateLimitError(null), 3000)
@@ -776,7 +771,6 @@ function MessagesContent() {
   const checkImageForSensitiveContent = (file: File): boolean => {
     const filename = file.name.toLowerCase()
     const sensitiveKeywords = ['password', 'ssn', 'license', 'card', 'bank', 'id']
-    
     return sensitiveKeywords.some(keyword => filename.includes(keyword))
   }
 
@@ -899,7 +893,6 @@ function MessagesContent() {
 
     if (!selectedConversation) return
 
-    // NEW: Check rate limit
     const rateLimitCheck = checkMessageRateLimit()
     if (!rateLimitCheck.allowed) {
       setRateLimitError(rateLimitCheck.error || 'Rate limit exceeded')
@@ -960,7 +953,6 @@ function MessagesContent() {
         })
         .eq('id', selectedConversation.id)
 
-      // NEW: Record successful message for rate limiting
       recordMessageSent()
 
       setNewMessage('')
@@ -982,14 +974,12 @@ function MessagesContent() {
   const createConversationAndSendMessage = async () => {
     if (!pendingListingId || !pendingSellerId) return
 
-    // NEW: Check conversation rate limit
     const convRateLimitCheck = checkConversationRateLimit()
     if (!convRateLimitCheck.allowed) {
       setRateLimitError(convRateLimitCheck.error || 'Rate limit exceeded')
       return
     }
 
-    // NEW: Check message rate limit
     const msgRateLimitCheck = checkMessageRateLimit()
     if (!msgRateLimitCheck.allowed) {
       setRateLimitError(msgRateLimitCheck.error || 'Rate limit exceeded')
@@ -1051,7 +1041,6 @@ function MessagesContent() {
 
       if (msgError) throw msgError
 
-      // NEW: Record successful conversation and message for rate limiting
       recordConversationCreated()
       recordMessageSent()
 
@@ -1221,14 +1210,14 @@ function MessagesContent() {
     )
   }
 
-  // NEW: Render delivery message with blur/reveal
+  // Render delivery message with blur/reveal (FIXED: no duplicate headers)
   const renderDeliveryMessage = (message: Message) => {
     const isRevealed = revealedDeliveryMessages.has(message.id)
-    const { header, credentials, footer } = extractDeliveryContent(message.content)
+    const { credentials } = extractDeliveryContent(message.content)
     
     return (
       <div className="flex justify-center my-3 sm:my-4">
-        <div className="max-w-[90%] sm:max-w-[85%] bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-lg border-2 border-green-400/50 rounded-2xl p-3 sm:p-4 shadow-lg">
+        <div className="max-w-[95%] sm:max-w-[85%] bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 backdrop-blur-lg border-2 border-green-400/50 rounded-2xl p-3 sm:p-4 shadow-lg">
           <div className="flex items-start gap-2 sm:gap-3">
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
               <span className="text-xl sm:text-2xl">🔑</span>
@@ -1244,23 +1233,23 @@ function MessagesContent() {
                   {isRevealed ? (
                     <button
                       onClick={() => hideDeliveryMessage(message.id)}
-                      className="px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-lg text-xs font-medium text-green-300 hover:bg-green-500/30 transition-all flex items-center gap-1"
+                      className="px-2 sm:px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-lg text-xs font-medium text-green-300 hover:bg-green-500/30 transition-all flex items-center gap-1 min-h-[32px]"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                       </svg>
-                      Hide
+                      <span className="hidden sm:inline">Hide</span>
                     </button>
                   ) : (
                     <button
                       onClick={() => handleRevealDeliveryMessage(message.id)}
-                      className="px-3 py-1 bg-green-500/30 border border-green-500/50 rounded-lg text-xs font-medium text-white hover:bg-green-500/40 transition-all flex items-center gap-1"
+                      className="px-2 sm:px-3 py-1 bg-green-500/30 border border-green-500/50 rounded-lg text-xs font-medium text-white hover:bg-green-500/40 transition-all flex items-center gap-1 min-h-[32px]"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                       </svg>
-                      Reveal
+                      <span className="hidden sm:inline">Reveal</span>
                     </button>
                   )}
                 </div>
@@ -1269,31 +1258,17 @@ function MessagesContent() {
               {/* Content area */}
               {isRevealed ? (
                 <div className="space-y-2">
-                  {/* Header */}
-                  {header && (
-                    <div className="text-white text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words">
-                      {header}
-                    </div>
-                  )}
-                  
                   {/* Credentials - shown when revealed */}
-                  <div className="bg-slate-900/80 border border-green-500/30 rounded-lg p-3">
+                  <div className="bg-slate-900/80 border border-green-500/30 rounded-lg p-2 sm:p-3">
                     <pre className="text-white font-mono text-xs sm:text-sm whitespace-pre-wrap break-all leading-relaxed select-all">
                       {credentials}
                     </pre>
                   </div>
                   
-                  {/* Footer */}
-                  {footer && (
-                    <div className="text-white text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words">
-                      {footer}
-                    </div>
-                  )}
-                  
                   {/* Security reminder */}
-                  <div className="mt-2 pt-2 border-t border-green-500/20">
+                  <div className="pt-2 border-t border-green-500/20">
                     <p className="text-xs text-green-400/70 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                       Access logged for security
@@ -1302,15 +1277,8 @@ function MessagesContent() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {/* Header - always visible */}
-                  {header && (
-                    <div className="text-white text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words opacity-80">
-                      {header.split('\n').slice(0, 2).join('\n')}
-                    </div>
-                  )}
-                  
                   {/* Blurred/hidden credentials */}
-                  <div className="bg-slate-900/80 border border-white/10 rounded-lg p-3 relative overflow-hidden">
+                  <div className="bg-slate-900/80 border border-white/10 rounded-lg p-2 sm:p-3 relative overflow-hidden">
                     <div className="blur-sm select-none pointer-events-none">
                       <p className="text-white font-mono text-xs sm:text-sm">
                         ••••••••••••••••••••<br/>
@@ -1320,7 +1288,7 @@ function MessagesContent() {
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                       <div className="flex items-center gap-2 text-white">
-                        <span className="text-2xl">🔒</span>
+                        <span className="text-xl sm:text-2xl">🔒</span>
                         <span className="text-xs font-medium">Click "Reveal" to show</span>
                       </div>
                     </div>
@@ -1332,7 +1300,7 @@ function MessagesContent() {
                       <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
-                      Only reveal when ready to use. Action will be logged.
+                      <span className="line-clamp-2">Only reveal when ready. Action will be logged.</span>
                     </p>
                   </div>
                 </div>
@@ -1381,54 +1349,54 @@ function MessagesContent() {
       <div className="relative z-10">
         <Navigation />
 
-        {/* NEW: Delivery Security Warning Modal */}
+        {/* Delivery Security Warning Modal */}
         {showDeliverySecurityModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-            <div className="bg-slate-900/95 backdrop-blur-xl border-2 border-orange-500/50 rounded-2xl p-6 max-w-md w-full shadow-2xl animate-fade-in">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="bg-slate-900/95 backdrop-blur-xl border-2 border-orange-500/50 rounded-t-3xl sm:rounded-2xl p-4 sm:p-6 w-full sm:max-w-md shadow-2xl animate-slide-up sm:animate-fade-in max-h-[85vh] overflow-y-auto">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl flex items-center justify-center border border-orange-500/30">
-                  <span className="text-3xl">🔐</span>
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl flex items-center justify-center border border-orange-500/30 flex-shrink-0">
+                  <span className="text-2xl sm:text-3xl">🔐</span>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-orange-400">Security Notice</h3>
-                  <p className="text-sm text-gray-400">Reveal Delivery Information</p>
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-xl font-bold text-orange-400">Security Notice</h3>
+                  <p className="text-xs sm:text-sm text-gray-400">Reveal Delivery Information</p>
                 </div>
               </div>
               
-              <div className="space-y-4 mb-6">
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
-                  <p className="text-orange-200 text-sm leading-relaxed">
+              <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+                <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 sm:p-4">
+                  <p className="text-orange-200 text-xs sm:text-sm leading-relaxed">
                     <strong className="text-orange-300">⚠️ Important:</strong> Only reveal when you're ready to use this information. For your security, this action is logged.
                   </p>
                 </div>
                 
-                <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
+                <div className="bg-slate-800/50 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3">
                   <div className="flex items-start gap-3">
                     <span className="text-green-400 mt-0.5">✓</span>
-                    <p className="text-gray-300 text-sm">Keep credentials private</p>
+                    <p className="text-gray-300 text-xs sm:text-sm">Keep credentials private</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="text-green-400 mt-0.5">✓</span>
-                    <p className="text-gray-300 text-sm">Test immediately to verify</p>
+                    <p className="text-gray-300 text-xs sm:text-sm">Test immediately to verify</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="text-red-400 mt-0.5">✕</span>
-                    <p className="text-gray-300 text-sm">Never share with anyone</p>
+                    <p className="text-gray-300 text-xs sm:text-sm">Never share with anyone</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                   <span>This reveal will be logged for security purposes</span>
                 </div>
               </div>
               
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <button 
                   onClick={confirmAndRevealDelivery}
-                  className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-orange-500/30 transition-all"
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-orange-500/30 transition-all min-h-[48px]"
                 >
                   🔓 I Understand, Reveal
                 </button>
@@ -1437,7 +1405,7 @@ function MessagesContent() {
                     setShowDeliverySecurityModal(false)
                     setPendingRevealMessageId(null)
                   }}
-                  className="flex-1 bg-white/5 text-white py-3 rounded-xl font-bold border border-white/10 hover:bg-white/10 transition-all"
+                  className="flex-1 bg-white/5 text-white py-3 rounded-xl font-bold border border-white/10 hover:bg-white/10 transition-all min-h-[48px]"
                 >
                   Cancel
                 </button>
@@ -1448,15 +1416,15 @@ function MessagesContent() {
 
         {/* Security Warning Banner */}
         {showSecurityWarning && (
-          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-md mx-auto px-4">
-            <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-xl border border-orange-400/30 rounded-2xl p-4 shadow-2xl">
+          <div className="fixed top-20 left-4 right-4 sm:left-1/2 sm:right-auto sm:transform sm:-translate-x-1/2 z-50 sm:max-w-md">
+            <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-xl border border-orange-400/30 rounded-2xl p-3 sm:p-4 shadow-2xl">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">⚠️</span>
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-base sm:text-xl">⚠️</span>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-orange-300 font-bold text-sm mb-1">Security Warning</h3>
-                  <p className="text-white text-xs leading-relaxed mb-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-orange-300 font-bold text-xs sm:text-sm mb-1">Security Warning</h3>
+                  <p className="text-white text-xs leading-relaxed mb-2 sm:mb-3">
                     This image filename suggests it may contain sensitive information. Never share passwords, credit cards, IDs, or personal documents.
                   </p>
                   <button
@@ -1472,7 +1440,7 @@ function MessagesContent() {
                     setSelectedImage(null)
                     setImagePreview(null)
                   }}
-                  className="text-gray-400 hover:text-white"
+                  className="text-gray-400 hover:text-white flex-shrink-0"
                 >
                   ✕
                 </button>
@@ -1483,21 +1451,21 @@ function MessagesContent() {
 
         {/* Report Success Message */}
         {showReportSuccess && (
-          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-md mx-auto px-4">
-            <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur-xl border border-green-400/30 rounded-2xl p-4 shadow-2xl animate-fade-in">
+          <div className="fixed top-20 left-4 right-4 sm:left-1/2 sm:right-auto sm:transform sm:-translate-x-1/2 z-50 sm:max-w-md">
+            <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur-xl border border-green-400/30 rounded-2xl p-3 sm:p-4 shadow-2xl animate-fade-in">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">✓</span>
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-base sm:text-xl">✓</span>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-green-300 font-bold text-sm mb-1">Report Submitted</h3>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-green-300 font-bold text-xs sm:text-sm mb-1">Report Submitted</h3>
                   <p className="text-white text-xs leading-relaxed">
                     Thank you for your report. Our team will review it shortly and take appropriate action.
                   </p>
                 </div>
                 <button
                   onClick={() => setShowReportSuccess(false)}
-                  className="text-gray-400 hover:text-white"
+                  className="text-gray-400 hover:text-white flex-shrink-0"
                 >
                   ✕
                 </button>
@@ -1508,11 +1476,11 @@ function MessagesContent() {
 
         {/* Report Modal */}
         {showReportModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-t-3xl sm:rounded-2xl p-4 sm:p-6 w-full sm:max-w-md shadow-2xl animate-slide-up sm:animate-fade-in max-h-[85vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <span className="text-2xl">🚨</span>
+                <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                  <span className="text-xl sm:text-2xl">🚨</span>
                   Report User
                 </h3>
                 <button
@@ -1520,22 +1488,22 @@ function MessagesContent() {
                     setShowReportModal(false)
                     setReportReason('')
                   }}
-                  className="text-gray-400 hover:text-white text-2xl"
+                  className="text-gray-400 hover:text-white text-2xl p-2"
                 >
                   ✕
                 </button>
               </div>
               
-              <p className="text-gray-400 text-sm mb-4">
+              <p className="text-gray-400 text-xs sm:text-sm mb-4">
                 Help us keep Nashflare safe. Tell us why you're reporting this user.
               </p>
               
-              <div className="space-y-3 mb-4">
+              <div className="space-y-2 sm:space-y-3 mb-4">
                 {['Scam or fraud', 'Inappropriate content', 'Harassment', 'Spam', 'Other'].map((reason) => (
                   <button
                     key={reason}
                     onClick={() => setReportReason(reason)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                    className={`w-full text-left px-3 sm:px-4 py-3 rounded-xl border transition-all min-h-[48px] text-sm ${
                       reportReason === reason
                         ? 'bg-purple-500/20 border-purple-500/50 text-white'
                         : 'bg-slate-800/50 border-white/10 text-gray-300 hover:bg-white/5'
@@ -1546,20 +1514,20 @@ function MessagesContent() {
                 ))}
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <button
                   onClick={() => {
                     setShowReportModal(false)
                     setReportReason('')
                   }}
-                  className="flex-1 px-4 py-3 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition"
+                  className="flex-1 px-4 py-3 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition min-h-[48px] text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={submitReport}
                   disabled={!reportReason || submittingReport}
-                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold hover:shadow-lg hover:shadow-red-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold hover:shadow-lg hover:shadow-red-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] text-sm"
                 >
                   {submittingReport ? 'Submitting...' : 'Submit Report'}
                 </button>
@@ -1574,14 +1542,14 @@ function MessagesContent() {
             <div className="relative max-w-4xl w-full">
               <button
                 onClick={() => setShowImageModal(false)}
-                className="absolute -top-12 right-0 text-white hover:text-gray-300 text-4xl font-bold"
+                className="absolute -top-10 sm:-top-12 right-0 text-white hover:text-gray-300 text-3xl sm:text-4xl font-bold p-2"
               >
                 ✕
               </button>
               <img
                 src={modalImageUrl}
                 alt="Full size"
-                className="w-full h-auto rounded-2xl shadow-2xl"
+                className="w-full h-auto rounded-2xl shadow-2xl max-h-[80vh] object-contain"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
@@ -1591,9 +1559,9 @@ function MessagesContent() {
         {/* Messages Content */}
         <div className="container mx-auto px-3 sm:px-4 pt-20 sm:pt-24 pb-4 sm:pb-8">
           <div className="max-w-7xl mx-auto">
-            {/* Page Header */}
-            <div className="mb-4 sm:mb-6">
-              <div className="inline-block mb-3 sm:mb-4">
+            {/* Page Header - Hidden on mobile when in conversation */}
+            <div className={`mb-4 sm:mb-6 ${!showMobileConversations && selectedConversation ? 'hidden sm:block' : ''}`}>
+              <div className="inline-block mb-2 sm:mb-4">
                 <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-xs sm:text-sm font-medium backdrop-blur-sm">
                   🚀 Space Chat Center
                 </span>
@@ -1603,7 +1571,7 @@ function MessagesContent() {
               </h1>
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 h-[calc(100vh-180px)] sm:h-[calc(100vh-220px)]">
+            <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 h-[calc(100vh-140px)] sm:h-[calc(100vh-220px)]">
               {/* Conversations List */}
               <div className={`${
                 showMobileConversations ? 'block' : 'hidden lg:block'
@@ -1624,68 +1592,69 @@ function MessagesContent() {
                   ) : (
                     <>
                       {conversations.map((conv) => {
-                      const otherUser = conv.buyer_id === user.id ? conv.seller : conv.buyer
-                      const hasUnread = (conv.unread_count || 0) > 0
-                      
-                      return (
-                        <button
-                          key={conv.id}
-                          onClick={() => {
-                            setSelectedConversation(conv)
-                            setShowMobileConversations(false)
-                            markConversationAsRead(conv.id)
-                          }}
-                          className={`w-full text-left p-3 sm:p-4 border-b border-white/10 hover:bg-white/5 transition-all duration-300 relative group ${
-                            selectedConversation?.id === conv.id ? 'bg-purple-500/20 border-l-4 border-l-purple-500' : ''
-                          } ${hasUnread ? 'bg-purple-500/10' : ''}`}
-                        >
-                          {hasUnread && (
-                            <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
-                              <span className="bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full min-w-[20px] text-center shadow-lg shadow-pink-500/30">
-                                {conv.unread_count}
-                              </span>
-                            </div>
-                          )}
-                          
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20 group-hover:scale-105 transition-transform duration-300">
-                              {conv.listing?.image_url ? (
-                                <img src={conv.listing.image_url} alt={conv.listing.title} className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-xl sm:text-2xl">🎮</div>
-                              )}
-                              {hasUnread && (
-                                <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full border-2 border-slate-900 animate-pulse"></div>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0 pr-6 sm:pr-8">
-                              <p className="font-semibold text-white truncate text-sm sm:text-base">{otherUser.username}</p>
-                              <p className="text-xs text-purple-400 mb-1 truncate">{conv.listing?.title || 'Unknown Item'}</p>
-                              <p className={`text-xs truncate ${hasUnread ? 'text-gray-300 font-semibold' : 'text-gray-400'}`}>
-                                {conv.last_message}
-                              </p>
-                              <div className="flex items-center justify-between mt-1">
-                                <p className="text-xs text-gray-500">{new Date(conv.last_message_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-                                {conv.order?.status && (
-                                  <span className={`text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-medium ${
-                                    conv.order.status === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                                    conv.order.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                    conv.order.status === 'refunded' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-                                    conv.order.status === 'delivered' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-                                    'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                                  }`}>
-                                    {conv.order.status === 'completed' ? 'Done' :
-                                     conv.order.status === 'dispute_raised' ? 'Dispute' :
-                                     conv.order.status === 'delivered' ? 'Delivered' :
-                                     conv.order.status === 'paid' ? 'Paid' : 'Pending'}
-                                  </span>
+                        const otherUser = conv.buyer_id === user.id ? conv.seller : conv.buyer
+                        const hasUnread = (conv.unread_count || 0) > 0
+                        const listingInfo = getListingInfo(conv)
+                        
+                        return (
+                          <button
+                            key={conv.id}
+                            onClick={() => {
+                              setSelectedConversation(conv)
+                              setShowMobileConversations(false)
+                              markConversationAsRead(conv.id)
+                            }}
+                            className={`w-full text-left p-3 sm:p-4 border-b border-white/10 hover:bg-white/5 transition-all duration-300 relative group ${
+                              selectedConversation?.id === conv.id ? 'bg-purple-500/20 border-l-4 border-l-purple-500' : ''
+                            } ${hasUnread ? 'bg-purple-500/10' : ''}`}
+                          >
+                            {hasUnread && (
+                              <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
+                                <span className="bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full min-w-[20px] text-center shadow-lg shadow-pink-500/30">
+                                  {conv.unread_count}
+                                </span>
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20 group-hover:scale-105 transition-transform duration-300">
+                                {listingInfo.image_url ? (
+                                  <img src={listingInfo.image_url} alt={listingInfo.title} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-xl sm:text-2xl">🎮</div>
+                                )}
+                                {hasUnread && (
+                                  <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full border-2 border-slate-900 animate-pulse"></div>
                                 )}
                               </div>
+                              <div className="flex-1 min-w-0 pr-6 sm:pr-8">
+                                <p className="font-semibold text-white truncate text-sm sm:text-base">{otherUser.username}</p>
+                                <p className="text-xs text-purple-400 mb-1 truncate">{listingInfo.title}</p>
+                                <p className={`text-xs truncate ${hasUnread ? 'text-gray-300 font-semibold' : 'text-gray-400'}`}>
+                                  {conv.last_message}
+                                </p>
+                                <div className="flex items-center justify-between mt-1">
+                                  <p className="text-xs text-gray-500">{new Date(conv.last_message_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                                  {conv.order?.status && (
+                                    <span className={`text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-medium ${
+                                      conv.order.status === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                                      conv.order.status === 'dispute_raised' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                      conv.order.status === 'refunded' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                      conv.order.status === 'delivered' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                                      'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                    }`}>
+                                      {conv.order.status === 'completed' ? 'Done' :
+                                       conv.order.status === 'dispute_raised' ? 'Dispute' :
+                                       conv.order.status === 'delivered' ? 'Delivered' :
+                                       conv.order.status === 'paid' ? 'Paid' : 'Pending'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                      )
-                    })}
+                          </button>
+                        )
+                      })}
                     </>
                   )}
                 </div>
@@ -1715,13 +1684,13 @@ function MessagesContent() {
                             setPendingSellerId(null)
                             router.push('/messages')
                           }}
-                          className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+                          className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                           </svg>
                         </button>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <h3 className="text-white font-bold text-base sm:text-lg">New Conversation</h3>
                           <p className="text-xs text-gray-400">Send a message to start the conversation</p>
                         </div>
@@ -1732,9 +1701,9 @@ function MessagesContent() {
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <p className="text-xs text-blue-300 flex items-center gap-2">
                           <span>🛡️</span>
-                          <span>Never share passwords, credit cards, or personal documents. Nashflare staff will never ask for this info.</span>
+                          <span className="line-clamp-2">Never share passwords, credit cards, or personal documents.</span>
                         </p>
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
+                        <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
                           <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                           </svg>
@@ -1744,13 +1713,13 @@ function MessagesContent() {
                     </div>
 
                     <div className="flex-1 flex items-center justify-center p-4">
-                      <div className="text-center max-w-md">
-                        <div className="text-5xl sm:text-6xl mb-4">💬</div>
-                        <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Start a Conversation</h3>
-                        <p className="text-gray-400 text-sm sm:text-base mb-4">
+                      <div className="text-center max-w-md px-4">
+                        <div className="text-4xl sm:text-6xl mb-4">💬</div>
+                        <h3 className="text-lg sm:text-2xl font-bold text-white mb-2">Start a Conversation</h3>
+                        <p className="text-gray-400 text-xs sm:text-base mb-4">
                           Type your message below to start chatting with the seller about this listing.
                         </p>
-                        <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4">
+                        <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 sm:p-4">
                           <p className="text-xs text-purple-300">
                             💡 <strong>Tip:</strong> Be clear about what you're interested in and ask any questions you have about the product.
                           </p>
@@ -1760,9 +1729,21 @@ function MessagesContent() {
 
                     {/* Message Input for new conversation */}
                     <form onSubmit={sendMessage} className="p-3 sm:p-4 border-t border-white/10 bg-slate-800/60 relative">
+                      {/* Rate limit error */}
+                      {rateLimitError && (
+                        <div className="mb-3 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                          <p className="text-red-400 text-xs flex items-center gap-2">
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {rateLimitError}
+                          </p>
+                        </div>
+                      )}
+                      
                       {imagePreview && (
                         <div className="mb-3 relative inline-block">
-                          <img src={imagePreview} alt="Preview" className="h-20 rounded-lg border-2 border-purple-500/50" />
+                          <img src={imagePreview} alt="Preview" className="h-16 sm:h-20 rounded-lg border-2 border-purple-500/50" />
                           <button
                             type="button"
                             onClick={() => {
@@ -1777,7 +1758,7 @@ function MessagesContent() {
                         </div>
                       )}
                       
-                      <div className="flex gap-2 sm:gap-3">
+                      <div className="flex gap-2">
                         <input
                           ref={fileInputRef}
                           type="file"
@@ -1789,7 +1770,7 @@ function MessagesContent() {
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="px-2 sm:px-3 py-2 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300 flex-shrink-0 text-base sm:text-lg"
+                          className="p-2 sm:px-3 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300 flex-shrink-0 text-base sm:text-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
                           title="Upload image"
                         >
                           📷
@@ -1802,15 +1783,15 @@ function MessagesContent() {
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                             placeholder="Type your first message..."
-                            className="relative w-full px-3 sm:px-4 py-2 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+                            className="relative w-full px-3 sm:px-4 py-2 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 min-h-[44px]"
                           />
                         </div>
                         <button
                           type="submit"
                           disabled={(!newMessage.trim() && !selectedImage) || sending || uploadingImage}
-                          className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0 text-sm sm:text-base"
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0 text-sm min-h-[44px]"
                         >
-                          {uploadingImage ? '📤' : sending ? '...' : <span className="hidden sm:inline">🚀 Send</span>}<span className="inline sm:hidden">🚀</span>
+                          {uploadingImage ? '📤' : sending ? '...' : '🚀'}
                         </button>
                       </div>
                     </form>
@@ -1822,7 +1803,7 @@ function MessagesContent() {
                       <div className="flex items-center justify-between gap-2">
                         <button
                           onClick={() => setShowMobileConversations(true)}
-                          className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+                          className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition-colors flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1830,8 +1811,8 @@ function MessagesContent() {
                         </button>
 
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-white font-bold text-base sm:text-lg flex items-center gap-2">
-                            <div className="relative">
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-shrink-0">
                               {renderAvatar(
                                 (selectedConversation.buyer_id === user.id 
                                   ? selectedConversation.seller.avatar_url 
@@ -1846,7 +1827,7 @@ function MessagesContent() {
                               )}
                             </div>
                             <div className="flex flex-col min-w-0">
-                              <span className="truncate">
+                              <span className="text-white font-bold text-sm sm:text-base truncate">
                                 {selectedConversation.buyer_id === user.id 
                                   ? selectedConversation.seller.username 
                                   : selectedConversation.buyer.username}
@@ -1854,7 +1835,7 @@ function MessagesContent() {
                               <span className="text-xs font-normal text-gray-400">
                                 {otherUserOnline ? (
                                   <span className="text-green-400 flex items-center gap-1">
-                                    <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
                                     Active now
                                   </span>
                                 ) : (
@@ -1862,24 +1843,30 @@ function MessagesContent() {
                                 )}
                               </span>
                             </div>
-                          </h3>
-                          {selectedConversation.listing ? (
-                            <Link 
-                              href={`/listing/${selectedConversation.listing_id}`}
-                              className="text-xs sm:text-sm text-purple-400 hover:text-purple-300 hover:underline transition flex items-center gap-1 mt-1 truncate"
-                            >
-                              <span>🏷️</span>
-                              <span className="truncate">{selectedConversation.listing.title} →</span>
-                            </Link>
-                          ) : (
-                            <p className="text-xs sm:text-sm text-gray-500 italic mt-1">⚠️ Listing no longer available</p>
-                          )}
+                          </div>
+                          {(() => {
+                            const listingInfo = getListingInfo(selectedConversation)
+                            return listingInfo.title !== 'Deleted Listing' ? (
+                              <Link 
+                                href={`/listing/${selectedConversation.listing_id}`}
+                                className="text-xs text-purple-400 hover:text-purple-300 hover:underline transition flex items-center gap-1 mt-1 truncate"
+                              >
+                                <span>🏷️</span>
+                                <span className="truncate">{listingInfo.title} →</span>
+                              </Link>
+                            ) : (
+                              <p className="text-xs text-gray-500 italic mt-1 flex items-center gap-1">
+                                <span>🏷️</span>
+                                <span className="truncate">{listingInfo.title}</span>
+                              </p>
+                            )
+                          })()}
                         </div>
                         
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2">
                           <button
                             onClick={handleReportUser}
-                            className="p-2 hover:bg-red-500/20 rounded-lg transition-colors group"
+                            className="p-2 hover:bg-red-500/20 rounded-lg transition-colors group min-h-[44px] min-w-[44px] flex items-center justify-center"
                             title="Report user"
                           >
                             <svg className="w-5 h-5 text-gray-400 group-hover:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1904,9 +1891,9 @@ function MessagesContent() {
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <p className="text-xs text-blue-300 flex items-center gap-2">
                           <span>🛡️</span>
-                          <span>Never share passwords, credit cards, or personal documents. Nashflare staff will never ask for this info.</span>
+                          <span className="line-clamp-1">Never share passwords, credit cards, or personal documents.</span>
                         </p>
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
+                        <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
                           <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                           </svg>
@@ -1935,12 +1922,12 @@ function MessagesContent() {
                               </div>
                             )}
                             
-                            {/* UPDATED: Delivery messages with blur/reveal */}
+                            {/* Delivery messages with blur/reveal */}
                             {isSystemMessage && isDelivery ? (
                               renderDeliveryMessage(message)
                             ) : isSystemMessage ? (
                               <div className="flex justify-center my-3 sm:my-4">
-                                <div className="max-w-[90%] sm:max-w-[85%] bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 backdrop-blur-lg border border-blue-400/30 rounded-2xl p-3 sm:p-4 shadow-lg">
+                                <div className="max-w-[95%] sm:max-w-[85%] bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 backdrop-blur-lg border border-blue-400/30 rounded-2xl p-3 sm:p-4 shadow-lg">
                                   <div className="flex items-start gap-2 sm:gap-3">
                                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
                                       <span className="text-base sm:text-xl">🔔</span>
@@ -1960,7 +1947,7 @@ function MessagesContent() {
                               </div>
                             ) : message.sender?.is_admin ? (
                               <div className="flex justify-center my-3 sm:my-4">
-                                <div className="max-w-[90%] sm:max-w-[85%] bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-lg border border-orange-400/30 rounded-2xl p-3 sm:p-4 shadow-lg">
+                                <div className="max-w-[95%] sm:max-w-[85%] bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-lg border border-orange-400/30 rounded-2xl p-3 sm:p-4 shadow-lg">
                                   <div className="flex items-start gap-2 sm:gap-3">
                                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
                                       <span className="text-base sm:text-xl">👑</span>
@@ -1981,16 +1968,16 @@ function MessagesContent() {
                             ) : (
                               <div className={`flex gap-2 mb-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
                                 {!isOwnMessage && (
-                                  <div className="mt-1">
+                                  <div className="mt-1 flex-shrink-0">
                                     {renderAvatar(message.sender.avatar_url, message.sender.username, 'sm')}
                                   </div>
                                 )}
-                                <div className={`max-w-[75%] sm:max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
+                                <div className={`max-w-[80%] sm:max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
                                   {hasScamPattern && !isOwnMessage && (
-                                    <div className="mb-1 px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-lg">
+                                    <div className="mb-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-red-500/20 border border-red-500/30 rounded-lg">
                                       <p className="text-xs text-red-300 flex items-center gap-1">
                                         <span>⚠️</span>
-                                        <span>{hasScamPattern}</span>
+                                        <span className="line-clamp-1">{hasScamPattern}</span>
                                       </p>
                                     </div>
                                   )}
@@ -2003,7 +1990,7 @@ function MessagesContent() {
                                     {message.reply_message && (
                                       <div className="mb-2 pb-2 border-b border-white/20">
                                         <div className="flex items-start gap-2 bg-black/20 rounded-lg p-2">
-                                          <div className="w-1 bg-white/40 rounded-full"></div>
+                                          <div className="w-1 bg-white/40 rounded-full flex-shrink-0 self-stretch"></div>
                                           <div className="flex-1 min-w-0">
                                             <p className="text-xs font-semibold opacity-80">{message.reply_message.sender.username}</p>
                                             {message.reply_message.image_url ? (
@@ -2021,7 +2008,7 @@ function MessagesContent() {
                                         <img
                                           src={message.image_url}
                                           alt="Shared image"
-                                          className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition"
+                                          className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition max-h-48 sm:max-h-64"
                                           onClick={() => {
                                             setModalImageUrl(message.image_url!)
                                             setShowImageModal(true)
@@ -2035,7 +2022,7 @@ function MessagesContent() {
                                     
                                     <button
                                       onClick={() => setReplyingTo(message)}
-                                      className="absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-700 hover:bg-slate-600 rounded-full p-1.5"
+                                      className="absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-700 hover:bg-slate-600 rounded-full p-1.5 min-h-[28px] min-w-[28px] flex items-center justify-center"
                                       title="Reply"
                                     >
                                       <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2052,7 +2039,7 @@ function MessagesContent() {
                                   </div>
                                 </div>
                                 {isOwnMessage && (
-                                  <div className="mt-1">
+                                  <div className="mt-1 flex-shrink-0">
                                     {renderAvatar(userProfile?.avatar_url || null, userProfile?.username || user.email?.charAt(0) || 'U', 'sm')}
                                   </div>
                                 )}
@@ -2068,13 +2055,13 @@ function MessagesContent() {
                     {/* Message Input */}
                     <form onSubmit={sendMessage} className="p-3 sm:p-4 border-t border-white/10 bg-slate-800/60 relative">
                       {replyingTo && (
-                        <div className="mb-3 bg-slate-700/50 border border-white/10 rounded-xl p-3 flex items-start justify-between gap-2">
+                        <div className="mb-3 bg-slate-700/50 border border-white/10 rounded-xl p-2 sm:p-3 flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                               </svg>
-                              <span className="text-xs text-purple-300 font-semibold">Replying to {replyingTo.sender.username}</span>
+                              <span className="text-xs text-purple-300 font-semibold truncate">Replying to {replyingTo.sender.username}</span>
                             </div>
                             {replyingTo.image_url ? (
                               <p className="text-xs text-gray-400 truncate">📷 Image</p>
@@ -2085,7 +2072,7 @@ function MessagesContent() {
                           <button
                             type="button"
                             onClick={() => setReplyingTo(null)}
-                            className="text-gray-400 hover:text-white flex-shrink-0"
+                            className="text-gray-400 hover:text-white flex-shrink-0 p-1 min-h-[32px] min-w-[32px] flex items-center justify-center"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2096,7 +2083,7 @@ function MessagesContent() {
                       
                       {imagePreview && (
                         <div className="mb-3 relative inline-block">
-                          <img src={imagePreview} alt="Preview" className="h-20 rounded-lg border-2 border-purple-500/50" />
+                          <img src={imagePreview} alt="Preview" className="h-16 sm:h-20 rounded-lg border-2 border-purple-500/50" />
                           <button
                             type="button"
                             onClick={() => {
@@ -2115,11 +2102,11 @@ function MessagesContent() {
                         <div className="absolute bottom-16 sm:bottom-20 left-2 sm:left-4 bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-xl p-3 sm:p-4 shadow-2xl z-50 max-w-[calc(100%-1rem)]">
                           <div className="flex items-center justify-between mb-2 sm:mb-3">
                             <p className="text-xs sm:text-sm text-gray-400 font-semibold">Quick Emojis</p>
-                            <button type="button" onClick={() => setShowEmojiPicker(false)} className="text-gray-400 hover:text-white transition text-lg">✕</button>
+                            <button type="button" onClick={() => setShowEmojiPicker(false)} className="text-gray-400 hover:text-white transition text-lg p-1">✕</button>
                           </div>
                           <div className="grid grid-cols-8 gap-1 sm:gap-2 max-h-[200px] overflow-y-auto">
                             {commonEmojis.map((emoji, index) => (
-                              <button key={index} type="button" onClick={() => insertEmoji(emoji)} className="text-xl sm:text-2xl hover:bg-white/10 rounded-lg p-1.5 sm:p-2 transition-all duration-200 hover:scale-125">
+                              <button key={index} type="button" onClick={() => insertEmoji(emoji)} className="text-xl sm:text-2xl hover:bg-white/10 rounded-lg p-1.5 sm:p-2 transition-all duration-200 hover:scale-125 min-h-[36px] min-w-[36px] flex items-center justify-center">
                                 {emoji}
                               </button>
                             ))}
@@ -2127,7 +2114,7 @@ function MessagesContent() {
                         </div>
                       )}
 
-                      {/* NEW: Rate limit error message */}
+                      {/* Rate limit error message */}
                       {rateLimitError && (
                         <div className="mb-3 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
                           <p className="text-red-400 text-xs flex items-center gap-2">
@@ -2139,7 +2126,7 @@ function MessagesContent() {
                         </div>
                       )}
                       
-                      <div className="flex gap-2 sm:gap-3">
+                      <div className="flex gap-2">
                         <input
                           ref={fileInputRef}
                           type="file"
@@ -2151,13 +2138,13 @@ function MessagesContent() {
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="px-2 sm:px-3 py-2 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300 flex-shrink-0 text-base sm:text-lg"
+                          className="p-2 sm:px-3 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300 flex-shrink-0 text-base sm:text-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
                           title="Upload image"
                         >
                           📷
                         </button>
                         
-                        <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="px-2 sm:px-3 py-2 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300 flex-shrink-0 text-base sm:text-lg">
+                        <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 sm:px-3 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300 flex-shrink-0 text-base sm:text-lg min-h-[44px] min-w-[44px] flex items-center justify-center">
                           😊
                         </button>
                         <div className="flex-1 relative group">
@@ -2168,7 +2155,7 @@ function MessagesContent() {
                             onChange={(e) => setNewMessage(e.target.value.slice(0, 2000))}
                             maxLength={2000}
                             placeholder="Type a message..."
-                            className="relative w-full px-3 sm:px-4 py-2 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+                            className="relative w-full px-3 sm:px-4 py-2 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 min-h-[44px]"
                           />
                           {/* Character counter - shows when approaching limit */}
                           {newMessage.length > 1800 && (
@@ -2180,9 +2167,9 @@ function MessagesContent() {
                         <button
                           type="submit"
                           disabled={(!newMessage.trim() && !selectedImage) || sending || uploadingImage}
-                          className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0 text-sm sm:text-base"
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0 text-sm min-h-[44px]"
                         >
-                          {uploadingImage ? '📤' : sending ? '...' : <span className="hidden sm:inline">🚀 Send</span>}<span className="inline sm:hidden">🚀</span>
+                          {uploadingImage ? '📤' : sending ? '...' : '🚀'}
                         </button>
                       </div>
                     </form>
@@ -2219,8 +2206,23 @@ function MessagesContent() {
           }
         }
         
+        @keyframes slide-up {
+          from {
+            transform: translateY(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        
         .animate-fade-in {
           animation: fade-in 0.2s ease-out;
+        }
+        
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
         }
       `}</style>
     </div>
