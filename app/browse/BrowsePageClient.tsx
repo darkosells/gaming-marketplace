@@ -679,7 +679,7 @@ function BrowseContent() {
           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}
         >
           <option value="all">All Types</option>
-          <option value="instant">⚡ Instant Delivery</option>
+          <option value="automatic">⚡ Instant Delivery</option>
           <option value="manual">📦 Manual Delivery (up to 24h)</option>
         </select>
       </div>
@@ -879,7 +879,7 @@ function BrowseContent() {
                           onClick={() => setSelectedDeliveryType('all')}
                           className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-full text-xs text-blue-300 transition min-h-[32px]"
                         >
-                          <span>{selectedDeliveryType === 'instant' ? '⚡ Instant' : '📦 Manual'}</span>
+                          <span>{selectedDeliveryType === 'automatic' ? '⚡ Instant' : '📦 Manual'}</span>
                           <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
@@ -959,11 +959,11 @@ function BrowseContent() {
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                     {currentListings.map((listing) => (
-                      <Link key={listing.id} href={`/listing/${listing.id}`} className="group">
-                        <div className="relative bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 sm:hover:-translate-y-2">
+                      <Link key={listing.id} href={`/listing/${listing.id}`} className="group h-full">
+                        <div className="relative h-full flex flex-col bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 sm:hover:-translate-y-2">
                           <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/0 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-500"></div>
                           
-                          <div className="relative h-40 sm:h-48 bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
+                          <div className="relative h-40 sm:h-48 flex-shrink-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
                             {listing.image_url ? (
                               <img src={listing.image_url} alt={listing.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                             ) : (
@@ -978,46 +978,42 @@ function BrowseContent() {
                                 {listing.category === 'account' ? '🎮 Account' : listing.category === 'items' ? '🎒 Items' : listing.category === 'currency' ? '💰 Currency' : '🔑 Key'}
                               </span>
                             </div>
-                            {/* Delivery Type Badge - Top Right */}
-                            <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
-                              {listing.delivery_type === 'automatic' ? (
+                            {/* Delivery Type Badge - Top Right (Only show for instant delivery) */}
+                            {listing.delivery_type === 'automatic' && (
+                              <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
                                 <span className="bg-green-500/80 backdrop-blur-lg px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                   </svg>
                                   Instant
                                 </span>
-                              ) : (
-                                <span className="bg-blue-500/80 backdrop-blur-lg px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  24 Hours
-                                </span>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
-                          <div className="relative p-4 sm:p-5">
+                          <div className="relative p-4 sm:p-5 flex flex-col flex-grow">
                             <p className="text-purple-400 text-xs sm:text-sm font-semibold mb-1">{listing.game}</p>
                             <h3 className="text-white font-bold text-base sm:text-lg mb-2 group-hover:text-purple-400 transition line-clamp-1">{listing.title}</h3>
                             <p className="text-gray-400 text-xs sm:text-sm mb-3 line-clamp-2">{listing.description}</p>
                             
-                            {listing.tags && listing.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-3">
-                                {listing.tags.slice(0, 3).map((tag: string) => (
-                                  <span key={tag} className="px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-xs text-purple-300">
-                                    {tag}
-                                  </span>
-                                ))}
-                                {listing.tags.length > 3 && (
-                                  <span className="px-2 py-1 bg-slate-800/50 border border-white/10 rounded text-xs text-gray-400">
-                                    +{listing.tags.length - 3} more
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                            {/* Tags Display - Fixed height container */}
+                            <div className="h-8 mb-3">
+                              {listing.tags && listing.tags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {listing.tags.slice(0, 3).map((tag: string) => (
+                                    <span key={tag} className="px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-xs text-purple-300">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {listing.tags.length > 3 && (
+                                    <span className="px-2 py-1 bg-slate-800/50 border border-white/10 rounded text-xs text-gray-400">
+                                      +{listing.tags.length - 3} more
+                                    </span>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
 
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mt-auto">
                               <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${parseFloat(listing.price).toFixed(2)}</span>
                               <div className="text-right">
                                 <p className="text-gray-500 text-xs mb-0.5 sm:mb-1">Seller</p>

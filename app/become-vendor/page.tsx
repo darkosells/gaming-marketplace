@@ -18,6 +18,19 @@ export default function BecomeVendorPage() {
   const [calculatedAge, setCalculatedAge] = useState<number | null>(null)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   
+  // Validation Modal State
+  const [validationModal, setValidationModal] = useState<{
+    show: boolean
+    title: string
+    message: string
+    type: 'error' | 'warning' | 'info'
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    type: 'error'
+  })
+  
   const [formData, setFormData] = useState({
     fullName: '', dateOfBirth: '', phoneNumber: '', streetAddress: '', city: '', stateProvince: '', postalCode: '', country: 'United States',
     idType: 'drivers_license', verificationType: 'selfie', hasPreviousExperience: false, platformNames: '', platformUsernames: '', experienceDescription: ''
@@ -33,6 +46,11 @@ export default function BecomeVendorPage() {
 
   const router = useRouter()
   const supabase = createClient()
+
+  // Show validation modal helper function
+  const showValidation = (title: string, message: string, type: 'error' | 'warning' | 'info' = 'error') => {
+    setValidationModal({ show: true, title, message, type })
+  }
 
   useEffect(() => { checkUser() }, [])
 
@@ -61,7 +79,11 @@ export default function BecomeVendorPage() {
     setUser(user)
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(profileData)
-    if (profileData?.role === 'vendor') { alert('You are already a vendor!'); router.push('/dashboard'); return }
+    if (profileData?.role === 'vendor') { 
+      showValidation('Already a Vendor', 'You are already a vendor!', 'info')
+      setTimeout(() => router.push('/dashboard'), 2000)
+      return 
+    }
     await checkPreviousSubmission(user.id)
     setLoading(false)
   }
@@ -72,14 +94,14 @@ export default function BecomeVendorPage() {
     if (!latestVerification) return
     
     if (latestVerification.status === 'pending') {
-      alert('You already have a pending verification application.')
-      router.push('/customer-dashboard')
+      showValidation('Application Pending', 'You already have a pending verification application.', 'info')
+      setTimeout(() => router.push('/customer-dashboard'), 2000)
       return
     }
     
     if (latestVerification.status === 'approved') {
-      alert('You are already an approved vendor!')
-      router.push('/dashboard')
+      showValidation('Already Approved', 'You are already an approved vendor!', 'info')
+      setTimeout(() => router.push('/dashboard'), 2000)
       return
     }
     
@@ -88,8 +110,8 @@ export default function BecomeVendorPage() {
         setPreviousSubmission(latestVerification)
         setIsResubmission(true)
       } else {
-        alert('Your vendor application was permanently rejected.')
-        router.push('/customer-dashboard')
+        showValidation('Application Rejected', 'Your vendor application was permanently rejected.', 'error')
+        setTimeout(() => router.push('/customer-dashboard'), 2000)
         return
       }
     }
@@ -103,8 +125,14 @@ export default function BecomeVendorPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back' | 'verification') => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 10 * 1024 * 1024) { alert('File too large. Max 10MB.'); return }
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { alert('Only JPG, PNG, WEBP allowed.'); return }
+    if (file.size > 10 * 1024 * 1024) { 
+      showValidation('File Too Large', 'The file you selected is too large. Maximum file size is 10MB.', 'error')
+      return 
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { 
+      showValidation('Invalid File Type', 'Only JPG, PNG, and WEBP image formats are allowed.', 'error')
+      return 
+    }
     
     if (type === 'front') { 
       setIdFrontFile(file)
@@ -131,59 +159,77 @@ export default function BecomeVendorPage() {
   const validateStep = (stepNum: number): boolean => {
     if (stepNum === 1) {
       if (!formData.fullName.trim() || formData.fullName.trim().length < 2) { 
-        alert('Please enter your full legal name.'); 
+        showValidation('Full Name Required', 'Please enter your full legal name as it appears on your government-issued ID.', 'error')
         return false 
       }
       if (!formData.dateOfBirth) { 
-        alert('Please enter your date of birth.'); 
+        showValidation('Date of Birth Required', 'Please enter your date of birth to verify your age.', 'error')
         return false 
       }
       
       // Enhanced age validation
       if (calculatedAge === null) {
-        alert('Please enter a valid date of birth.')
+        showValidation('Invalid Date', 'Please enter a valid date of birth.', 'error')
         return false
       }
       
       if (calculatedAge < 0 || calculatedAge > 120) {
-        alert('Please enter a valid date of birth.')
+        showValidation('Invalid Date', 'Please enter a valid date of birth.', 'error')
         return false
       }
       
       if (calculatedAge < 18) { 
-        alert(`You must be at least 18 years old to become a vendor. Based on your date of birth, you are ${calculatedAge} years old.`)
+        showValidation('Age Requirement Not Met', `You must be at least 18 years old to become a vendor. Based on your date of birth, you are ${calculatedAge} years old.`, 'error')
         return false 
       }
       
       if (!formData.phoneNumber || formData.phoneNumber.length < 10) { 
-        alert('Please enter a valid phone number (at least 10 digits).'); 
+        showValidation('Phone Number Required', 'Please enter a valid phone number with at least 10 digits.', 'error')
         return false 
       }
     }
     if (stepNum === 2) {
-      if (!formData.streetAddress.trim()) { alert('Please enter your street address.'); return false }
-      if (!formData.city.trim()) { alert('Please enter your city.'); return false }
-      if (!formData.stateProvince.trim()) { alert('Please enter your state or province.'); return false }
-      if (!formData.postalCode.trim()) { alert('Please enter your postal code.'); return false }
-    }
-    if (stepNum === 3) {
-      if (!idFrontFile) { alert('Please upload the front of your ID.'); return false }
-      if ((formData.idType === 'drivers_license' || formData.idType === 'national_id') && !idBackFile) { 
-        alert('Please upload the back of your ID.'); 
+      if (!formData.streetAddress.trim()) { 
+        showValidation('Street Address Required', 'Please enter your street address including apartment/unit number if applicable.', 'error')
         return false 
       }
-      if (!verificationPhotoFile) { alert('Please upload your verification photo.'); return false }
+      if (!formData.city.trim()) { 
+        showValidation('City Required', 'Please enter the city where you reside.', 'error')
+        return false 
+      }
+      if (!formData.stateProvince.trim()) { 
+        showValidation('State/Province Required', 'Please enter your state or province.', 'error')
+        return false 
+      }
+      if (!formData.postalCode.trim()) { 
+        showValidation('Postal Code Required', 'Please enter your postal/ZIP code.', 'error')
+        return false 
+      }
+    }
+    if (stepNum === 3) {
+      if (!idFrontFile) { 
+        showValidation('ID Front Required', 'Please upload a clear photo of the front of your government-issued ID.', 'error')
+        return false 
+      }
+      if ((formData.idType === 'drivers_license' || formData.idType === 'national_id') && !idBackFile) { 
+        showValidation('ID Back Required', 'Please upload a clear photo of the back of your ID.', 'error')
+        return false 
+      }
+      if (!verificationPhotoFile) { 
+        showValidation('Verification Photo Required', 'Please upload your verification photo (selfie with ID or website with ID).', 'error')
+        return false 
+      }
     }
     return true
   }
 
   const handleSubmit = async () => {
     if (!agreedToTerms) { 
-      alert('You must agree to the Terms of Service and Privacy Policy.'); 
+      showValidation('Terms Required', 'You must agree to the Terms of Service and Privacy Policy to continue.', 'warning')
       return 
     }
     if (!agreedToSellerRules) { 
-      alert('You must read and agree to the Seller Rules & Guidelines.'); 
+      showValidation('Seller Rules Required', 'You must read and agree to the Seller Rules & Guidelines to continue.', 'warning')
       return 
     }
     
@@ -218,9 +264,108 @@ export default function BecomeVendorPage() {
       setShowSuccessModal(true)
     } catch (error) { 
       console.error('Error:', error)
-      alert('Failed to submit. Please try again.') 
+      showValidation('Submission Failed', 'Failed to submit your application. Please try again or contact support if the issue persists.', 'error')
     }
     setSubmitting(false)
+  }
+
+  // Validation Modal Component
+  const ValidationModal = () => {
+    if (!validationModal.show) return null
+    
+    const iconConfig = {
+      error: {
+        bg: 'from-red-500 to-rose-600',
+        glow: 'from-red-500/20 via-rose-500/20 to-red-500/20',
+        icon: (
+          <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ),
+        borderColor: 'border-red-500/30'
+      },
+      warning: {
+        bg: 'from-amber-500 to-orange-500',
+        glow: 'from-amber-500/20 via-orange-500/20 to-amber-500/20',
+        icon: (
+          <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        ),
+        borderColor: 'border-amber-500/30'
+      },
+      info: {
+        bg: 'from-blue-500 to-cyan-500',
+        glow: 'from-blue-500/20 via-cyan-500/20 to-blue-500/20',
+        icon: (
+          <svg className="w-8 h-8 sm:w-10 sm:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        borderColor: 'border-blue-500/30'
+      }
+    }
+    
+    const config = iconConfig[validationModal.type]
+    
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* Backdrop */}
+        <div 
+          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          onClick={() => setValidationModal({ ...validationModal, show: false })}
+        ></div>
+        
+        {/* Modal Content */}
+        <div className={`relative bg-slate-900/95 backdrop-blur-xl border ${config.borderColor} rounded-2xl sm:rounded-3xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-2xl transform transition-all animate-modal-pop`}>
+          {/* Glowing effect */}
+          <div className={`absolute -inset-1 bg-gradient-to-r ${config.glow} rounded-2xl sm:rounded-3xl blur-xl`}></div>
+          
+          <div className="relative">
+            {/* Icon */}
+            <div className="flex justify-center mb-5">
+              <div className={`w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br ${config.bg} rounded-full flex items-center justify-center shadow-lg`}>
+                {config.icon}
+              </div>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-xl sm:text-2xl font-bold text-white text-center mb-3">
+              {validationModal.title}
+            </h2>
+
+            {/* Message */}
+            <p className="text-gray-300 text-center text-sm sm:text-base mb-6 leading-relaxed">
+              {validationModal.message}
+            </p>
+
+            {/* Action Button */}
+            <button
+              onClick={() => setValidationModal({ ...validationModal, show: false })}
+              className={`w-full bg-gradient-to-r ${config.bg} hover:opacity-90 text-white py-3 sm:py-3.5 rounded-xl font-semibold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2`}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+        
+        <style jsx>{`
+          @keyframes modal-pop {
+            0% {
+              opacity: 0;
+              transform: scale(0.9);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+          .animate-modal-pop {
+            animation: modal-pop 0.2s ease-out forwards;
+          }
+        `}</style>
+      </div>
+    )
   }
 
   // Success Modal Component
@@ -317,6 +462,9 @@ export default function BecomeVendorPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
+        {/* Validation Modal even during loading */}
+        <ValidationModal />
+        
         {/* Cosmic Background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-20 left-10 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
@@ -346,6 +494,9 @@ export default function BecomeVendorPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden flex flex-col">
+      {/* Validation Modal */}
+      <ValidationModal />
+      
       {/* Success Modal */}
       {showSuccessModal && <SuccessModal />}
 
