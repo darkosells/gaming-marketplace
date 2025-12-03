@@ -2,6 +2,7 @@
 // Location: app/games/[slug]/page.tsx
 
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { siteConfig } from '@/lib/seo-config'
 import { getGameBySlug, getAllGameSlugs } from '@/lib/games-config'
@@ -73,6 +74,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+// Loading component for Suspense fallback
+function GamePageLoading() {
+  return (
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+      </div>
+      <div className="relative z-10 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="relative inline-block">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-lg opacity-50 animate-pulse"></div>
+            <div className="relative inline-block animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent"></div>
+          </div>
+          <p className="text-white mt-6 text-lg">Loading...</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default async function GamePage({ params }: Props) {
   const { slug } = await params
   const game = getGameBySlug(slug)
@@ -137,7 +158,9 @@ export default async function GamePage({ params }: Props) {
         }}
       />
       
-      <GamePageClient slug={slug} />
+      <Suspense fallback={<GamePageLoading />}>
+        <GamePageClient slug={slug} />
+      </Suspense>
     </>
   )
 }
