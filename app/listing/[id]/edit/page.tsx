@@ -1,4 +1,4 @@
-// app/listing/[id]/edit/page.tsx - MODERNIZED EDIT LISTING WITH TAGS & VALIDATION
+// app/listing/[id]/edit/page.tsx - MODERNIZED EDIT LISTING WITH TAGS, VALIDATION & GAME-SPECIFIC FILTERS
 
 'use client'
 
@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 import ImageUploader from '@/components/ImageUploader'
 
 // Custom Modal Component
@@ -96,14 +97,30 @@ const categoryGamesMap: { [key: string]: string[] } = {
   key: ['Steam', 'Playstation', 'Xbox']
 }
 
-// Platform options (matches browse page filter)
-const platformOptions = [
-  { value: 'PC', label: '🖥️ PC' },
-  { value: 'PlayStation', label: '🎮 PlayStation' },
-  { value: 'Xbox', label: '🟢 Xbox' },
-  { value: 'Nintendo', label: '🔴 Nintendo' },
-  { value: 'Mobile', label: '📱 Mobile' }
-]
+// Game-specific platform options (null means no platform selection needed)
+const gamePlatformsMap: { [key: string]: string[] | null } = {
+  'GTA 5': ['PC', 'Playstation 4', 'Playstation 5', 'Xbox X/S', 'Xbox One'],
+  'Fortnite': ['PC', 'Playstation', 'Xbox', 'Switch', 'Android', 'iOS'],
+  'Roblox': null,
+  'Valorant': ['PC', 'Playstation', 'Xbox'],
+  'League of Legends': null,
+  'Clash Royale': null,
+  'Clash of Clans': null,
+  'Steam': null,
+  // Items category games - no platform
+  'Steal a Brainrot': null,
+  'Grow a Garden': null,
+  'Adopt me': null,
+  'Blox Fruits': null,
+  'Plants vs Brainrots': null,
+}
+
+// Valorant-specific options
+const valorantRegions = ['NA', 'EU/TR/MENA/CIS', 'LATAM', 'Brazil', 'AP', 'KR']
+const valorantRanks = ['Ranked Ready', 'Unranked', 'Radiant', 'Immortal', 'Ascendant', 'Diamond', 'Gold']
+
+// League of Legends-specific options
+const lolServers = ['Europe Nordic & East', 'Europe West', 'North America', 'Brazil']
 
 // Tags for each game in Account category
 const accountGameTags: { [key: string]: string[] } = {
@@ -178,6 +195,11 @@ export default function EditListingPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [tagSearchQuery, setTagSearchQuery] = useState('')
 
+  // Game-specific fields
+  const [valorantRegion, setValorantRegion] = useState('')
+  const [valorantRank, setValorantRank] = useState('')
+  const [lolServer, setLolServer] = useState('')
+
   // Helper functions for modal
   const showAlert = (title: string, message: string) => {
     setModal({
@@ -212,21 +234,29 @@ export default function EditListingPage() {
     }
   }, [user])
 
-  // Reset game if it's not valid for the new category (but only after initial load)
+  // Reset game and game-specific fields if category changes
   useEffect(() => {
     if (listing && category !== listing.category) {
       const validGames = categoryGamesMap[category] || []
       if (!validGames.includes(game)) {
         setGame('')
+        setPlatform('')
+        setValorantRegion('')
+        setValorantRank('')
+        setLolServer('')
       }
     }
   }, [category])
 
-  // Reset tags when category or game changes
+  // Reset tags and game-specific fields when game changes
   useEffect(() => {
     if (listing && (category !== listing.category || game !== listing.game)) {
       setSelectedTags([])
       setTagSearchQuery('')
+      setPlatform('')
+      setValorantRegion('')
+      setValorantRank('')
+      setLolServer('')
     }
   }, [category, game])
 
@@ -272,6 +302,11 @@ export default function EditListingPage() {
       if (data.tags && Array.isArray(data.tags)) {
         setSelectedTags(data.tags)
       }
+
+      // Load game-specific fields
+      setValorantRegion(data.region || '')
+      setValorantRank(data.rank || '')
+      setLolServer(data.server || '')
 
       // Handle images - support both old single image and new array
       if (data.image_urls && data.image_urls.length > 0) {
@@ -426,6 +461,16 @@ export default function EditListingPage() {
     return categoryGamesMap[category] || []
   }
 
+  const getAvailablePlatforms = () => {
+    if (!game) return null
+    return gamePlatformsMap[game] || null
+  }
+
+  const shouldShowPlatformField = () => {
+    const platforms = getAvailablePlatforms()
+    return platforms !== null && platforms.length > 0
+  }
+
   const getCategoryLabel = (cat: string) => {
     switch (cat) {
       case 'account': return 'Accounts'
@@ -439,8 +484,26 @@ export default function EditListingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!title || !game || !description || !price || !platform) {
+    if (!title || !game || !description || !price) {
       showAlert('Validation Error', 'Please fill in all required fields')
+      return
+    }
+
+    // Validate platform only if required for the selected game
+    if (shouldShowPlatformField() && !platform) {
+      showAlert('Validation Error', 'Please select a platform')
+      return
+    }
+
+    // Validate Valorant-specific fields
+    if (game === 'Valorant' && (!valorantRegion || !valorantRank)) {
+      showAlert('Validation Error', 'Please select Region and Rank for Valorant listings')
+      return
+    }
+
+    // Validate LoL-specific fields
+    if (game === 'League of Legends' && !lolServer) {
+      showAlert('Validation Error', 'Please select a Server for League of Legends listings')
       return
     }
 
@@ -503,23 +566,42 @@ export default function EditListingPage() {
         newStatus = 'out_of_stock' // Mark as out of stock when no stock
       }
 
-      // Update listing with correct stock count, status, AND tags
+      // Build update data
+      const updateData: any = {
+        title,
+        game,
+        category,
+        description,
+        price: parseFloat(price),
+        platform: shouldShowPlatformField() ? platform : null,
+        stock: finalStock,
+        status: newStatus,
+        image_url: imageUrls[0] || null, // Keep for backward compatibility
+        image_urls: imageUrls, // New array field
+        delivery_type: deliveryType === 'automatic' ? 'instant' : 'manual',
+        tags: selectedTags.length > 0 ? selectedTags : null
+      }
+
+      // Add Valorant-specific fields
+      if (game === 'Valorant') {
+        updateData.region = valorantRegion
+        updateData.rank = valorantRank
+      } else {
+        updateData.region = null
+        updateData.rank = null
+      }
+
+      // Add LoL-specific fields
+      if (game === 'League of Legends') {
+        updateData.server = lolServer
+      } else {
+        updateData.server = null
+      }
+
+      // Update listing
       const { error: listingError } = await supabase
         .from('listings')
-        .update({
-          title,
-          game,
-          category,
-          description,
-          price: parseFloat(price),
-          platform,
-          stock: finalStock,
-          status: newStatus,
-          image_url: imageUrls[0] || null, // Keep for backward compatibility
-          image_urls: imageUrls, // New array field
-          delivery_type: deliveryType === 'automatic' ? 'instant' : 'manual',
-          tags: selectedTags.length > 0 ? selectedTags : null
-        })
+        .update(updateData)
         .eq('id', params.id)
 
       if (listingError) throw listingError
@@ -755,6 +837,124 @@ export default function EditListingPage() {
                     </div>
                   </div>
 
+                  {/* Platform Selection - Only show for games that have platforms */}
+                  {shouldShowPlatformField() && (
+                    <div>
+                      <label className="block text-white mb-2 font-semibold">
+                        Platform <span className="text-red-400">*</span>
+                      </label>
+                      <select
+                        value={platform}
+                        onChange={(e) => setPlatform(e.target.value)}
+                        className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 appearance-none cursor-pointer transition"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 1rem center',
+                          backgroundSize: '1.5em 1.5em',
+                          paddingRight: '3rem'
+                        }}
+                        required
+                      >
+                        <option value="">Select a platform</option>
+                        {getAvailablePlatforms()?.map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Valorant-specific fields */}
+                  {game === 'Valorant' && (
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* Region */}
+                      <div>
+                        <label className="block text-white mb-2 font-semibold flex items-center gap-2">
+                          <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Region <span className="text-red-400">*</span>
+                        </label>
+                        <select
+                          value={valorantRegion}
+                          onChange={(e) => setValorantRegion(e.target.value)}
+                          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 appearance-none cursor-pointer transition"
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 1rem center',
+                            backgroundSize: '1.5em 1.5em',
+                            paddingRight: '3rem'
+                          }}
+                          required
+                        >
+                          <option value="">Select a region</option>
+                          {valorantRegions.map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Rank */}
+                      <div>
+                        <label className="block text-white mb-2 font-semibold flex items-center gap-2">
+                          <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                          </svg>
+                          Rank <span className="text-red-400">*</span>
+                        </label>
+                        <select
+                          value={valorantRank}
+                          onChange={(e) => setValorantRank(e.target.value)}
+                          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 appearance-none cursor-pointer transition"
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 1rem center',
+                            backgroundSize: '1.5em 1.5em',
+                            paddingRight: '3rem'
+                          }}
+                          required
+                        >
+                          <option value="">Select a rank</option>
+                          {valorantRanks.map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* League of Legends-specific fields */}
+                  {game === 'League of Legends' && (
+                    <div>
+                      <label className="block text-white mb-2 font-semibold flex items-center gap-2">
+                        <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                        </svg>
+                        Server <span className="text-red-400">*</span>
+                      </label>
+                      <select
+                        value={lolServer}
+                        onChange={(e) => setLolServer(e.target.value)}
+                        className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 appearance-none cursor-pointer transition"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 1rem center',
+                          backgroundSize: '1.5em 1.5em',
+                          paddingRight: '3rem'
+                        }}
+                        required
+                      >
+                        <option value="">Select a server</option>
+                        {lolServers.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   {/* Tags Selection - Only for Accounts and Items */}
                   {shouldShowTags() && (
                     <div>
@@ -878,29 +1078,20 @@ export default function EditListingPage() {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-white mb-2 font-semibold">
-                        Platform <span className="text-red-400">*</span>
-                      </label>
-                      <select
-                        value={platform}
-                        onChange={(e) => setPlatform(e.target.value)}
-                        className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 appearance-none cursor-pointer transition"
-                        style={{
-                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 1rem center',
-                          backgroundSize: '1.5em 1.5em',
-                          paddingRight: '3rem'
-                        }}
-                        required
-                      >
-                        <option value="">Select a platform</option>
-                        {platformOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* Stock - only show for manual delivery */}
+                    {deliveryType === 'manual' && (
+                      <div>
+                        <label className="block text-white mb-2 font-semibold">Stock Quantity *</label>
+                        <input
+                          type="number"
+                          value={stock}
+                          onChange={(e) => setStock(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition"
+                          placeholder="10"
+                          required
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -963,20 +1154,6 @@ export default function EditListingPage() {
                       </button>
                     </div>
                   </div>
-
-                  {deliveryType === 'manual' && (
-                    <div>
-                      <label className="block text-white mb-2 font-semibold">Stock Quantity *</label>
-                      <input
-                        type="number"
-                        value={stock}
-                        onChange={(e) => setStock(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition"
-                        placeholder="10"
-                        required
-                      />
-                    </div>
-                  )}
 
                   {deliveryType === 'automatic' && (
                     <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
@@ -1323,11 +1500,7 @@ export default function EditListingPage() {
         </div>
 
         {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
-          <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2024 Nashflare. All rights reserved.</p>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   )

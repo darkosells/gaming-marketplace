@@ -2,14 +2,41 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import { getGameBySlug } from '@/lib/games-config'
+import { getSEOContentBySlug } from '@/lib/seo-content-config'
 
 interface Props {
   slug: string
 }
+
+// Game-specific platform options (null or empty array means no platform filter)
+const gamePlatformsMap: { [key: string]: string[] | null } = {
+  'GTA 5': ['PC', 'Playstation 4', 'Playstation 5', 'Xbox X/S', 'Xbox One'],
+  'Fortnite': ['PC', 'Playstation', 'Xbox', 'Switch', 'Android', 'iOS'],
+  'Roblox': null,
+  'Valorant': ['PC', 'Playstation', 'Xbox'],
+  'League of Legends': null,
+  'Clash Royale': null,
+  'Clash of Clans': null,
+  'Steam': null,
+  // Items category games
+  'Steal a Brainrot': null,
+  'Grow a Garden': null,
+  'Adopt me': null,
+  'Blox Fruits': null,
+  'Plants vs Brainrots': null,
+}
+
+// Valorant-specific options
+const valorantRegions = ['NA', 'EU/TR/MENA/CIS', 'LATAM', 'Brazil', 'AP', 'KR']
+const valorantRanks = ['Ranked Ready', 'Unranked', 'Radiant', 'Immortal', 'Ascendant', 'Diamond', 'Gold']
+
+// League of Legends-specific options
+const lolServers = ['Europe Nordic & East', 'Europe West', 'North America', 'Brazil']
 
 // Tags for each game in Account category
 const accountGameTags: { [key: string]: string[] } = {
@@ -40,29 +67,47 @@ export default function GamePageClient({ slug }: Props) {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedPlatform, setSelectedPlatform] = useState('all')
   const [selectedDeliveryType, setSelectedDeliveryType] = useState('all')
   const [priceRange, setPriceRange] = useState('all')
   const [sortBy, setSortBy] = useState('recommended')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  
+  // Game-specific filters
+  const [selectedValorantRegion, setSelectedValorantRegion] = useState('all')
+  const [selectedValorantRank, setSelectedValorantRank] = useState('all')
+  const [selectedLolServer, setSelectedLolServer] = useState('all')
 
   const supabase = createClient()
+  const searchParams = useSearchParams()
   const game = getGameBySlug(slug)
+  const seoContent = getSEOContentBySlug(slug)
 
   useEffect(() => {
+    // Initialize category from URL params
+    const categoryParam = searchParams.get('category')
+    if (categoryParam) {
+      setSelectedCategory(categoryParam)
+    }
+    
     if (game) {
       fetchListings()
     }
-  }, [slug])
+  }, [slug, searchParams])
 
   useEffect(() => {
     applyFilters()
     setCurrentPage(1) // Reset to first page when filters change
-  }, [listings, searchQuery, selectedCategory, selectedDeliveryType, priceRange, sortBy, selectedTags])
+  }, [listings, searchQuery, selectedCategory, selectedPlatform, selectedDeliveryType, priceRange, sortBy, selectedTags, selectedValorantRegion, selectedValorantRank, selectedLolServer])
 
-  // Reset tags when category changes
+  // Reset tags and game-specific filters when category changes
   useEffect(() => {
     setSelectedTags([])
+    setSelectedPlatform('all')
+    setSelectedValorantRegion('all')
+    setSelectedValorantRank('all')
+    setSelectedLolServer('all')
   }, [selectedCategory])
 
   const fetchListings = async () => {
@@ -100,6 +145,10 @@ export default function GamePageClient({ slug }: Props) {
       filtered = filtered.filter((listing) => listing.category === selectedCategory)
     }
 
+    if (selectedPlatform !== 'all') {
+      filtered = filtered.filter(listing => listing.platform === selectedPlatform)
+    }
+
     if (selectedDeliveryType !== 'all') {
       filtered = filtered.filter(listing => listing.delivery_type === selectedDeliveryType)
     }
@@ -127,6 +176,23 @@ export default function GamePageClient({ slug }: Props) {
         if (!listing.tags || !Array.isArray(listing.tags)) return false
         return selectedTags.every(tag => listing.tags.includes(tag))
       })
+    }
+
+    // Valorant-specific filters
+    if (game?.name === 'Valorant') {
+      if (selectedValorantRegion !== 'all') {
+        filtered = filtered.filter(listing => listing.region === selectedValorantRegion)
+      }
+      if (selectedValorantRank !== 'all') {
+        filtered = filtered.filter(listing => listing.rank === selectedValorantRank)
+      }
+    }
+
+    // League of Legends-specific filters
+    if (game?.name === 'League of Legends') {
+      if (selectedLolServer !== 'all') {
+        filtered = filtered.filter(listing => listing.server === selectedLolServer)
+      }
     }
 
     // Apply sorting
@@ -173,11 +239,15 @@ export default function GamePageClient({ slug }: Props) {
   const resetFilters = () => {
     setSearchQuery('')
     setSelectedCategory('all')
+    setSelectedPlatform('all')
     setSelectedDeliveryType('all')
     setPriceRange('all')
     setSortBy('recommended')
     setSelectedTags([])
     setCurrentPage(1)
+    setSelectedValorantRegion('all')
+    setSelectedValorantRank('all')
+    setSelectedLolServer('all')
   }
 
   const getCategoryLabel = (category: string) => {
@@ -193,6 +263,17 @@ export default function GamePageClient({ slug }: Props) {
       default:
         return category
     }
+  }
+
+  // Get available platforms for the current game
+  const getAvailablePlatforms = () => {
+    if (!game) return null
+    return gamePlatformsMap[game.name] || null
+  }
+
+  const shouldShowPlatformFilter = () => {
+    const platforms = getAvailablePlatforms()
+    return platforms !== null && platforms.length > 0
   }
 
   // Get available tags based on selected category and game
@@ -221,6 +302,19 @@ export default function GamePageClient({ slug }: Props) {
         ? prev.filter(t => t !== tag)
         : [...prev, tag]
     )
+  }
+
+  // Count active filters for display
+  const getActiveFilterCount = () => {
+    let count = 0
+    if (selectedTags.length > 0) count += selectedTags.length
+    if (selectedPlatform !== 'all') count++
+    if (selectedValorantRegion !== 'all') count++
+    if (selectedValorantRank !== 'all') count++
+    if (selectedLolServer !== 'all') count++
+    if (selectedDeliveryType !== 'all') count++
+    if (priceRange !== 'all') count++
+    return count
   }
 
   // Pagination calculations
@@ -434,7 +528,7 @@ export default function GamePageClient({ slug }: Props) {
 
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Filters Sidebar */}
-            <aside className="w-full lg:w-64 flex-shrink-0" role="complementary" aria-label="Filters">
+            <aside className="w-full lg:w-72 flex-shrink-0" role="complementary" aria-label="Filters">
               <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-all duration-300">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -447,6 +541,127 @@ export default function GamePageClient({ slug }: Props) {
                     Reset All
                   </button>
                 </div>
+
+                {/* Platform Filter - Only show for games that have platforms */}
+                {shouldShowPlatformFilter() && (
+                  <div className="mb-6">
+                    <label htmlFor="platform-filter" className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
+                      <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Platform
+                    </label>
+                    <select
+                      id="platform-filter"
+                      value={selectedPlatform}
+                      onChange={(e) => setSelectedPlatform(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 1rem center',
+                        backgroundSize: '1.5em 1.5em',
+                        paddingRight: '3rem',
+                      }}
+                    >
+                      <option value="all">All Platforms</option>
+                      {getAvailablePlatforms()?.map(platform => (
+                        <option key={platform} value={platform}>{platform}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Valorant-specific filters */}
+                {game.name === 'Valorant' && (
+                  <>
+                    {/* Region Filter */}
+                    <div className="mb-6">
+                      <label htmlFor="valorant-region" className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
+                        <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Region
+                      </label>
+                      <select
+                        id="valorant-region"
+                        value={selectedValorantRegion}
+                        onChange={(e) => setSelectedValorantRegion(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 1rem center',
+                          backgroundSize: '1.5em 1.5em',
+                          paddingRight: '3rem',
+                        }}
+                      >
+                        <option value="all">All Regions</option>
+                        {valorantRegions.map(region => (
+                          <option key={region} value={region}>{region}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Rank Filter */}
+                    <div className="mb-6">
+                      <label htmlFor="valorant-rank" className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
+                        <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                        </svg>
+                        Rank
+                      </label>
+                      <select
+                        id="valorant-rank"
+                        value={selectedValorantRank}
+                        onChange={(e) => setSelectedValorantRank(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 1rem center',
+                          backgroundSize: '1.5em 1.5em',
+                          paddingRight: '3rem',
+                        }}
+                      >
+                        <option value="all">All Ranks</option>
+                        {valorantRanks.map(rank => (
+                          <option key={rank} value={rank}>{rank}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                {/* League of Legends-specific filters */}
+                {game.name === 'League of Legends' && (
+                  <div className="mb-6">
+                    <label htmlFor="lol-server" className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
+                      <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                      </svg>
+                      Server
+                    </label>
+                    <select
+                      id="lol-server"
+                      value={selectedLolServer}
+                      onChange={(e) => setSelectedLolServer(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 1rem center',
+                        backgroundSize: '1.5em 1.5em',
+                        paddingRight: '3rem',
+                      }}
+                    >
+                      <option value="all">All Servers</option>
+                      {lolServers.map(server => (
+                        <option key={server} value={server}>{server}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Delivery Type Filter */}
                 <div className="mb-6">
@@ -596,24 +811,76 @@ export default function GamePageClient({ slug }: Props) {
               )}
 
               {/* Active Filters Display */}
-              {(selectedTags.length > 0 || selectedDeliveryType !== 'all') && (
+              {(selectedTags.length > 0 || selectedDeliveryType !== 'all' || selectedPlatform !== 'all' || selectedValorantRegion !== 'all' || selectedValorantRank !== 'all' || selectedLolServer !== 'all') && (
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-4 mb-6">
                   <div className="flex flex-wrap gap-2 items-center">
                     <span className="text-sm text-gray-400 font-medium">Active filters:</span>
                     {selectedTags.map(tag => (
-                      <span
+                      <button
                         key={tag}
-                        className="inline-flex items-center gap-1 px-3 py-1 bg-purple-500/10 border border-purple-500/30 rounded-full text-xs text-purple-300"
+                        onClick={() => toggleTag(tag)}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-full text-xs text-purple-300 transition"
                       >
                         🏷️ {tag}
-                      </span>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     ))}
                     {selectedDeliveryType !== 'all' && (
-                      <span
-                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-xs text-blue-300"
+                      <button
+                        onClick={() => setSelectedDeliveryType('all')}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-full text-xs text-blue-300 transition"
                       >
                         {selectedDeliveryType === 'automatic' ? '⚡ Instant' : '📦 Manual'}
-                      </span>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                    {selectedPlatform !== 'all' && (
+                      <button
+                        onClick={() => setSelectedPlatform('all')}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-full text-xs text-green-300 transition"
+                      >
+                        🎮 {selectedPlatform}
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                    {selectedValorantRegion !== 'all' && (
+                      <button
+                        onClick={() => setSelectedValorantRegion('all')}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full text-xs text-red-300 transition"
+                      >
+                        🌍 {selectedValorantRegion}
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                    {selectedValorantRank !== 'all' && (
+                      <button
+                        onClick={() => setSelectedValorantRank('all')}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-full text-xs text-yellow-300 transition"
+                      >
+                        🏆 {selectedValorantRank}
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                    {selectedLolServer !== 'all' && (
+                      <button
+                        onClick={() => setSelectedLolServer('all')}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-full text-xs text-cyan-300 transition"
+                      >
+                        🖥️ {selectedLolServer}
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -680,24 +947,17 @@ export default function GamePageClient({ slug }: Props) {
                                   : '🔑 Key'}
                               </span>
                             </div>
-                            {/* Delivery Type Badge - Top Right */}
-                            <div className="absolute top-3 right-3">
-                              {listing.delivery_type === 'automatic' ? (
+                            {/* Instant Delivery Badge - Top Right (only for automatic delivery) */}
+                            {listing.delivery_type === 'automatic' && (
+                              <div className="absolute top-3 right-3">
                                 <span className="bg-green-500/80 backdrop-blur-lg px-3 py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                   </svg>
                                   Instant
                                 </span>
-                              ) : (
-                                <span className="bg-blue-500/80 backdrop-blur-lg px-3 py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  24 Hour
-                                </span>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                           <div className="relative p-5">
                             <h3 className="text-white font-bold text-lg mb-2 group-hover:text-purple-400 transition line-clamp-1">
@@ -750,6 +1010,65 @@ export default function GamePageClient({ slug }: Props) {
               )}
             </section>
           </div>
+
+          {/* SEO Content Section - Fully Visible */}
+          {seoContent && (
+            <section className="mt-16" aria-label={`About ${game.name} on Nashflare`}>
+              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all duration-300">
+                <div className="px-8 py-8">
+                  {/* Main Title & Description */}
+                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
+                    {seoContent.mainTitle}
+                  </h2>
+                  <p className="text-gray-300 text-base leading-relaxed mb-8">
+                    {seoContent.mainDescription}
+                  </p>
+
+                  {/* Content Sections */}
+                  <div className="space-y-8">
+                    {seoContent.sections.map((section, index) => (
+                      <div key={index}>
+                        <h3 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500"></span>
+                          {section.title}
+                        </h3>
+                        <p className="text-gray-400 leading-relaxed">
+                          {section.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* FAQs */}
+                  {seoContent.faqs.length > 0 && (
+                    <div className="mt-10">
+                      <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Frequently Asked Questions
+                      </h3>
+                      <div className="space-y-4">
+                        {seoContent.faqs.map((faq, index) => (
+                          <div key={index} className="bg-slate-800/50 rounded-xl p-5 border border-white/5">
+                            <h4 className="text-white font-semibold mb-2">{faq.question}</h4>
+                            <p className="text-gray-400 text-sm leading-relaxed">{faq.answer}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Disclaimer */}
+                  <div className="mt-8 pt-6 border-t border-white/10">
+                    <p className="text-gray-500 text-xs italic">
+                      {seoContent.disclaimer}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
         </main>
 
         <Footer />

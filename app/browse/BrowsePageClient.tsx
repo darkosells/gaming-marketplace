@@ -15,6 +15,31 @@ const categoryGamesMap: { [key: string]: string[] } = {
   key: ['Steam', 'Playstation', 'Xbox']
 }
 
+// Game-specific platform options (null or empty array means no platform filter)
+const gamePlatformsMap: { [key: string]: string[] | null } = {
+  'GTA 5': ['PC', 'Playstation 4', 'Playstation 5', 'Xbox X/S', 'Xbox One'],
+  'Fortnite': ['PC', 'Playstation', 'Xbox', 'Switch', 'Android', 'iOS'],
+  'Roblox': null,
+  'Valorant': ['PC', 'Playstation', 'Xbox'],
+  'League of Legends': null,
+  'Clash Royale': null,
+  'Clash of Clans': null,
+  'Steam': null,
+  // Items category games - add as needed
+  'Steal a Brainrot': null,
+  'Grow a Garden': null,
+  'Adopt me': null,
+  'Blox Fruits': null,
+  'Plants vs Brainrots': null,
+}
+
+// Valorant-specific options
+const valorantRegions = ['NA', 'EU/TR/MENA/CIS', 'LATAM', 'Brazil', 'AP', 'KR']
+const valorantRanks = ['Ranked Ready', 'Unranked', 'Radiant', 'Immortal', 'Ascendant', 'Diamond', 'Gold']
+
+// League of Legends-specific options
+const lolServers = ['Europe Nordic & East', 'Europe West', 'North America', 'Brazil']
+
 // Tags for each game in Account category
 const accountGameTags: { [key: string]: string[] } = {
   'Fortnite': ['Renegade Raider', 'Travis Scott', 'Black Knight', 'Take The L', 'Omega', 'Elite Agent', 'Blue Squire', 'Floss', 'IKONIK', 'Galaxy', 'Wonder', 'Reaper', 'Leviathan Axe', 'Mako', 'Lara Croft', 'Glow', 'Sparkle Specialist', 'Royale Knight', 'Peely', 'Deadpool', 'Havoc', 'Skull Trooper', 'Ghoul Trooper', 'STW', 'Midas', 'Wildcat'],
@@ -53,6 +78,11 @@ function BrowseContent() {
   const [tagSearchQuery, setTagSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  
+  // Game-specific filters
+  const [selectedValorantRegion, setSelectedValorantRegion] = useState('all')
+  const [selectedValorantRank, setSelectedValorantRank] = useState('all')
+  const [selectedLolServer, setSelectedLolServer] = useState('all')
 
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -75,7 +105,7 @@ function BrowseContent() {
   useEffect(() => { 
     applyFilters()
     setCurrentPage(1)
-  }, [listings, searchQuery, selectedCategory, selectedGame, selectedPlatform, selectedDeliveryType, priceRange, sortBy, selectedTags])
+  }, [listings, searchQuery, selectedCategory, selectedGame, selectedPlatform, selectedDeliveryType, priceRange, sortBy, selectedTags, selectedValorantRegion, selectedValorantRank, selectedLolServer])
 
   useEffect(() => {
     if (selectedCategory !== 'all') {
@@ -89,8 +119,13 @@ function BrowseContent() {
   }, [selectedCategory])
 
   useEffect(() => {
+    // Reset game-specific filters when game changes
     setSelectedTags([])
     setTagSearchQuery('')
+    setSelectedPlatform('all')
+    setSelectedValorantRegion('all')
+    setSelectedValorantRank('all')
+    setSelectedLolServer('all')
   }, [selectedGame])
 
   const fetchListings = async () => {
@@ -154,6 +189,23 @@ function BrowseContent() {
       })
     }
 
+    // Valorant-specific filters
+    if (selectedGame === 'Valorant') {
+      if (selectedValorantRegion !== 'all') {
+        filtered = filtered.filter(listing => listing.region === selectedValorantRegion)
+      }
+      if (selectedValorantRank !== 'all') {
+        filtered = filtered.filter(listing => listing.rank === selectedValorantRank)
+      }
+    }
+
+    // League of Legends-specific filters
+    if (selectedGame === 'League of Legends') {
+      if (selectedLolServer !== 'all') {
+        filtered = filtered.filter(listing => listing.server === selectedLolServer)
+      }
+    }
+
     switch (sortBy) {
       case 'recommended':
         filtered.sort((a, b) => {
@@ -199,6 +251,9 @@ function BrowseContent() {
     setTagSearchQuery('')
     setCurrentPage(1)
     setMobileFiltersOpen(false)
+    setSelectedValorantRegion('all')
+    setSelectedValorantRank('all')
+    setSelectedLolServer('all')
   }
 
   const getAvailableGames = () => {
@@ -206,6 +261,18 @@ function BrowseContent() {
       return Array.from(new Set(listings.map(l => l.game)))
     }
     return categoryGamesMap[selectedCategory] || []
+  }
+
+  const getAvailablePlatforms = () => {
+    if (selectedGame === 'all') {
+      return null // Don't show platform filter when no game selected
+    }
+    return gamePlatformsMap[selectedGame] || null
+  }
+
+  const shouldShowPlatformFilter = () => {
+    const platforms = getAvailablePlatforms()
+    return platforms !== null && platforms.length > 0
   }
 
   const getAvailableTags = () => {
@@ -430,6 +497,99 @@ function BrowseContent() {
         )}
       </div>
 
+      {/* Platform Filter - Only show for games that have platforms */}
+      {shouldShowPlatformFilter() && (
+        <div className="mb-6">
+          <label className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
+            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Platform
+          </label>
+          <select 
+            value={selectedPlatform} 
+            onChange={(e) => setSelectedPlatform(e.target.value)} 
+            className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30" 
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}
+          >
+            <option value="all">All Platforms</option>
+            {getAvailablePlatforms()?.map(platform => (
+              <option key={platform} value={platform}>{platform}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Valorant-specific filters */}
+      {selectedGame === 'Valorant' && (
+        <>
+          {/* Region Filter */}
+          <div className="mb-6">
+            <label className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
+              <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Region
+            </label>
+            <select 
+              value={selectedValorantRegion} 
+              onChange={(e) => setSelectedValorantRegion(e.target.value)} 
+              className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30" 
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}
+            >
+              <option value="all">All Regions</option>
+              {valorantRegions.map(region => (
+                <option key={region} value={region}>{region}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Rank Filter */}
+          <div className="mb-6">
+            <label className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
+              <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+              </svg>
+              Rank
+            </label>
+            <select 
+              value={selectedValorantRank} 
+              onChange={(e) => setSelectedValorantRank(e.target.value)} 
+              className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30" 
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}
+            >
+              <option value="all">All Ranks</option>
+              {valorantRanks.map(rank => (
+                <option key={rank} value={rank}>{rank}</option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+
+      {/* League of Legends-specific filters */}
+      {selectedGame === 'League of Legends' && (
+        <div className="mb-6">
+          <label className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
+            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+            </svg>
+            Server
+          </label>
+          <select 
+            value={selectedLolServer} 
+            onChange={(e) => setSelectedLolServer(e.target.value)} 
+            className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30" 
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}
+          >
+            <option value="all">All Servers</option>
+            {lolServers.map(server => (
+              <option key={server} value={server}>{server}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Tags Section */}
       {shouldShowTags() && (
         <div className="mb-6">
@@ -524,19 +684,6 @@ function BrowseContent() {
         </select>
       </div>
 
-      {/* Platform Filter */}
-      <div className="mb-6">
-        <label className="block text-white font-semibold mb-3 text-sm">Platform</label>
-        <select value={selectedPlatform} onChange={(e) => setSelectedPlatform(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}>
-          <option value="all">All Platforms</option>
-          <option value="PC">🖥️ PC</option>
-          <option value="PlayStation">🎮 PlayStation</option>
-          <option value="Xbox">🟢 Xbox</option>
-          <option value="Nintendo">🔴 Nintendo</option>
-          <option value="Mobile">📱 Mobile</option>
-        </select>
-      </div>
-
       {/* Price Range Filter */}
       <div className="mb-6">
         <label className="block text-white font-semibold mb-3 text-sm">Price Range</label>
@@ -559,6 +706,21 @@ function BrowseContent() {
       </div>
     </>
   )
+
+  // Count active filters for mobile button badge
+  const getActiveFilterCount = () => {
+    let count = 0
+    if (selectedTags.length > 0) count += selectedTags.length
+    if (selectedCategory !== 'all') count++
+    if (selectedGame !== 'all') count++
+    if (selectedPlatform !== 'all') count++
+    if (selectedValorantRegion !== 'all') count++
+    if (selectedValorantRank !== 'all') count++
+    if (selectedLolServer !== 'all') count++
+    if (selectedDeliveryType !== 'all') count++
+    if (priceRange !== 'all') count++
+    return count
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
@@ -614,9 +776,9 @@ function BrowseContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
               Filters
-              {(selectedTags.length > 0 || selectedCategory !== 'all' || selectedGame !== 'all') && (
+              {getActiveFilterCount() > 0 && (
                 <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
-                  {selectedTags.length + (selectedCategory !== 'all' ? 1 : 0) + (selectedGame !== 'all' ? 1 : 0)}
+                  {getActiveFilterCount()}
                 </span>
               )}
             </button>
@@ -696,7 +858,7 @@ function BrowseContent() {
                 </div>
 
                 {/* Active Filters Display */}
-                {(selectedTags.length > 0 || selectedDeliveryType !== 'all') && (
+                {(selectedTags.length > 0 || selectedDeliveryType !== 'all' || selectedValorantRegion !== 'all' || selectedValorantRank !== 'all' || selectedLolServer !== 'all' || selectedPlatform !== 'all') && (
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/10">
                     <div className="flex flex-wrap gap-2 items-center">
                       <span className="text-xs sm:text-sm text-gray-400">Active filters:</span>
@@ -718,6 +880,50 @@ function BrowseContent() {
                           className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-full text-xs text-blue-300 transition min-h-[32px]"
                         >
                           <span>{selectedDeliveryType === 'instant' ? '⚡ Instant' : '📦 Manual'}</span>
+                          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                      {selectedPlatform !== 'all' && (
+                        <button
+                          onClick={() => setSelectedPlatform('all')}
+                          className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-full text-xs text-green-300 transition min-h-[32px]"
+                        >
+                          <span>🎮 {selectedPlatform}</span>
+                          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                      {selectedValorantRegion !== 'all' && (
+                        <button
+                          onClick={() => setSelectedValorantRegion('all')}
+                          className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-full text-xs text-red-300 transition min-h-[32px]"
+                        >
+                          <span>🌍 {selectedValorantRegion}</span>
+                          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                      {selectedValorantRank !== 'all' && (
+                        <button
+                          onClick={() => setSelectedValorantRank('all')}
+                          className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-full text-xs text-yellow-300 transition min-h-[32px]"
+                        >
+                          <span>🏆 {selectedValorantRank}</span>
+                          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                      {selectedLolServer !== 'all' && (
+                        <button
+                          onClick={() => setSelectedLolServer('all')}
+                          className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-full text-xs text-cyan-300 transition min-h-[32px]"
+                        >
+                          <span>🖥️ {selectedLolServer}</span>
                           <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
