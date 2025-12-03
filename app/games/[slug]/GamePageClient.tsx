@@ -41,7 +41,7 @@ const lolServers = ['Europe Nordic & East', 'Europe West', 'North America', 'Bra
 // Tags for each game in Account category
 const accountGameTags: { [key: string]: string[] } = {
   'Fortnite': ['Renegade Raider', 'Travis Scott', 'Black Knight', 'Take The L', 'Omega', 'Elite Agent', 'Blue Squire', 'Floss', 'IKONIK', 'Galaxy', 'Wonder', 'Reaper', 'Leviathan Axe', 'Mako', 'Lara Croft', 'Glow', 'Sparkle Specialist', 'Royale Knight', 'Peely', 'Deadpool', 'Havoc', 'Skull Trooper', 'Ghoul Trooper', 'STW', 'Midas', 'Wildcat'],
-  'GTA 5': ['High Level', 'Modded Account', 'Rare Vehicles', 'Full Businesses', 'Bunker', 'CEO Office', 'MC Clubhouse', 'Hangar', 'Facility', 'Arena Workshop', 'Nightclub', 'Arcade', 'Casino Penthouse', 'Kosatka', 'Agency'],
+  'GTA 5': ['High Level', 'Modded Account', 'Billions', 'Modded Outfits', 'Modded Cars', 'All Unlocks', 'Max Stats', 'Male', 'Female', 'Fast Run', 'Arena Workshop', 'Nightclub'],
   'Valorant': ['Radiant', 'Immortal', 'Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'Skins', 'Champions Bundle', 'Protocol 781-A', 'Prime Collection', 'Elderflame'],
   'Roblox': ['High RAP', 'Limiteds', 'Headless', 'Dominus', 'Korblox', 'Valkyrie', 'Sparkle Time Fedora', 'OG Account'],
   'League of Legends': ['Challenger', 'Grandmaster', 'Master', 'Diamond', 'Platinum', 'Gold', 'Silver', 'Bronze', 'PAX Skins', 'Championship Riven', 'Black Alistar', 'Silver Kayle'],
@@ -965,21 +965,23 @@ export default function GamePageClient({ slug }: Props) {
                             </h3>
                             <p className="text-gray-400 text-sm mb-3 line-clamp-2">{listing.description}</p>
                             
-                            {/* Tags Display */}
-                            {listing.tags && listing.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-3">
-                                {listing.tags.slice(0, 3).map((tag: string) => (
-                                  <span key={tag} className="px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-xs text-purple-300">
-                                    {tag}
-                                  </span>
-                                ))}
-                                {listing.tags.length > 3 && (
-                                  <span className="px-2 py-1 bg-slate-800/50 border border-white/10 rounded text-xs text-gray-400">
-                                    +{listing.tags.length - 3} more
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                            {/* Tags Display - Fixed height for consistent card sizing */}
+                            <div className="flex flex-wrap gap-1 mb-3 min-h-[28px]">
+                              {listing.tags && listing.tags.length > 0 ? (
+                                <>
+                                  {listing.tags.slice(0, 3).map((tag: string) => (
+                                    <span key={tag} className="px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-xs text-purple-300">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {listing.tags.length > 3 && (
+                                    <span className="px-2 py-1 bg-slate-800/50 border border-white/10 rounded text-xs text-gray-400">
+                                      +{listing.tags.length - 3} more
+                                    </span>
+                                  )}
+                                </>
+                              ) : null}
+                            </div>
 
                             <div className="flex items-center justify-between">
                               <span className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
