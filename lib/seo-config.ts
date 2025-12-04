@@ -6,7 +6,7 @@ export const siteConfig = {
   description: 'The #1 trusted gaming marketplace for buying and selling gaming accounts, in-game currency, items, and game keys. Secure transactions with buyer protection.',
   url: 'https://nashflare.com',
   ogImage: 'https://nashflare.com/og-image.png',
-  twitterHandle: '@nashflare',
+  twitterHandle: '@NashflareGaming',
   keywords: [
     'gaming marketplace',
     'buy gaming accounts',
@@ -130,9 +130,13 @@ export function generateOrganizationSchema() {
     logo: `${siteConfig.url}/logo.png`,
     description: siteConfig.description,
     sameAs: [
-      // Add your social media URLs here
-      // 'https://twitter.com/nashflare',
-      // 'https://discord.gg/nashflare',
+      'https://x.com/NashflareGaming',
+      'https://discord.gg/caz5gyqUQh',
+      'https://www.instagram.com/nashflaregaming/',
+      'https://www.tiktok.com/@nashflare',
+      'https://www.facebook.com/people/Nashflare/61584340365529/',
+      'https://www.reddit.com/r/Nashflare/',
+      'https://www.trustpilot.com/review/nashflare.com',
     ],
     contactPoint: {
       '@type': 'ContactPoint',
