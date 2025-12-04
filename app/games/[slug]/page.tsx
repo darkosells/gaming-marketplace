@@ -6,6 +6,7 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { siteConfig } from '@/lib/seo-config'
 import { getGameBySlug, getAllGameSlugs } from '@/lib/games-config'
+import { getSEOContentBySlug } from '@/lib/seo-content-config'
 import GamePageClient from './GamePageClient'
 
 interface Props {
@@ -102,6 +103,9 @@ export default async function GamePage({ params }: Props) {
     notFound()
   }
 
+  // Get SEO content for FAQ schema
+  const seoContent = getSEOContentBySlug(slug)
+
   // Generate breadcrumb structured data
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
@@ -142,21 +146,47 @@ export default async function GamePage({ params }: Props) {
     },
   }
 
+  // Generate FAQ schema if FAQs exist for this game
+  const faqSchema = seoContent && seoContent.faqs && seoContent.faqs.length > 0
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: seoContent.faqs.map((faq) => ({
+          '@type': 'Question',
+          name: faq.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: faq.answer,
+          },
+        })),
+      }
+    : null
+
   return (
     <>
-      {/* JSON-LD Structured Data */}
+      {/* Breadcrumb Schema - shows navigation path in search results */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(breadcrumbSchema),
         }}
       />
+      {/* Collection Page Schema - tells Google this is a category/collection page */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(collectionSchema),
         }}
       />
+      {/* FAQ Schema - enables FAQ rich snippets in Google Search */}
+      {faqSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(faqSchema),
+          }}
+        />
+      )}
       
       <Suspense fallback={<GamePageLoading />}>
         <GamePageClient slug={slug} />

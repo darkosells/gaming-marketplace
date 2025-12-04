@@ -90,41 +90,10 @@ const gameToSlug = (gameName: string): string => {
 }
 
 // JSON-LD Structured Data for SEO
-const websiteJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "Nashflare",
-  "url": "https://nashflare.com",
-  "description": "Buy and sell gaming accounts, in-game currency, items, and game keys securely on Nashflare - the trusted gaming marketplace.",
-  "potentialAction": {
-    "@type": "SearchAction",
-    "target": {
-      "@type": "EntryPoint",
-      "urlTemplate": "https://nashflare.com/browse?search={search_term_string}"
-    },
-    "query-input": "required name=search_term_string"
-  }
-}
+// NOTE: Organization and WebSite schemas are in layout.tsx (global)
+// Only homepage-specific schemas are defined here
 
-const organizationJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  "name": "Nashflare",
-  "url": "https://nashflare.com",
-  "logo": "https://nashflare.com/logo6.svg",
-  "description": "Nashflare is a secure gaming marketplace for buying and selling gaming accounts, in-game currency, items, and game keys.",
-  "sameAs": [
-    // Add your social media URLs here when available
-    // "https://twitter.com/nashflare",
-    // "https://discord.gg/nashflare"
-  ],
-  "contactPoint": {
-    "@type": "ContactPoint",
-    "contactType": "customer service",
-    "availableLanguage": "English"
-  }
-}
-
+// FAQ Schema - Unique to homepage (helps with rich snippets)
 const faqJsonLd = {
   "@context": "https://schema.org",
   "@type": "FAQPage",
@@ -138,7 +107,7 @@ const faqJsonLd = {
   }))
 }
 
-// Marketplace/Store structured data
+// Marketplace/Store structured data - Unique to homepage
 const marketplaceJsonLd = {
   "@context": "https://schema.org",
   "@type": "Store",
@@ -225,14 +194,7 @@ export default function HomePageClient() {
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
       {/* JSON-LD Structured Data for SEO */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd).replace(/</g, '\\u003c') }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd).replace(/</g, '\\u003c') }}
-      />
+      {/* NOTE: Organization and WebSite schemas removed - they are in layout.tsx */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, '\\u003c') }}

@@ -199,7 +199,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     if (!profilesError && profiles) {
       profilePages = profiles.map((profile) => ({
-        url: `${baseUrl}/profile/${profile.id}`,
+        url: `${baseUrl}/seller/${profile.id}`,
         lastModified: new Date(profile.updated_at || Date.now()),
         changeFrequency: 'weekly' as const,
         priority: 0.5,

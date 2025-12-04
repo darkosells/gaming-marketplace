@@ -126,7 +126,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         
         {/* DNS Prefetch for Supabase */}
-        <link rel="dns-prefetch" href="https://your-project.supabase.co" />
+        <link rel="dns-prefetch" href="https://oljvdnbgefdgxadfeslx.supabase.co" />
       </head>
       <body 
         className={`${inter.className} bg-slate-950 text-white antialiased`}
