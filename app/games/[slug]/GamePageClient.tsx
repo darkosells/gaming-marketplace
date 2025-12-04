@@ -737,7 +737,8 @@ export default function GamePageClient({ slug }: Props) {
         <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl p-4">
           <p className="text-sm text-gray-400">
             Showing{' '}
-            <span className="text-white font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            {/* iOS Safari Fix: Solid color instead of gradient */}
+            <span className="text-purple-400 font-bold">
               {currentListings.length}
             </span>{' '}
             of{' '}
@@ -1125,7 +1126,8 @@ export default function GamePageClient({ slug }: Props) {
                             </div>
 
                             <div className="flex items-center justify-between mt-auto">
-                              <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                              {/* iOS Safari Fix: Solid color instead of gradient */}
+                              <span className="text-xl sm:text-2xl font-bold text-green-400">
                                 ${parseFloat(listing.price).toFixed(2)}
                               </span>
                               <div className="text-right">
