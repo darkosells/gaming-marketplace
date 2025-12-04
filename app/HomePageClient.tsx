@@ -204,30 +204,30 @@ export default function HomePageClient() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(marketplaceJsonLd).replace(/</g, '\\u003c') }}
       />
 
-      {/* Optimized Cosmic Space Background */}
-      <div className="fixed inset-0 z-0 will-change-transform">
+      {/* Optimized Cosmic Space Background - iOS Safari Compatible */}
+      <div className="fixed inset-0 z-0">
         {/* Base gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
         
         {/* Gradient Mesh - Static, no animation */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
         
-        {/* Simplified Nebula Clouds */}
+        {/* Simplified Nebula Clouds - Reduced blur for iOS performance */}
         <div 
-          className={`absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[100px] ${!prefersReducedMotion ? 'animate-pulse' : ''}`}
+          className={`absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-3xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`}
           style={{ animationDuration: '8s' }}
         ></div>
         <div 
-          className={`absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/10 rounded-full blur-[90px] ${!prefersReducedMotion ? 'animate-pulse' : ''}`}
+          className={`absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-3xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`}
           style={{ animationDuration: '10s', animationDelay: '2s' }}
         ></div>
         <div 
-          className={`absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-blue-600/10 rounded-full blur-[80px] ${!prefersReducedMotion ? 'animate-pulse' : ''}`}
+          className={`absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-blue-600/15 rounded-full blur-3xl ${!prefersReducedMotion ? 'animate-pulse' : ''}`}
           style={{ animationDuration: '12s', animationDelay: '4s' }}
         ></div>
         
         {/* Grid Pattern - Static */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] opacity-50"></div>
         
         {/* Reduced Starfield */}
         {!prefersReducedMotion && (
@@ -303,10 +303,10 @@ export default function HomePageClient() {
         <section className="relative pt-28 sm:pt-32 pb-8 sm:pb-12">
           <div className="container mx-auto px-4">
             <header className="relative z-10 text-center max-w-4xl mx-auto mb-8 sm:mb-12">
-              {/* Compact Headline - Using proper H1 for SEO */}
+              {/* Compact Headline - iOS Safari Fix: Solid color instead of gradient text */}
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-3 sm:mb-4 leading-tight">
                 Buy & Sell
-                <span className="block sm:inline bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent"> Gaming Goods</span>
+                <span className="block sm:inline text-purple-400"> Gaming Goods</span>
               </h1>
               <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-2xl mx-auto px-4">
                 Accounts, items, currency & game keys — all in one secure marketplace
@@ -320,7 +320,7 @@ export default function HomePageClient() {
                   {/* Desktop Card - Click to navigate */}
                   <article 
                     onClick={() => handleCategoryClick(key)}
-                    className="hidden sm:block relative overflow-hidden rounded-2xl bg-slate-900/60 border border-white/10 p-4 lg:p-6 cursor-pointer hover:border-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-500/10"
+                    className="hidden sm:block relative overflow-hidden rounded-2xl bg-slate-900/80 border border-white/10 p-4 lg:p-6 cursor-pointer hover:border-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-500/10"
                   >
                     {/* Hover glow effect */}
                     <div className={`absolute inset-0 bg-gradient-to-br ${category.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
@@ -379,7 +379,7 @@ export default function HomePageClient() {
                     <button
                       onClick={() => toggleCategory(key)}
                       aria-expanded={expandedCategory === key}
-                      className={`w-full relative overflow-hidden rounded-xl bg-slate-900/60 border ${expandedCategory === key ? 'border-white/20' : 'border-white/10'} p-4 text-left transition-all duration-300`}
+                      className={`w-full relative overflow-hidden rounded-xl bg-slate-900/80 border ${expandedCategory === key ? 'border-white/20' : 'border-white/10'} p-4 text-left transition-all duration-300`}
                     >
                       <div className={`absolute inset-0 bg-gradient-to-br ${category.gradient} ${expandedCategory === key ? 'opacity-10' : 'opacity-0'} transition-opacity duration-300`}></div>
                       
@@ -406,7 +406,7 @@ export default function HomePageClient() {
                     
                     {/* Mobile Expanded Games List */}
                     {expandedCategory === key && (
-                      <div className="mt-2 bg-slate-900/40 border border-white/10 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                      <div className="mt-2 bg-slate-900/60 border border-white/10 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
                         {category.games.map((game) => (
                           <button
                             key={game}
@@ -446,7 +446,7 @@ export default function HomePageClient() {
                   <Link
                     key={game.name}
                     href={`/games/${gameNameToSlug(game.name)}`}
-                    className="flex items-center space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-900/50 hover:bg-slate-800/70 border border-white/10 hover:border-purple-500/30 rounded-full transition-all duration-200 hover:-translate-y-0.5 group min-h-[44px]"
+                    className="flex items-center space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-900/70 hover:bg-slate-800/70 border border-white/10 hover:border-purple-500/30 rounded-full transition-all duration-200 hover:-translate-y-0.5 group min-h-[44px]"
                   >
                     <span className="text-base sm:text-lg group-hover:scale-110 transition-transform">{game.icon}</span>
                     <span className="text-xs sm:text-sm text-gray-300 group-hover:text-white font-medium">{game.name}</span>
@@ -484,7 +484,7 @@ export default function HomePageClient() {
                   />
                   <button 
                     type="submit"
-                    className="absolute right-1.5 sm:right-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-300 hover:scale-105 min-h-[40px]"
+                    className="absolute right-1.5 sm:right-2 bg-purple-500 hover:bg-purple-600 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-300 hover:scale-105 min-h-[40px]"
                   >
                     Search
                   </button>
@@ -494,7 +494,7 @@ export default function HomePageClient() {
           </div>
         </section>
 
-        {/* How It Works - Simplified */}
+        {/* How It Works - Simplified with iOS-compatible styling */}
         <section className="py-12 sm:py-16 lg:py-20" aria-labelledby="how-it-works-heading">
           <div className="container mx-auto px-4">
             <h2 id="how-it-works-heading" className="text-2xl sm:text-3xl md:text-4xl font-bold text-white text-center mb-3 sm:mb-4">
@@ -505,10 +505,10 @@ export default function HomePageClient() {
             </p>
 
             <div className="grid sm:grid-cols-3 gap-6 sm:gap-8 max-w-4xl mx-auto">
+              {/* Step 1 - iOS Safari Fix: Removed blur glow, using solid shadow instead */}
               <article className="text-center group">
                 <div className="relative inline-block mb-4 sm:mb-6">
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-lg opacity-40 group-hover:opacity-60 transition"></div>
-                  <div className="relative w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white shadow-lg shadow-purple-500/40 group-hover:shadow-purple-500/60 transition-shadow">
                     1
                   </div>
                 </div>
@@ -518,10 +518,10 @@ export default function HomePageClient() {
                 </p>
               </article>
 
+              {/* Step 2 - iOS Safari Fix: Removed blur glow, using solid shadow instead */}
               <article className="text-center group">
                 <div className="relative inline-block mb-4 sm:mb-6">
-                  <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-orange-500 rounded-full blur-lg opacity-40 group-hover:opacity-60 transition"></div>
-                  <div className="relative w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-pink-500 to-orange-500 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-pink-500 to-orange-500 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white shadow-lg shadow-pink-500/40 group-hover:shadow-pink-500/60 transition-shadow">
                     2
                   </div>
                 </div>
@@ -531,10 +531,10 @@ export default function HomePageClient() {
                 </p>
               </article>
 
+              {/* Step 3 - iOS Safari Fix: Removed blur glow, using solid shadow instead */}
               <article className="text-center group">
                 <div className="relative inline-block mb-4 sm:mb-6">
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-lg opacity-40 group-hover:opacity-60 transition"></div>
-                  <div className="relative w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white shadow-lg shadow-blue-500/40 group-hover:shadow-blue-500/60 transition-shadow">
                     3
                   </div>
                 </div>
@@ -553,22 +553,22 @@ export default function HomePageClient() {
             <h2 id="trust-heading" className="sr-only">Why Trust Nashflare</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 text-center">
               <article className="group p-4 sm:p-0">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-900/50 border border-white/5 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mx-auto mb-3 sm:mb-4 group-hover:border-purple-500/30 transition">🔒</div>
+                <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-900/80 border border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mx-auto mb-3 sm:mb-4 group-hover:border-purple-500/30 transition">🔒</div>
                 <h3 className="text-white font-semibold mb-1 sm:mb-2 text-sm sm:text-base">Secure Payments</h3>
                 <p className="text-gray-500 text-xs sm:text-sm">Bank-level encryption</p>
               </article>
               <article className="group p-4 sm:p-0">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-900/50 border border-white/5 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mx-auto mb-3 sm:mb-4 group-hover:border-green-500/30 transition">✓</div>
+                <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-900/80 border border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mx-auto mb-3 sm:mb-4 group-hover:border-green-500/30 transition">✓</div>
                 <h3 className="text-white font-semibold mb-1 sm:mb-2 text-sm sm:text-base">Verified Sellers</h3>
                 <p className="text-gray-500 text-xs sm:text-sm">Every seller is verified</p>
               </article>
               <article className="group p-4 sm:p-0">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-900/50 border border-white/5 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mx-auto mb-3 sm:mb-4 group-hover:border-blue-500/30 transition">💬</div>
+                <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-900/80 border border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mx-auto mb-3 sm:mb-4 group-hover:border-blue-500/30 transition">💬</div>
                 <h3 className="text-white font-semibold mb-1 sm:mb-2 text-sm sm:text-base">24/7 Support</h3>
                 <p className="text-gray-500 text-xs sm:text-sm">Always here to help</p>
               </article>
               <article className="group p-4 sm:p-0">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-900/50 border border-white/5 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mx-auto mb-3 sm:mb-4 group-hover:border-yellow-500/30 transition">⚡</div>
+                <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-900/80 border border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mx-auto mb-3 sm:mb-4 group-hover:border-yellow-500/30 transition">⚡</div>
                 <h3 className="text-white font-semibold mb-1 sm:mb-2 text-sm sm:text-base">Instant Delivery</h3>
                 <p className="text-gray-500 text-xs sm:text-sm">Get your items fast</p>
               </article>
@@ -593,7 +593,7 @@ export default function HomePageClient() {
                 {faqData.map((faq, index) => (
                   <article 
                     key={index}
-                    className="bg-slate-900/50 border border-white/10 rounded-xl sm:rounded-2xl overflow-hidden"
+                    className="bg-slate-900/70 border border-white/10 rounded-xl sm:rounded-2xl overflow-hidden"
                   >
                     <button
                       onClick={() => toggleFaq(index)}
@@ -639,7 +639,7 @@ export default function HomePageClient() {
           <div className="container mx-auto px-4">
             <div className="relative max-w-4xl mx-auto">
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-2xl sm:rounded-3xl blur-xl"></div>
-              <div className="relative text-center bg-slate-900/50 border border-white/10 rounded-2xl sm:rounded-3xl p-8 sm:p-10 lg:p-12">
+              <div className="relative text-center bg-slate-900/70 border border-white/10 rounded-2xl sm:rounded-3xl p-8 sm:p-10 lg:p-12">
                 <h2 id="cta-heading" className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 sm:mb-6">
                   Ready to Start Trading?
                 </h2>
@@ -655,7 +655,7 @@ export default function HomePageClient() {
                   </Link>
                   <Link
                     href="/browse"
-                    className="bg-slate-800/50 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg border border-white/10 hover:bg-slate-700/50 transition min-h-[48px] flex items-center justify-center"
+                    className="bg-slate-800/70 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg border border-white/10 hover:bg-slate-700/70 transition min-h-[48px] flex items-center justify-center"
                   >
                     Browse Listings
                   </Link>
