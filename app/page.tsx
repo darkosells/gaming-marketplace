@@ -1,10 +1,12 @@
 import { Metadata } from 'next'
 import HomePageClient from './HomePageClient'
 
-// SEO Metadata for Homepage
+// SEO Metadata for Homepage - Optimized lengths for search display
 export const metadata: Metadata = {
-  title: 'Nashflare - Buy & Sell Gaming Accounts, Currency & Game Keys',
-  description: 'The trusted gaming marketplace for buying and selling gaming accounts, in-game currency like V-Bucks & Robux, rare items, and game keys. Secure transactions with buyer protection.',
+  // Title: 59 characters (under 60 for full display)
+  title: 'Nashflare - Buy & Sell Gaming Accounts, V-Bucks & Game Keys',
+  // Description: 158 characters (under 160 for full display)
+  description: 'Buy and sell gaming accounts, V-Bucks, Robux, and game keys. Secure marketplace with buyer protection and instant delivery. Fortnite, GTA 5, Valorant & more.',
   keywords: [
     'gaming marketplace',
     'buy gaming accounts',
@@ -23,7 +25,13 @@ export const metadata: Metadata = {
     'gaming items',
     'secure gaming marketplace',
     'buy game accounts',
-    'sell game accounts'
+    'sell game accounts',
+    'fortnite account shop',
+    'valorant account shop',
+    'gta modded accounts',
+    'roblox limiteds',
+    'clash of clans accounts',
+    'league of legends accounts'
   ],
   authors: [{ name: 'Nashflare' }],
   creator: 'Nashflare',
@@ -44,21 +52,21 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://nashflare.com',
     siteName: 'Nashflare',
-    title: 'Nashflare - Buy & Sell Gaming Accounts, Currency & Game Keys',
-    description: 'The trusted gaming marketplace for buying and selling gaming accounts, in-game currency, rare items, and game keys. Secure transactions with buyer protection.',
+    title: 'Nashflare - Buy & Sell Gaming Accounts, V-Bucks & Game Keys',
+    description: 'Buy and sell gaming accounts, V-Bucks, Robux, and game keys. Secure marketplace with buyer protection and instant delivery.',
     images: [
       {
         url: 'https://nashflare.com/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Nashflare - Gaming Marketplace',
+        alt: 'Nashflare - Gaming Marketplace for Accounts, Currency & Game Keys',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Nashflare - Buy & Sell Gaming Accounts, Currency & Game Keys',
-    description: 'The trusted gaming marketplace for buying and selling gaming accounts, in-game currency, rare items, and game keys.',
+    title: 'Nashflare - Buy & Sell Gaming Accounts, V-Bucks & Game Keys',
+    description: 'Buy and sell gaming accounts, V-Bucks, Robux, and game keys. Secure marketplace with buyer protection and instant delivery.',
     images: ['https://nashflare.com/og-image.png'],
     // Add your Twitter handle when you have one
     // creator: '@nashflare',

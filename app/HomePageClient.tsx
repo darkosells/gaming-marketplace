@@ -172,15 +172,6 @@ export default function HomePageClient() {
     }
   }
 
-  const handleCategoryClick = (category: string) => {
-    router.push(`/browse?category=${category}`)
-  }
-
-  const handleGameClick = (category: string, game: string) => {
-    const gameSlug = gameToSlug(game)
-    router.push(`/games/${gameSlug}?category=${category}`)
-  }
-
   // Toggle category expansion on mobile
   const toggleCategory = (category: string) => {
     setExpandedCategory(expandedCategory === category ? null : category)
@@ -303,56 +294,53 @@ export default function HomePageClient() {
         <section className="relative pt-28 sm:pt-32 pb-8 sm:pb-12">
           <div className="container mx-auto px-4">
             <header className="relative z-10 text-center max-w-4xl mx-auto mb-8 sm:mb-12">
-              {/* Compact Headline - iOS Safari Fix: Solid color instead of gradient text */}
+              {/* SEO-Optimized H1 - iOS Safari Fix: Solid color instead of gradient text */}
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-3 sm:mb-4 leading-tight">
                 Buy & Sell
-                <span className="block sm:inline text-purple-400"> Gaming Goods</span>
+                <span className="block sm:inline text-purple-400"> Gaming Accounts & Items</span>
               </h1>
               <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-2xl mx-auto px-4">
                 Accounts, items, currency & game keys — all in one secure marketplace
               </p>
             </header>
 
-            {/* Category Cards Grid */}
+            {/* Category Cards Grid - SEO: Using Link components for crawlability */}
             <nav aria-label="Product categories" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 max-w-6xl mx-auto mb-8 sm:mb-12">
               {Object.entries(categoryData).map(([key, category]) => (
                 <div key={key} className="group">
-                  {/* Desktop Card - Click to navigate */}
-                  <article 
-                    onClick={() => handleCategoryClick(key)}
-                    className="hidden sm:block relative overflow-hidden rounded-2xl bg-slate-900/80 border border-white/10 p-4 lg:p-6 cursor-pointer hover:border-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-500/10"
-                  >
+                  {/* Desktop Card - SEO: Proper Link wrapper for crawlability */}
+                  <article className="hidden sm:block relative overflow-hidden rounded-2xl bg-slate-900/80 border border-white/10 p-4 lg:p-6 hover:border-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-500/10">
                     {/* Hover glow effect */}
                     <div className={`absolute inset-0 bg-gradient-to-br ${category.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
                     
                     <div className="relative">
-                      {/* Icon and Title */}
-                      <div className="flex items-center space-x-3 mb-3">
-                        <div className={`w-12 h-12 lg:w-14 lg:h-14 bg-gradient-to-br ${category.gradient} rounded-xl flex items-center justify-center text-2xl lg:text-3xl shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                      {/* Icon and Title - Links to category page */}
+                      <Link 
+                        href={`/browse?category=${key}`}
+                        className="flex items-center space-x-3 mb-3 group/header"
+                      >
+                        <div className={`w-12 h-12 lg:w-14 lg:h-14 bg-gradient-to-br ${category.gradient} rounded-xl flex items-center justify-center text-2xl lg:text-3xl shadow-lg group-hover/header:scale-110 transition-transform duration-300`}>
                           {category.icon}
                         </div>
                         <div className="text-left">
-                          <h2 className="text-lg lg:text-xl font-bold text-white">{category.label}</h2>
+                          <h2 className="text-lg lg:text-xl font-bold text-white group-hover/header:text-purple-400 transition-colors">{category.label}</h2>
                           <p className="text-xs lg:text-sm text-gray-400">{category.description}</p>
                         </div>
-                      </div>
+                      </Link>
                       
-                      {/* Games preview */}
+                      {/* Games preview - SEO: Using Link components */}
                       <ul className="space-y-1.5">
                         {category.games.slice(0, 4).map((game) => (
                           <li key={game}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleGameClick(key, game)
-                              }}
+                            <Link
+                              href={`/games/${gameToSlug(game)}?category=${key}`}
                               className="w-full flex items-center space-x-2 px-2.5 py-1.5 lg:px-3 lg:py-2 rounded-lg bg-white/5 hover:bg-white/10 text-left transition-colors group/game"
                             >
                               <span className="text-gray-400 group-hover/game:text-white text-xs lg:text-sm truncate">{game}</span>
                               <svg className="w-3 h-3 lg:w-4 lg:h-4 text-gray-500 group-hover/game:text-white ml-auto flex-shrink-0 opacity-0 group-hover/game:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
-                            </button>
+                            </Link>
                           </li>
                         ))}
                         {category.games.length > 4 && (
@@ -362,19 +350,22 @@ export default function HomePageClient() {
                         )}
                       </ul>
                       
-                      {/* View all link */}
+                      {/* View all link - SEO: Proper Link component */}
                       <div className="mt-3 pt-3 border-t border-white/10">
-                        <span className="flex items-center justify-center space-x-1 text-sm font-medium text-gray-400 group-hover:text-white transition-colors">
+                        <Link 
+                          href={`/browse?category=${key}`}
+                          className="flex items-center justify-center space-x-1 text-sm font-medium text-gray-400 hover:text-white transition-colors"
+                        >
                           <span>View All {category.label}</span>
                           <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                           </svg>
-                        </span>
+                        </Link>
                       </div>
                     </div>
                   </article>
 
-                  {/* Mobile Card - Expandable */}
+                  {/* Mobile Card - Expandable with crawlable links */}
                   <div className="sm:hidden">
                     <button
                       onClick={() => toggleCategory(key)}
@@ -404,30 +395,30 @@ export default function HomePageClient() {
                       </div>
                     </button>
                     
-                    {/* Mobile Expanded Games List */}
+                    {/* Mobile Expanded Games List - SEO: Using Link components */}
                     {expandedCategory === key && (
                       <div className="mt-2 bg-slate-900/60 border border-white/10 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
                         {category.games.map((game) => (
-                          <button
+                          <Link
                             key={game}
-                            onClick={() => handleGameClick(key, game)}
+                            href={`/games/${gameToSlug(game)}?category=${key}`}
                             className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 active:bg-white/15 transition-colors min-h-[44px]"
                           >
                             <span className="text-gray-300 text-sm">{game}</span>
                             <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
-                          </button>
+                          </Link>
                         ))}
-                        <button
-                          onClick={() => handleCategoryClick(key)}
+                        <Link
+                          href={`/browse?category=${key}`}
                           className={`w-full flex items-center justify-center space-x-2 px-3 py-2.5 rounded-lg bg-gradient-to-r ${category.gradient} text-white font-medium text-sm min-h-[44px]`}
                         >
                           <span>View All {category.label}</span>
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                           </svg>
-                        </button>
+                        </Link>
                       </div>
                     )}
                   </div>
@@ -435,7 +426,7 @@ export default function HomePageClient() {
               ))}
             </nav>
 
-            {/* Popular Games Quick Access */}
+            {/* Popular Games Quick Access - Already using Links (SEO friendly) */}
             <div className="max-w-4xl mx-auto mb-8 sm:mb-12">
               <div className="flex items-center justify-center space-x-2 mb-4">
                 <span className="text-lg sm:text-xl">🔥</span>
@@ -491,6 +482,58 @@ export default function HomePageClient() {
                 </div>
               </div>
             </form>
+          </div>
+        </section>
+
+        {/* SEO Content Section - Crawlable text with internal links */}
+        <section className="py-10 sm:py-14">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-white text-center mb-4">
+                The Trusted Gaming Marketplace
+              </h2>
+              <div className="text-gray-400 text-sm sm:text-base leading-relaxed space-y-4 text-center">
+                <p>
+                  Nashflare is your secure destination for buying and selling gaming accounts, 
+                  in-game currency, rare items, and game keys. Join thousands of gamers who trust 
+                  our marketplace for fast, safe transactions with buyer protection on every purchase.
+                </p>
+                <p>
+                  Looking for a stacked{' '}
+                  <Link href="/games/fortnite" className="text-purple-400 hover:text-purple-300 font-medium">
+                    Fortnite account
+                  </Link>{' '}
+                  with rare skins? Want to skip the grind with a{' '}
+                  <Link href="/games/gta-5" className="text-purple-400 hover:text-purple-300 font-medium">
+                    GTA 5 modded account
+                  </Link>
+                  ? Or perhaps you need a competitive{' '}
+                  <Link href="/games/valorant" className="text-purple-400 hover:text-purple-300 font-medium">
+                    Valorant account
+                  </Link>{' '}
+                  or high-level{' '}
+                  <Link href="/games/league-of-legends" className="text-purple-400 hover:text-purple-300 font-medium">
+                    League of Legends account
+                  </Link>
+                  ? Browse our verified listings and find exactly what you need.
+                </p>
+                <p>
+                  Sell your gaming accounts and items with instant payouts. Whether it&apos;s{' '}
+                  <Link href="/games/roblox" className="text-purple-400 hover:text-purple-300 font-medium">
+                    Roblox limiteds
+                  </Link>
+                  ,{' '}
+                  <Link href="/games/clash-of-clans" className="text-purple-400 hover:text-purple-300 font-medium">
+                    Clash of Clans
+                  </Link>{' '}
+                  bases, or{' '}
+                  <Link href="/browse?category=key" className="text-purple-400 hover:text-purple-300 font-medium">
+                    Steam game keys
+                  </Link>
+                  , Nashflare connects you with buyers worldwide.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 

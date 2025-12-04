@@ -15,7 +15,7 @@ export default function robots(): MetadataRoute.Robots {
           '/games/',
           '/blog/',
           '/listing/',
-          '/profile/',
+          '/seller/',
           '/signup',
           '/login',
           '/terms',

@@ -14,6 +14,28 @@ declare global {
   }
 }
 
+// Compact game data for footer SEO links
+const footerGameLinks = [
+  // Top Account Games
+  { name: 'Fortnite', slug: 'fortnite', category: 'account' },
+  { name: 'GTA 5', slug: 'gta-5', category: 'account' },
+  { name: 'Roblox', slug: 'roblox', category: 'account' },
+  { name: 'Valorant', slug: 'valorant', category: 'account' },
+  { name: 'Clash of Clans', slug: 'clash-of-clans', category: 'account' },
+  { name: 'Clash Royale', slug: 'clash-royale', category: 'account' },
+  // Top Item Games
+  { name: 'Adopt Me', slug: 'adopt-me', category: 'items' },
+  { name: 'Blox Fruits', slug: 'blox-fruits', category: 'items' },
+  { name: 'Grow a Garden', slug: 'grow-a-garden', category: 'items' },
+  // Currency
+  { name: 'V-Bucks', slug: 'fortnite', category: 'currency' },
+  { name: 'Robux', slug: 'roblox', category: 'currency' },
+  // Game Keys
+  { name: 'Steam Keys', slug: 'steam', category: 'key' },
+  { name: 'PlayStation', slug: 'playstation', category: 'key' },
+  { name: 'Xbox', slug: 'xbox', category: 'key' },
+]
+
 export default function Footer() {
   const currentYear = new Date().getFullYear()
   const trustpilotRef = useRef<HTMLDivElement>(null)
@@ -83,8 +105,39 @@ export default function Footer() {
   ]
 
   return (
-    <footer className="bg-black/40 backdrop-blur-lg border-t border-white/10 py-12 mt-12">
-      <div className="container mx-auto px-4">
+    <footer className="bg-black/40 backdrop-blur-lg border-t border-white/10 mt-12">
+      {/* NEW: Compact Browse by Game Section - Horizontal Pills */}
+      <div className="border-b border-white/10">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h2 className="text-sm font-semibold text-white">
+              Popular Games
+            </h2>
+            <Link 
+              href="/games"
+              className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors"
+            >
+              View All Games →
+            </Link>
+          </div>
+          
+          {/* Horizontal Wrapping Pills */}
+          <div className="flex flex-wrap gap-2">
+            {footerGameLinks.map((game, index) => (
+              <Link
+                key={`${game.slug}-${game.category}-${index}`}
+                href={`/games/${game.slug}?category=${game.category}`}
+                className="px-3 py-1.5 bg-white/5 hover:bg-purple-500/20 border border-white/10 hover:border-purple-500/40 rounded-full text-gray-400 hover:text-white text-xs font-medium transition-all duration-200"
+              >
+                {game.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ORIGINAL FOOTER CONTENT - Unchanged */}
+      <div className="container mx-auto px-4 py-12">
         <div className="grid md:grid-cols-4 gap-8 mb-8">
           {/* About Section */}
           <div>
@@ -196,7 +249,7 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Trustpilot Widget */}
+        {/* Trustpilot Widget - ORIGINAL */}
         <div className="border-t border-white/10 pt-8 mb-8">
           <div 
             ref={trustpilotRef}
@@ -217,7 +270,7 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Copyright */}
+        {/* Copyright - ORIGINAL */}
         <div className="border-t border-white/10 pt-8 text-center text-gray-400 text-sm">
           <p>&copy; {currentYear} Nashflare. All rights reserved.</p>
         </div>
