@@ -151,6 +151,13 @@ export default function RootLayout({
             gtag('config', 'G-DGY6KK5E3Q');
           `}
         </Script>
+        
+        {/* Trustpilot Widget Script */}
+        <Script
+          src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js"
+          strategy="lazyOnload"
+        />
+        
         {children}
       </body>
     </html>
