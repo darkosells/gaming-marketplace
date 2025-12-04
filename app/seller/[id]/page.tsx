@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
+import Footer from '@/components/Footer'
 import VendorRankBadge, { VendorRank, RANK_CONFIGS } from '@/app/dashboard/components/VendorRankBadge'
 
 interface SellerProfile {
@@ -425,13 +426,7 @@ export default function SellerProfilePage() {
                                 {listing.delivery_type === 'automatic' ? '⚡ Auto' : '👤 Manual'}
                               </span>
                             </div>
-                            {listing.stock <= 3 && listing.stock > 0 && (
-                              <div className="absolute top-3 left-3">
-                                <span className="bg-orange-500/90 backdrop-blur-lg px-3 py-1 rounded-full text-xs text-white font-semibold">
-                                  Only {listing.stock} left!
-                                </span>
-                              </div>
-                            )}
+
                           </div>
                           <div className="p-4">
                             <p className="text-xs text-purple-400 mb-1 font-semibold">{listing.game}</p>
@@ -441,9 +436,6 @@ export default function SellerProfilePage() {
                             <div className="flex justify-between items-center">
                               <span className="text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                                 ${listing.price.toFixed(2)}
-                              </span>
-                              <span className="text-xs text-gray-400 bg-white/5 px-2 py-1 rounded-full">
-                                {listing.stock} in stock
                               </span>
                             </div>
                           </div>
@@ -504,11 +496,7 @@ export default function SellerProfilePage() {
         </div>
 
         {/* Footer */}
-        <footer className="bg-slate-950/80 backdrop-blur-lg border-t border-white/5 py-8 mt-12">
-          <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>&copy; 2025 Nashflare. All rights reserved.</p>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </div>
   )
