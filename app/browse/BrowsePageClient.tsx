@@ -700,7 +700,7 @@ function BrowseContent() {
       <div className="pt-6 border-t border-white/10">
         <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl p-4">
           <p className="text-sm text-gray-400">
-            Showing <span className="text-white font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">{currentListings.length}</span> of <span className="text-white font-semibold">{filteredListings.length}</span> listings
+            Showing <span className="text-purple-400 font-bold">{currentListings.length}</span> of <span className="text-white font-semibold">{filteredListings.length}</span> listings
           </p>
         </div>
       </div>
@@ -754,7 +754,7 @@ function BrowseContent() {
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2 sm:mb-3">
-              Browse <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Marketplace</span>
+              Browse <span className="text-purple-400">Marketplace</span>
             </h1>
             <p className="text-gray-400 text-sm sm:text-base lg:text-lg">Discover gaming accounts, items, currency, and game keys from verified sellers</p>
           </div>
@@ -1014,7 +1014,8 @@ function BrowseContent() {
                             </div>
 
                             <div className="flex items-center justify-between mt-auto">
-                              <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${parseFloat(listing.price).toFixed(2)}</span>
+                              {/* iOS Safari Fix: Solid color instead of gradient */}
+                              <span className="text-xl sm:text-2xl font-bold text-green-400">${parseFloat(listing.price).toFixed(2)}</span>
                               <div className="text-right">
                                 <p className="text-gray-500 text-xs mb-0.5 sm:mb-1">Seller</p>
                                 <p className="text-white font-semibold text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">{listing.profiles?.username}</p>

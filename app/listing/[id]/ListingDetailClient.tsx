@@ -276,6 +276,7 @@ function ListingUnavailablePage({
                     <div className="text-left flex-1 min-w-0">
                       <h3 className="text-white font-bold truncate text-sm sm:text-base">{listing.title}</h3>
                       <p className="text-purple-400 text-xs sm:text-sm">{listing.game}</p>
+                      {/* iOS Safari Fix: Solid color instead of gradient */}
                       <p className="text-xl sm:text-2xl font-bold text-green-400 mt-1">${listing.price.toFixed(2)}</p>
                     </div>
                   </div>
@@ -379,6 +380,7 @@ function ListingUnavailablePage({
                           </h3>
                           <p className="text-purple-400 text-xs mb-1 sm:mb-2">{item.game}</p>
                           <div className="flex items-center justify-between">
+                            {/* iOS Safari Fix: Solid color instead of gradient */}
                             <span className="text-sm sm:text-lg font-bold text-green-400">${item.price.toFixed(2)}</span>
                             {sellerData?.average_rating > 0 && (
                               <span className="text-xs text-yellow-400 flex items-center gap-0.5">
@@ -770,7 +772,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
 
               <div>
                 <p className="text-gray-400 text-sm mb-2">Price</p>
-                <p className="text-4xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                {/* iOS Safari Fix: Solid color instead of gradient */}
+                <p className="text-4xl font-bold text-green-400">
                   ${listing.price.toFixed(2)}
                 </p>
               </div>
@@ -787,7 +790,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                 </div>
                 <div className="flex justify-between text-white font-bold text-xl pt-3 border-t border-white/10">
                   <span>Total</span>
-                  <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  {/* iOS Safari Fix: Solid color instead of gradient */}
+                  <span className="text-purple-400">
                     ${finalTotal.toFixed(2)}
                   </span>
                 </div>
@@ -1009,7 +1013,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                         )}
                       </p>
                       <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
-                        <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent break-words">
+                        {/* iOS Safari Fix: Solid color instead of gradient */}
+                        <span className="text-purple-400 break-words">
                           {listing.title}
                         </span>
                       </h1>
@@ -1171,6 +1176,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                               {item.title}
                             </h3>
                             <div className="flex items-center justify-between">
+                              {/* iOS Safari Fix: Solid color instead of gradient */}
                               <p className="text-green-400 font-bold text-sm sm:text-base">${item.price.toFixed(2)}</p>
                               {sellerData?.average_rating > 0 && (
                                 <div className="flex items-center gap-0.5 sm:gap-1 text-xs text-yellow-400">
@@ -1260,7 +1266,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
 
                 <div className="mb-6">
                   <p className="text-gray-400 text-sm mb-2">Price</p>
-                  <p className="text-5xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                  {/* iOS Safari Fix: Solid color instead of gradient */}
+                  <p className="text-5xl font-bold text-green-400">
                     ${listing.price.toFixed(2)}
                   </p>
                 </div>
@@ -1277,7 +1284,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   </div>
                   <div className="flex justify-between text-white font-bold text-xl pt-3 border-t border-white/10">
                     <span>Total</span>
-                    <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    {/* iOS Safari Fix: Solid color instead of gradient */}
+                    <span className="text-purple-400">
                       ${finalTotal.toFixed(2)}
                     </span>
                   </div>
@@ -1498,7 +1506,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <p className="text-xs text-gray-400 mb-0.5">Price</p>
-              <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+              {/* iOS Safari Fix: Solid color instead of gradient */}
+              <p className="text-2xl sm:text-3xl font-bold text-green-400">
                 ${listing.price.toFixed(2)}
               </p>
             </div>
