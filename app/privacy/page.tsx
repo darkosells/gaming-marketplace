@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Privacy Policy</h1>
-            <p className="text-gray-400">Last updated November 30, 2025</p>
+            <p className="text-gray-400">Last updated December 4, 2025</p>
           </div>
 
           {/* Main Content Card */}
@@ -161,7 +161,7 @@ export default function PrivacyPolicy() {
                   </p>
                 </div>
 
-                {/* NEW: Security & Fraud Prevention Data */}
+                {/* Security & Fraud Prevention Data */}
                 <div className="bg-red-900/20 border border-red-500/20 rounded-xl p-6 mb-4">
                   <h4 className="text-lg font-semibold text-white mb-3">🛡️ Security &amp; Fraud Prevention Data</h4>
                   <p className="text-gray-300 leading-relaxed mb-3">
@@ -221,7 +221,6 @@ export default function PrivacyPolicy() {
                   <li><strong className="text-white">To process vendor withdrawals</strong> and manage platform commission fees.</li>
                   <li><strong className="text-white">To identify usage trends</strong> and improve our Services.</li>
                   <li><strong className="text-white">To save or protect an individual&apos;s vital interest.</strong></li>
-                  {/* NEW: Fraud prevention processing */}
                   <li><strong className="text-white">To prevent fraud and abuse</strong> by analyzing login patterns, detecting multiple accounts from the same device or IP address, and identifying suspicious behavioral patterns.</li>
                   <li><strong className="text-white">To calculate risk assessments</strong> for accounts based on behavioral patterns to protect buyers and sellers from fraudulent transactions.</li>
                   <li><strong className="text-white">To detect related accounts</strong> that may share the same IP address or device fingerprint to prevent marketplace manipulation, fake reviews, and ban evasion.</li>
@@ -258,11 +257,11 @@ export default function PrivacyPolicy() {
                 </ul>
               </section>
 
-              {/* Section 4 - THIRD-PARTY SERVICES */}
+              {/* Section 4 - THIRD-PARTY SERVICES - UPDATED */}
               <section id="third-party" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">4. THIRD-PARTY SERVICES WE USE</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
-                  We use the following third-party services to operate our platform:
+                  We use the following third-party services to operate our platform. These services may collect data about you as described below:
                 </p>
 
                 <div className="space-y-4">
@@ -318,6 +317,84 @@ export default function PrivacyPolicy() {
                   </div>
 
                   <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5">
+                    <h4 className="text-lg font-semibold text-white mb-2">Google Analytics</h4>
+                    <p className="text-gray-300 text-sm mb-2">
+                      We use Google Analytics to understand how visitors use our website:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-300 text-sm mb-2">
+                      <li>Page views and user behavior</li>
+                      <li>Traffic sources and demographics</li>
+                      <li>Session duration and bounce rates</li>
+                    </ul>
+                    <p className="text-gray-300 text-sm mb-2">
+                      <strong className="text-white">Opt-out:</strong> You can opt out using the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Google Analytics Opt-out Browser Add-on</a>.
+                    </p>
+                    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                      View Google Privacy Policy →
+                    </a>
+                  </div>
+
+                  {/* Trustpilot - NEW */}
+                  <div className="bg-green-900/20 rounded-xl p-6 border border-green-500/30">
+                    <h4 className="text-lg font-semibold text-white mb-2">⭐ Trustpilot (Review Widget)</h4>
+                    <p className="text-gray-300 text-sm mb-2">
+                      We display a Trustpilot widget to show customer reviews. The widget may collect:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-300 text-sm mb-2">
+                      <li>Widget interaction data</li>
+                      <li>Browser information</li>
+                      <li>Cookies for session management</li>
+                    </ul>
+                    <p className="text-gray-300 text-sm mb-2">
+                      <strong className="text-white">Important:</strong> The Trustpilot widget also loads third-party services (Hotjar, Google Ads) that may set their own cookies. See our <Link href="/cookies" className="text-purple-400 hover:text-purple-300">Cookie Policy</Link> for details.
+                    </p>
+                    <a href="https://legal.trustpilot.com/for-reviewers/end-user-privacy-terms" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                      View Trustpilot Privacy Policy →
+                    </a>
+                  </div>
+
+                  {/* Hotjar - NEW */}
+                  <div className="bg-orange-900/20 rounded-xl p-6 border border-orange-500/30">
+                    <h4 className="text-lg font-semibold text-white mb-2">🔥 Hotjar (via Trustpilot Widget)</h4>
+                    <p className="text-gray-300 text-sm mb-2">
+                      The Trustpilot widget loads Hotjar analytics, which may collect:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-300 text-sm mb-2">
+                      <li>Session recordings and heatmaps</li>
+                      <li>User behavior analytics</li>
+                      <li>Device and browser information</li>
+                    </ul>
+                    <p className="text-gray-300 text-sm mb-2">
+                      <strong className="text-white">Note:</strong> This service is loaded by Trustpilot, not directly by Nashflare.
+                    </p>
+                    <p className="text-gray-300 text-sm mb-2">
+                      <strong className="text-white">Opt-out:</strong> Visit <a href="https://www.hotjar.com/legal/compliance/opt-out" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Hotjar Opt-out</a>
+                    </p>
+                    <a href="https://www.hotjar.com/legal/policies/privacy/" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                      View Hotjar Privacy Policy →
+                    </a>
+                  </div>
+
+                  {/* Google Ads - NEW */}
+                  <div className="bg-red-900/20 rounded-xl p-6 border border-red-500/30">
+                    <h4 className="text-lg font-semibold text-white mb-2">📢 Google Advertising (via Trustpilot Widget)</h4>
+                    <p className="text-gray-300 text-sm mb-2">
+                      The Trustpilot widget may load Google advertising cookies. <strong className="text-white">Nashflare does not run ads</strong> - these are set by Trustpilot&apos;s integration and may be used for:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-300 text-sm mb-2">
+                      <li>Ad personalization across the web</li>
+                      <li>Frequency capping</li>
+                      <li>Ad measurement</li>
+                    </ul>
+                    <p className="text-gray-300 text-sm mb-2">
+                      <strong className="text-white">Opt-out:</strong> Visit <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Google Ads Settings</a> to manage your preferences.
+                    </p>
+                    <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                      View Google Ads Policy →
+                    </a>
+                  </div>
+
+                  <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5">
                     <h4 className="text-lg font-semibold text-white mb-2">IP Geolocation Services</h4>
                     <p className="text-gray-300 text-sm mb-2">
                       We use IP geolocation services to determine approximate location from IP addresses for fraud prevention:
@@ -334,10 +411,10 @@ export default function PrivacyPolicy() {
                 </div>
               </section>
 
-              {/* Section 5 - COOKIES */}
+              {/* Section 5 - COOKIES - UPDATED */}
               <section id="cookies" className="mb-10">
                 <h2 className="text-2xl font-bold text-white mb-4">5. DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?</h2>
-                <p className="text-gray-400 italic mb-4">In Short: We primarily use localStorage rather than traditional cookies.</p>
+                <p className="text-gray-400 italic mb-4">In Short: We use localStorage for our own functionality and third-party cookies from integrated services.</p>
                 <p className="text-gray-300 leading-relaxed mb-4">
                   We use localStorage (similar to cookies) to gather information when you interact with our Services. This includes:
                 </p>
@@ -346,8 +423,23 @@ export default function PrivacyPolicy() {
                   <li><strong className="text-white">Shopping Cart:</strong> Your cart contents are stored locally until checkout</li>
                   <li><strong className="text-white">User Preferences:</strong> Theme settings and notification preferences</li>
                 </ul>
+
+                <div className="bg-yellow-900/20 border border-yellow-500/20 rounded-xl p-6 mb-4">
+                  <h4 className="text-lg font-semibold text-white mb-3">⚠️ Third-Party Cookies</h4>
+                  <p className="text-gray-300 leading-relaxed mb-3">
+                    Our website also uses third-party services that set their own cookies, including:
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-gray-300">
+                    <li><strong className="text-white">Google Analytics:</strong> Analytics cookies for understanding site usage</li>
+                    <li><strong className="text-white">Trustpilot Widget:</strong> Functional and analytics cookies</li>
+                    <li><strong className="text-white">Hotjar (via Trustpilot):</strong> Session recording and analytics</li>
+                    <li><strong className="text-white">Google Ads (via Trustpilot):</strong> Advertising cookies</li>
+                    <li><strong className="text-white">Stripe:</strong> Fraud prevention cookies during checkout</li>
+                  </ul>
+                </div>
+
                 <p className="text-gray-300 leading-relaxed">
-                  For detailed information about our cookie and localStorage usage, please see our <Link href="/cookies" className="text-purple-400 hover:text-purple-300">Cookie Policy</Link>.
+                  For detailed information about all cookies and how to opt out, please see our <Link href="/cookies" className="text-purple-400 hover:text-purple-300">Cookie Policy</Link>.
                 </p>
               </section>
 
@@ -380,7 +472,6 @@ export default function PrivacyPolicy() {
                     <li>
                       <strong className="text-white">Server Logs:</strong> <strong>90 days</strong> (rolling deletion)
                     </li>
-                    {/* NEW: Security data retention */}
                     <li>
                       <strong className="text-white">Login/Session History:</strong> <strong>12 months</strong> (rolling deletion)
                     </li>
@@ -465,8 +556,18 @@ export default function PrivacyPolicy() {
                   To request this information, contact us at <a href="mailto:contact@nashflare.com" className="text-purple-400 hover:text-purple-300">contact@nashflare.com</a>.
                 </p>
 
+                <h3 className="text-xl font-semibold text-white mb-3">Third-Party Cookie Opt-Outs</h3>
+                <p className="text-gray-300 leading-relaxed mb-4">
+                  You can opt out of third-party tracking:
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-gray-300 mb-4">
+                  <li><strong className="text-white">Google Analytics:</strong> <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Install opt-out add-on</a></li>
+                  <li><strong className="text-white">Google Ads:</strong> <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Manage ad settings</a></li>
+                  <li><strong className="text-white">Hotjar:</strong> <a href="https://www.hotjar.com/legal/compliance/opt-out" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Opt out of Hotjar</a></li>
+                </ul>
+
                 <p className="text-gray-300 leading-relaxed">
-                  <strong className="text-white">Cookies and similar technologies:</strong> You can set your browser to remove cookies and localStorage data. If you choose to remove this data, you may be logged out and your cart will be cleared.
+                  <strong className="text-white">Cookies and similar technologies:</strong> You can set your browser to remove cookies and localStorage data. If you choose to remove this data, you may be logged out and your cart will be cleared. See our <Link href="/cookies" className="text-purple-400 hover:text-purple-300">Cookie Policy</Link> for more details.
                 </p>
               </section>
 

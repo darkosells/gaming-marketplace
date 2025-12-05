@@ -1,0 +1,21 @@
+{
+  "name": "Nashflare - Gaming Marketplace",
+  "short_name": "Nashflare",
+  "description": "Buy and sell gaming accounts, in-game currency, items, and game keys securely",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#8b5cf6",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png"
+    },
+    {
+      "src": "/nashflare-logo.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}

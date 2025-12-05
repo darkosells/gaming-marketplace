@@ -37,7 +37,7 @@ export default function CookiePolicy() {
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Cookie Policy</h1>
-            <p className="text-gray-400">Last updated November 30, 2025</p>
+            <p className="text-gray-400">Last updated December 4, 2025</p>
           </div>
 
           {/* Main Content Card */}
@@ -65,7 +65,7 @@ export default function CookiePolicy() {
                   <strong className="text-white">Local Storage</strong> is similar to cookies but allows websites to store larger amounts of data locally within your browser. Unlike cookies, local storage data is not sent to the server with every request, making it more efficient for storing user preferences and session data.
                 </p>
                 <p className="text-gray-300 leading-relaxed">
-                  Our Website primarily uses <strong className="text-white">local storage</strong> (localStorage) rather than traditional browser cookies to store information. This is a more modern approach that offers better performance and security for our users.
+                  Our Website uses a combination of <strong className="text-white">local storage</strong> (localStorage) for our own functionality and <strong className="text-white">third-party cookies</strong> from integrated services like Trustpilot, Google Analytics, and payment processors.
                 </p>
               </section>
 
@@ -136,7 +136,7 @@ export default function CookiePolicy() {
                   </div>
                 </div>
 
-                {/* NEW: Security & Fraud Prevention Data */}
+                {/* Security & Fraud Prevention Data */}
                 <div className="bg-red-900/20 rounded-xl p-6 border border-red-500/30 mb-6">
                   <h3 className="text-xl font-semibold text-white mb-3">4. 🛡️ Security &amp; Fraud Prevention Data</h3>
                   <div className="space-y-3">
@@ -170,40 +170,225 @@ export default function CookiePolicy() {
                 </div>
               </section>
 
-              {/* Third-Party Services */}
+              {/* Third-Party Cookies Section - NEW/UPDATED */}
               <section className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">Third-Party Services</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">Third-Party Cookies &amp; Services</h2>
                 <p className="text-gray-300 leading-relaxed mb-4">
-                  We use the following third-party services that may store their own cookies or local storage data:
+                  We use third-party services that set their own cookies when you visit our website. Some of these cookies are set automatically when embedded widgets or scripts load.
                 </p>
-                
-                <div className="space-y-4">
-                  <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5">
-                    <h3 className="text-lg font-semibold text-white mb-2">Supabase (Authentication &amp; Database)</h3>
-                    <p className="text-gray-300 text-sm mb-2">
-                      Supabase stores authentication tokens in your browser&apos;s local storage to maintain your session. This is essential for keeping you logged in.
-                    </p>
-                    <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
-                      View Supabase Privacy Policy →
-                    </a>
-                  </div>
 
-                  <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5">
-                    <h3 className="text-lg font-semibold text-white mb-2">Stripe (Payment Processing)</h3>
-                    <p className="text-gray-300 text-sm mb-2">
-                      When you make a purchase, Stripe may use cookies for fraud prevention and to process your payment securely. We do not store any payment card information on our servers.
-                    </p>
-                    <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
-                      View Stripe Privacy Policy →
-                    </a>
+                {/* Trustpilot - NEW */}
+                <div className="bg-green-900/20 rounded-xl p-6 border border-green-500/30 mb-4">
+                  <h3 className="text-lg font-semibold text-white mb-2">⭐ Trustpilot (Review Widget)</h3>
+                  <p className="text-gray-300 text-sm mb-3">
+                    We display a Trustpilot widget in our footer to show our customer reviews. When this widget loads, Trustpilot and its partner services may set the following cookies:
+                  </p>
+                  
+                  <div className="overflow-x-auto mb-3">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-800/50">
+                          <th className="border border-white/10 p-2 text-left text-white">Cookie</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Provider</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Purpose</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-300">
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">tp-b2b-refresh-token</code></td>
+                          <td className="border border-white/10 p-2">Trustpilot</td>
+                          <td className="border border-white/10 p-2">Session/token refresh for widget</td>
+                          <td className="border border-white/10 p-2"><span className="bg-blue-500/20 text-blue-400 px-1 rounded text-xs">Functional</span></td>
+                        </tr>
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">_iidt</code></td>
+                          <td className="border border-white/10 p-2">Trustpilot</td>
+                          <td className="border border-white/10 p-2">User identification for widget</td>
+                          <td className="border border-white/10 p-2"><span className="bg-yellow-500/20 text-yellow-400 px-1 rounded text-xs">Analytics</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
+                  <a href="https://legal.trustpilot.com/for-everyone/cookie-policy" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                    View Trustpilot Cookie Policy →
+                  </a>
+                </div>
 
-                  <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5">
-                    <h3 className="text-lg font-semibold text-white mb-2">IP Geolocation Services</h3>
-                    <p className="text-gray-300 text-sm mb-2">
-                      We use IP geolocation APIs to determine your approximate location from your IP address. This is used for fraud detection (e.g., detecting logins from unusual locations). No cookies are stored by these services.
-                    </p>
+                {/* Hotjar - NEW */}
+                <div className="bg-orange-900/20 rounded-xl p-6 border border-orange-500/30 mb-4">
+                  <h3 className="text-lg font-semibold text-white mb-2">🔥 Hotjar (via Trustpilot)</h3>
+                  <p className="text-gray-300 text-sm mb-3">
+                    The Trustpilot widget loads Hotjar for analytics and session recording. Hotjar helps understand how users interact with the widget. The following cookies may be set:
+                  </p>
+                  
+                  <div className="overflow-x-auto mb-3">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-800/50">
+                          <th className="border border-white/10 p-2 text-left text-white">Cookie</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Purpose</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Duration</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-300">
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">_hjSessionUser_*</code></td>
+                          <td className="border border-white/10 p-2">Identifies unique visitors across sessions</td>
+                          <td className="border border-white/10 p-2">365 days</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">_hjHasCachedUserAttributes</code></td>
+                          <td className="border border-white/10 p-2">Caches user attributes for performance</td>
+                          <td className="border border-white/10 p-2">Session</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">_hjDonePolls</code></td>
+                          <td className="border border-white/10 p-2">Tracks completed feedback polls</td>
+                          <td className="border border-white/10 p-2">365 days</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
+                  <p className="text-gray-400 text-xs mb-2">
+                    <strong>Note:</strong> These cookies are set by Trustpilot&apos;s widget, not directly by Nashflare.
+                  </p>
+                  <a href="https://www.hotjar.com/legal/policies/cookie-information/" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                    View Hotjar Cookie Policy →
+                  </a>
+                </div>
+
+                {/* Google Ads - NEW */}
+                <div className="bg-red-900/20 rounded-xl p-6 border border-red-500/30 mb-4">
+                  <h3 className="text-lg font-semibold text-white mb-2">📢 Google Advertising (via Trustpilot)</h3>
+                  <p className="text-gray-300 text-sm mb-3">
+                    The Trustpilot widget may load Google advertising cookies. These are used by Google for ad personalization and measurement. <strong className="text-white">Nashflare does not run ads or use this data</strong> - these cookies are set by Trustpilot&apos;s integration.
+                  </p>
+                  
+                  <div className="overflow-x-auto mb-3">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-800/50">
+                          <th className="border border-white/10 p-2 text-left text-white">Cookie</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Purpose</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-300">
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">__gads</code></td>
+                          <td className="border border-white/10 p-2">Google ad serving and frequency capping</td>
+                          <td className="border border-white/10 p-2"><span className="bg-red-500/20 text-red-400 px-1 rounded text-xs">Advertising</span></td>
+                        </tr>
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">__gpi</code></td>
+                          <td className="border border-white/10 p-2">Google Publisher ID for ad targeting</td>
+                          <td className="border border-white/10 p-2"><span className="bg-red-500/20 text-red-400 px-1 rounded text-xs">Advertising</span></td>
+                        </tr>
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">__eoi</code></td>
+                          <td className="border border-white/10 p-2">Google ad optimization identifier</td>
+                          <td className="border border-white/10 p-2"><span className="bg-red-500/20 text-red-400 px-1 rounded text-xs">Advertising</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <a href="https://policies.google.com/technologies/cookies" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                    View Google Cookie Policy →
+                  </a>
+                </div>
+
+                {/* OneTrust/Optanon - NEW */}
+                <div className="bg-blue-900/20 rounded-xl p-6 border border-blue-500/30 mb-4">
+                  <h3 className="text-lg font-semibold text-white mb-2">🔒 OneTrust (Consent Management via Trustpilot)</h3>
+                  <p className="text-gray-300 text-sm mb-3">
+                    Trustpilot uses OneTrust for cookie consent management. These cookies remember your consent preferences:
+                  </p>
+                  
+                  <div className="overflow-x-auto mb-3">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-800/50">
+                          <th className="border border-white/10 p-2 text-left text-white">Cookie</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Purpose</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-300">
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">OptanonConsent</code></td>
+                          <td className="border border-white/10 p-2">Stores your cookie consent preferences</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">OptanonAlertBoxClosed</code></td>
+                          <td className="border border-white/10 p-2">Tracks if consent banner was closed</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Google Analytics */}
+                <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5 mb-4">
+                  <h3 className="text-lg font-semibold text-white mb-2">📊 Google Analytics</h3>
+                  <p className="text-gray-300 text-sm mb-3">
+                    We use Google Analytics to understand how visitors use our website. This helps us improve the user experience.
+                  </p>
+                  <div className="overflow-x-auto mb-3">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-800/50">
+                          <th className="border border-white/10 p-2 text-left text-white">Cookie</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Purpose</th>
+                          <th className="border border-white/10 p-2 text-left text-white">Duration</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-300">
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">_ga</code></td>
+                          <td className="border border-white/10 p-2">Distinguishes unique users</td>
+                          <td className="border border-white/10 p-2">2 years</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-white/10 p-2"><code className="text-xs">_ga_*</code></td>
+                          <td className="border border-white/10 p-2">Maintains session state</td>
+                          <td className="border border-white/10 p-2">2 years</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                    View Google Privacy Policy →
+                  </a>
+                </div>
+
+                {/* Supabase */}
+                <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5 mb-4">
+                  <h3 className="text-lg font-semibold text-white mb-2">Supabase (Authentication &amp; Database)</h3>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Supabase stores authentication tokens in your browser&apos;s local storage to maintain your session. This is essential for keeping you logged in.
+                  </p>
+                  <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                    View Supabase Privacy Policy →
+                  </a>
+                </div>
+
+                {/* Stripe */}
+                <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5 mb-4">
+                  <h3 className="text-lg font-semibold text-white mb-2">Stripe (Payment Processing)</h3>
+                  <p className="text-gray-300 text-sm mb-2">
+                    When you make a purchase, Stripe may use cookies for fraud prevention and to process your payment securely. We do not store any payment card information on our servers.
+                  </p>
+                  <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-sm">
+                    View Stripe Privacy Policy →
+                  </a>
+                </div>
+
+                {/* IP Geolocation */}
+                <div className="bg-slate-900/50 rounded-xl p-6 border border-white/5">
+                  <h3 className="text-lg font-semibold text-white mb-2">IP Geolocation Services</h3>
+                  <p className="text-gray-300 text-sm mb-2">
+                    We use IP geolocation APIs to determine your approximate location from your IP address. This is used for fraud detection (e.g., detecting logins from unusual locations). No cookies are stored by these services.
+                  </p>
                 </div>
               </section>
 
@@ -225,6 +410,18 @@ export default function CookiePolicy() {
                       <li><strong className="text-white">Firefox:</strong> Options → Privacy &amp; Security → Clear Data</li>
                       <li><strong className="text-white">Safari:</strong> Preferences → Privacy → Manage Website Data</li>
                       <li><strong className="text-white">Edge:</strong> Settings → Privacy, search, and services → Clear browsing data</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-3">Opting Out of Third-Party Cookies</h3>
+                    <p className="text-gray-300 leading-relaxed mb-4">
+                      You can opt out of specific third-party tracking:
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 text-gray-300">
+                      <li><strong className="text-white">Google Analytics:</strong> Install the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Google Analytics Opt-out Browser Add-on</a></li>
+                      <li><strong className="text-white">Google Ads:</strong> Visit <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Google Ads Settings</a> to manage preferences</li>
+                      <li><strong className="text-white">Hotjar:</strong> Visit <a href="https://www.hotjar.com/legal/compliance/opt-out" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Hotjar Opt-out</a></li>
                     </ul>
                   </div>
 
@@ -253,7 +450,7 @@ export default function CookiePolicy() {
                   </div>
 
                   <div>
-                    <h3 className="text-xl font-semibold text-white mb-3">Impact of Disabling Storage</h3>
+                    <h3 className="text-xl font-semibold text-white mb-3">Impact of Disabling Cookies</h3>
                     <p className="text-gray-300 leading-relaxed">
                       Please note that if you disable cookies or clear local storage, you may experience the following:
                     </p>
@@ -261,6 +458,7 @@ export default function CookiePolicy() {
                       <li>You will be logged out and need to sign in again</li>
                       <li>Your shopping cart will be emptied</li>
                       <li>Your theme and notification preferences will be reset to defaults</li>
+                      <li>The Trustpilot review widget may not display properly</li>
                       <li>Some features of the website may not function properly</li>
                     </ul>
                   </div>
@@ -269,7 +467,7 @@ export default function CookiePolicy() {
 
               {/* Categories */}
               <section className="mb-10">
-                <h2 className="text-2xl font-bold text-white mb-4">Categories of Storage We Use</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">Categories of Cookies We Use</h2>
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
@@ -296,7 +494,7 @@ export default function CookiePolicy() {
                           <strong className="text-white">Security</strong>
                         </td>
                         <td className="border border-white/10 p-4 text-gray-300">
-                          Fraud prevention, risk assessment, abuse detection, multi-account detection
+                          Fraud prevention, risk assessment, abuse detection
                         </td>
                         <td className="border border-white/10 p-4 text-gray-300">
                           <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-sm">Yes</span>
@@ -318,7 +516,18 @@ export default function CookiePolicy() {
                           <strong className="text-white">Analytics</strong>
                         </td>
                         <td className="border border-white/10 p-4 text-gray-300">
-                          Understanding how users interact with our site (if implemented)
+                          Google Analytics, Hotjar (via Trustpilot) - understanding site usage
+                        </td>
+                        <td className="border border-white/10 p-4 text-gray-300">
+                          <span className="bg-gray-500/20 text-gray-400 px-2 py-1 rounded text-sm">Optional</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-white/10 p-4 text-gray-300">
+                          <strong className="text-white">Advertising</strong>
+                        </td>
+                        <td className="border border-white/10 p-4 text-gray-300">
+                          Google Ads cookies (via Trustpilot widget) - ad personalization
                         </td>
                         <td className="border border-white/10 p-4 text-gray-300">
                           <span className="bg-gray-500/20 text-gray-400 px-2 py-1 rounded text-sm">Optional</span>
