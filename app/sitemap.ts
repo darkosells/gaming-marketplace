@@ -40,6 +40,23 @@ const blogPosts = [
     slug: 'best-gaming-accounts-to-buy-2024',
     lastModified: '2024-10-28',
   },
+  // New blog posts added December 2024
+  {
+    slug: 'how-to-sell-gaming-account-complete-guide',
+    lastModified: '2024-12-01',
+  },
+  {
+    slug: 'is-buying-gaming-accounts-legal',
+    lastModified: '2024-12-03',
+  },
+  {
+    slug: 'how-much-is-my-fortnite-account-worth',
+    lastModified: '2024-12-05',
+  },
+  {
+    slug: 'gta-5-modded-cars-outfits-guide',
+    lastModified: '2024-12-06',
+  },
 ]
 
 // Product categories with their slugs
