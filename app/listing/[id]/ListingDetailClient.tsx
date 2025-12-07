@@ -100,7 +100,6 @@ function ListingUnavailablePage({
         .gt('stock', 0)
         .limit(4)
 
-      // If we have listing info, try to find similar ones
       if (listing?.game) {
         query = query.eq('game', listing.game)
       } else if (listing?.category) {
@@ -111,7 +110,6 @@ function ListingUnavailablePage({
 
       if (error) throw error
 
-      // If we didn't get enough results from same game, fetch more general ones
       if ((!data || data.length < 4) && listing?.category) {
         const { data: moreData } = await supabase
           .from('listings')
@@ -213,7 +211,6 @@ function ListingUnavailablePage({
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-      {/* Background */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
@@ -227,9 +224,7 @@ function ListingUnavailablePage({
 
         <div className="container mx-auto px-4 pt-24 pb-12">
           <div className="max-w-4xl mx-auto">
-            {/* Main Unavailable Card */}
             <div className={`bg-gradient-to-r ${colors.bg} backdrop-blur-xl border-2 ${colors.border} rounded-3xl p-6 sm:p-8 md:p-12 mb-8 text-center`}>
-              {/* Animated Emoji */}
               <div className="relative inline-block mb-6">
                 <div className={`absolute inset-0 bg-gradient-to-r ${colors.button} rounded-full blur-xl opacity-50 animate-pulse`}></div>
                 <div className="relative text-6xl sm:text-7xl md:text-8xl animate-bounce" style={{ animationDuration: '2s' }}>
@@ -237,24 +232,20 @@ function ListingUnavailablePage({
                 </div>
               </div>
 
-              {/* Status Badge */}
               <div className="inline-block mb-4">
                 <span className={`px-4 py-2 rounded-full text-sm font-semibold border ${colors.badge}`}>
                   {content.title}
                 </span>
               </div>
 
-              {/* Title */}
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4">
                 {content.subtitle}
               </h1>
 
-              {/* Message */}
               <p className="text-gray-300 text-base sm:text-lg mb-8 max-w-2xl mx-auto">
                 {content.message}
               </p>
 
-              {/* Listing Info (if available) */}
               {listing && (reason === 'out_of_stock' || reason === 'inactive') && (
                 <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 sm:p-6 mb-8 max-w-md mx-auto">
                   <div className="flex items-center gap-4">
@@ -276,7 +267,6 @@ function ListingUnavailablePage({
                     <div className="text-left flex-1 min-w-0">
                       <h3 className="text-white font-bold truncate text-sm sm:text-base">{listing.title}</h3>
                       <p className="text-purple-400 text-xs sm:text-sm">{listing.game}</p>
-                      {/* iOS Safari Fix: Solid color instead of gradient */}
                       <p className="text-xl sm:text-2xl font-bold text-green-400 mt-1">${listing.price.toFixed(2)}</p>
                     </div>
                   </div>
@@ -287,7 +277,7 @@ function ListingUnavailablePage({
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
-                        <span className="font-semibold">0 in stock</span>
+                        <span className="font-semibold">Currently Unavailable</span>
                       </div>
                     </div>
                   )}
@@ -305,7 +295,6 @@ function ListingUnavailablePage({
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/browse"
@@ -324,7 +313,6 @@ function ListingUnavailablePage({
                 )}
               </div>
 
-              {/* Notify Button (for out of stock) */}
               {content.showNotifyButton && listing && (
                 <div className="mt-6">
                   <button
@@ -340,7 +328,6 @@ function ListingUnavailablePage({
               )}
             </div>
 
-            {/* Similar Listings */}
             {similarListings.length > 0 && (
               <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 md:p-8">
                 <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-3">
@@ -380,7 +367,6 @@ function ListingUnavailablePage({
                           </h3>
                           <p className="text-purple-400 text-xs mb-1 sm:mb-2">{item.game}</p>
                           <div className="flex items-center justify-between">
-                            {/* iOS Safari Fix: Solid color instead of gradient */}
                             <span className="text-sm sm:text-lg font-bold text-green-400">${item.price.toFixed(2)}</span>
                             {sellerData?.average_rating > 0 && (
                               <span className="text-xs text-yellow-400 flex items-center gap-0.5">
@@ -408,7 +394,6 @@ function ListingUnavailablePage({
               </div>
             )}
 
-            {/* Help Section */}
             <div className="mt-8 text-center">
               <p className="text-gray-400 mb-4">Need help finding something specific?</p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -449,15 +434,14 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
   const [showModal, setShowModal] = useState(false)
   const [modalMessage, setModalMessage] = useState({ title: '', message: '', type: 'info' })
   const [showMobilePurchase, setShowMobilePurchase] = useState(false)
+  const [showGuaranteeModal, setShowGuaranteeModal] = useState(false)
   
   const supabase = createClient()
 
-  // If there's an unavailable reason, show the unavailable page
   if (unavailableReason) {
     return <ListingUnavailablePage listing={initialListing} reason={unavailableReason} />
   }
 
-  // Check if current user is the seller (owner) of this listing
   const isOwnListing = user && listing && listing.seller_id === user.id
 
   useEffect(() => {
@@ -560,7 +544,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
     
     if (!listing) return
 
-    // Prevent buying own product
     if (listing.seller_id === user.id) {
       setModalMessage({
         title: 'Cannot Buy Own Product',
@@ -591,7 +574,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
 
     if (!listing) return
 
-    // Prevent adding own product to cart
     if (listing.seller_id === user.id) {
       setModalMessage({
         title: 'Cannot Add to Cart',
@@ -654,7 +636,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
     }
 
     try {
-      // Check if conversation already exists
       const { data: existingConv, error: checkError } = await supabase
         .from('conversations')
         .select('id')
@@ -664,10 +645,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
         .maybeSingle()
 
       if (existingConv) {
-        // Conversation exists, go to it
         router.push(`/messages?conversation=${existingConv.id}`)
       } else {
-        // No conversation exists, pass listing info via URL to create on first message
         router.push(`/messages?listing_id=${listing.id}&seller_id=${listing.seller_id}`)
       }
     } catch (error) {
@@ -681,7 +660,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
     }
   }
 
-  // Fallback if somehow we get here without a listing and no unavailable reason
   if (!listing) {
     return <ListingUnavailablePage listing={null} reason="not_found" />
   }
@@ -734,6 +712,75 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
         </div>
       )}
 
+      {/* Money-Back Guarantee Info Modal */}
+      {showGuaranteeModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-bold text-white">Money-Back Guarantee</h3>
+              </div>
+              <button
+                onClick={() => setShowGuaranteeModal(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4 text-gray-300 text-sm">
+              <p>
+                Your purchase is protected by our 48-hour Money-Back Guarantee. If something goes wrong, we've got you covered.
+              </p>
+              
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5">✓</span>
+                  <div>
+                    <p className="text-white font-medium">Item Not As Described</p>
+                    <p className="text-gray-400 text-xs">Full refund if the item doesn't match the listing description</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5">✓</span>
+                  <div>
+                    <p className="text-white font-medium">Non-Delivery</p>
+                    <p className="text-gray-400 text-xs">Full refund if you don't receive your item</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5">✓</span>
+                  <div>
+                    <p className="text-white font-medium">Account Issues</p>
+                    <p className="text-gray-400 text-xs">Protected if account credentials don't work or get recovered</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                <p className="text-xs text-gray-400">
+                  <span className="text-white font-medium">How to claim:</span> Open a dispute within 48 hours of purchase through your order details page. Our team will review and resolve within 24 hours.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowGuaranteeModal(false)}
+              className="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition min-h-[48px]"
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Purchase Modal */}
       {showMobilePurchase && (
         <div className="lg:hidden fixed inset-0 z-50 flex items-end">
@@ -742,7 +789,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
             onClick={() => setShowMobilePurchase(false)}
           ></div>
           <div className="relative w-full bg-slate-900/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-slide-up">
-            {/* Header */}
             <div className="sticky top-0 bg-slate-900/95 backdrop-blur-xl border-b border-white/10 p-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white">Purchase Details</h3>
               <button 
@@ -755,9 +801,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
               </button>
             </div>
 
-            {/* Content */}
             <div className="p-4 space-y-4">
-              {/* Own Listing Warning */}
               {isOwnListing && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
                   <div className="flex items-center gap-3">
@@ -772,13 +816,11 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
 
               <div>
                 <p className="text-gray-400 text-sm mb-2">Price</p>
-                {/* iOS Safari Fix: Solid color instead of gradient */}
                 <p className="text-4xl font-bold text-green-400">
                   ${listing.price.toFixed(2)}
                 </p>
               </div>
 
-              {/* Price Breakdown */}
               <div className="space-y-3 pb-4 border-b border-white/10">
                 <div className="flex justify-between text-gray-300">
                   <span>Subtotal</span>
@@ -790,14 +832,12 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                 </div>
                 <div className="flex justify-between text-white font-bold text-xl pt-3 border-t border-white/10">
                   <span>Total</span>
-                  {/* iOS Safari Fix: Solid color instead of gradient */}
                   <span className="text-purple-400">
                     ${finalTotal.toFixed(2)}
                   </span>
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="space-y-3">
                 <button
                   onClick={handleBuyNow}
@@ -831,20 +871,58 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                 )}
               </div>
 
-              {/* Trust Badges */}
               {!isOwnListing && (
-                <div className="space-y-3 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border border-green-500/20">
-                  <div className="flex items-center space-x-3 text-sm text-gray-300">
-                    <span className="text-green-400 text-xl">✓</span>
-                    <span>Secure Payment</span>
+                <div className="space-y-3">
+                  {/* Trust Badges with Clickable Money-Back Guarantee */}
+                  <div className="bg-white/5 rounded-xl p-3 border border-white/10 space-y-2">
+                    <button
+                      onClick={() => setShowGuaranteeModal(true)}
+                      className="w-full flex items-center space-x-3 text-sm text-gray-300 hover:text-white transition group"
+                    >
+                      <span className="text-green-400 text-lg">✓</span>
+                      <span className="group-hover:underline">Money-Back Guarantee</span>
+                      <svg className="w-4 h-4 text-gray-500 group-hover:text-white transition ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+                    <div className="flex items-center space-x-3 text-sm text-gray-300">
+                      <span className="text-green-400 text-lg">✓</span>
+                      <span>Secure Payment</span>
+                    </div>
+                    <div className="flex items-center space-x-3 text-sm text-gray-300">
+                      <span className="text-green-400 text-lg">✓</span>
+                      <span>48h Buyer Protection</span>
+                    </div>
+                    <div className="flex items-center space-x-3 text-sm text-gray-300">
+                      <span className="text-green-400 text-lg">✓</span>
+                      <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-3 text-sm text-gray-300">
-                    <span className="text-green-400 text-xl">✓</span>
-                    <span>48h Buyer Protection</span>
-                  </div>
-                  <div className="flex items-center space-x-3 text-sm text-gray-300">
-                    <span className="text-green-400 text-xl">✓</span>
-                    <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
+
+                  {/* Payment Security Badges */}
+                  <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-gray-400 text-xs font-medium">SECURE CHECKOUT</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+                        <span className="text-blue-400 font-bold text-xs">Pay</span>
+                        <span className="text-blue-300 font-bold text-xs">Pal</span>
+                      </div>
+                      <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+                        <span className="text-orange-400 text-sm">₿</span>
+                        <span className="text-gray-300 text-xs font-medium">Crypto</span>
+                      </div>
+                      <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+                        <svg className="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        <span className="text-gray-300 text-xs font-medium">SSL</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -909,7 +987,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
         </div>
 
         <div className="container mx-auto px-3 sm:px-4 pb-8 sm:pb-12">
-          {/* Own Listing Banner */}
           {isOwnListing && (
             <div className="mb-4 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-2xl p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -979,7 +1056,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                       </span>
                     </div>
                   )}
-                  {/* Category & Delivery Badge */}
                   <div className="absolute top-2 sm:top-4 left-2 sm:left-4 flex flex-wrap gap-1.5 sm:gap-2">
                     <span className="bg-black/50 backdrop-blur-lg px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold">
                       {listing.category === 'account' ? '🎮 Account' : listing.category === 'currency' ? '💰 Currency' : '🔑 Game Key'}
@@ -990,7 +1066,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                       </span>
                     )}
                   </div>
-                  {/* Own Listing Badge */}
                   {isOwnListing && (
                     <div className="absolute top-2 sm:top-4 right-2 sm:right-4">
                       <span className="bg-yellow-500/80 backdrop-blur-lg px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold">
@@ -1013,13 +1088,11 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                         )}
                       </p>
                       <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
-                        {/* iOS Safari Fix: Solid color instead of gradient */}
                         <span className="text-purple-400 break-words">
                           {listing.title}
                         </span>
                       </h1>
                       
-                      {/* Tags Display */}
                       {listing.tags && listing.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-3 sm:mt-4">
                           {listing.tags.map((tag, index) => (
@@ -1061,7 +1134,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                     </div>
                   </div>
 
-                  {/* Tab Content */}
                   {activeTab === 'description' && (
                     <div className="text-gray-300 leading-relaxed text-sm sm:text-base">
                       <p className="whitespace-pre-wrap">{listing.description || 'No description provided.'}</p>
@@ -1092,14 +1164,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                           <span className="text-white font-semibold text-sm sm:text-base">{listing.platform}</span>
                         </div>
                       )}
-                      <div className="flex justify-between py-2 sm:py-3 border-b border-white/10">
-                        <span className="text-gray-400 flex items-center gap-2 text-sm sm:text-base">
-                          <span>📦</span> Stock
-                        </span>
-                        <span className={`font-semibold text-sm sm:text-base ${listing.stock > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {listing.stock} available
-                        </span>
-                      </div>
                       <div className="flex justify-between py-2 sm:py-3 border-b border-white/10">
                         <span className="text-gray-400 flex items-center gap-2 text-sm sm:text-base">
                           <span>🚚</span> Delivery
@@ -1176,7 +1240,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                               {item.title}
                             </h3>
                             <div className="flex items-center justify-between">
-                              {/* iOS Safari Fix: Solid color instead of gradient */}
                               <p className="text-green-400 font-bold text-sm sm:text-base">${item.price.toFixed(2)}</p>
                               {sellerData?.average_rating > 0 && (
                                 <div className="flex items-center gap-0.5 sm:gap-1 text-xs text-yellow-400">
@@ -1251,7 +1314,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
             <div className="hidden lg:block space-y-6">
               {/* Purchase Card */}
               <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-all duration-300">
-                {/* Own Listing Warning */}
                 {isOwnListing && (
                   <div className="mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
                     <div className="flex items-center gap-3">
@@ -1266,13 +1328,11 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
 
                 <div className="mb-6">
                   <p className="text-gray-400 text-sm mb-2">Price</p>
-                  {/* iOS Safari Fix: Solid color instead of gradient */}
                   <p className="text-5xl font-bold text-green-400">
                     ${listing.price.toFixed(2)}
                   </p>
                 </div>
 
-                {/* Price Breakdown */}
                 <div className="space-y-3 mb-6 pb-6 border-b border-white/10">
                   <div className="flex justify-between text-gray-300">
                     <span>Subtotal</span>
@@ -1284,14 +1344,12 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   </div>
                   <div className="flex justify-between text-white font-bold text-xl pt-3 border-t border-white/10">
                     <span>Total</span>
-                    {/* iOS Safari Fix: Solid color instead of gradient */}
                     <span className="text-purple-400">
                       ${finalTotal.toFixed(2)}
                     </span>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="space-y-3">
                   <button
                     onClick={handleBuyNow}
@@ -1325,20 +1383,62 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   )}
                 </div>
 
-                {/* Trust Badges */}
+                {/* Trust Badges with Clickable Money-Back Guarantee */}
                 {!isOwnListing && (
-                  <div className="mt-6 space-y-3 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border border-green-500/20">
-                    <div className="flex items-center space-x-3 text-sm text-gray-300">
-                      <span className="text-green-400 text-xl">✓</span>
-                      <span>Secure Payment</span>
+                  <div className="mt-6 space-y-4">
+                    {/* Trust Badges */}
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
+                      <button
+                        onClick={() => setShowGuaranteeModal(true)}
+                        className="w-full flex items-center space-x-3 text-sm text-gray-300 hover:text-white transition group"
+                      >
+                        <span className="text-green-400 text-xl">✓</span>
+                        <span className="group-hover:underline">Money-Back Guarantee</span>
+                        <svg className="w-4 h-4 text-gray-500 group-hover:text-white transition ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                      <div className="flex items-center space-x-3 text-sm text-gray-300">
+                        <span className="text-green-400 text-xl">✓</span>
+                        <span>Secure Payment</span>
+                      </div>
+                      <div className="flex items-center space-x-3 text-sm text-gray-300">
+                        <span className="text-green-400 text-xl">✓</span>
+                        <span>48h Buyer Protection</span>
+                      </div>
+                      <div className="flex items-center space-x-3 text-sm text-gray-300">
+                        <span className="text-green-400 text-xl">✓</span>
+                        <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-3 text-sm text-gray-300">
-                      <span className="text-green-400 text-xl">✓</span>
-                      <span>48h Buyer Protection</span>
-                    </div>
-                    <div className="flex items-center space-x-3 text-sm text-gray-300">
-                      <span className="text-green-400 text-xl">✓</span>
-                      <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
+
+                    {/* Payment Security Badges */}
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                      <div className="flex items-center justify-center gap-2 mb-3">
+                        <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-gray-400 text-xs font-medium">SECURE CHECKOUT</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-4">
+                        <div className="bg-white/10 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                          <span className="text-blue-400 font-bold text-sm">Pay</span>
+                          <span className="text-blue-300 font-bold text-sm">Pal</span>
+                        </div>
+                        <div className="bg-white/10 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                          <span className="text-orange-400">₿</span>
+                          <span className="text-gray-300 text-sm font-medium">Crypto</span>
+                        </div>
+                        <div className="bg-white/10 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                          </svg>
+                          <span className="text-gray-300 text-sm font-medium">SSL</span>
+                        </div>
+                      </div>
+                      <p className="text-center text-gray-500 text-xs mt-3">
+                        Your payment is encrypted and secure
+                      </p>
                     </div>
                   </div>
                 )}
@@ -1381,7 +1481,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   </div>
                 </div>
 
-                {/* Seller Rank Badge */}
                 <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1461,7 +1560,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                 </div>
               </div>
 
-              {/* Seller Rank Badge (Mobile) */}
               <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1506,7 +1604,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <p className="text-xs text-gray-400 mb-0.5">Price</p>
-              {/* iOS Safari Fix: Solid color instead of gradient */}
               <p className="text-2xl sm:text-3xl font-bold text-green-400">
                 ${listing.price.toFixed(2)}
               </p>
@@ -1533,7 +1630,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
         <Footer />
       </div>
 
-      {/* Custom Styles */}
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
