@@ -20,11 +20,34 @@ const STATUS_CONFIG: Record<string, any> = {
 
 // Helper function to parse timestamp as UTC
 const parseAsUTC = (timestamp: string): Date => {
+  if (!timestamp) return new Date()
   // If timestamp doesn't have timezone info, treat it as UTC
-  if (timestamp && !timestamp.includes('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
+  if (!timestamp.includes('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
     return new Date(timestamp + 'Z')
   }
   return new Date(timestamp)
+}
+
+// Helper function to format date consistently (parses as UTC, displays in local time)
+const formatDate = (timestamp: string | null | undefined, options?: Intl.DateTimeFormatOptions): string => {
+  if (!timestamp) return ''
+  const date = parseAsUTC(timestamp)
+  return date.toLocaleString('en-US', options || {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  })
+}
+
+// Short date format for compact displays
+const formatShortDate = (timestamp: string | null | undefined): string => {
+  if (!timestamp) return ''
+  const date = parseAsUTC(timestamp)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export default function OrderDetailPage() {
@@ -1057,7 +1080,7 @@ export default function OrderDetailPage() {
                     { l: 'Qty', v: order.quantity }, 
                     { l: 'Price', v: `$${(order.amount / order.quantity).toFixed(2)}` }, 
                     { l: 'Type', v: order.listing.delivery_type === 'automatic' ? '⚡ Auto' : '👤 Manual' }, 
-                    { l: 'Date', v: new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
+                    { l: 'Date', v: formatShortDate(order.created_at) }
                   ].map((x, i) => (
                     <div key={i} className="bg-white/5 rounded-lg p-2 sm:p-3 border border-white/10">
                       <p className="text-xs text-gray-400 mb-0.5 sm:mb-1">{x.l}</p>
@@ -1067,7 +1090,7 @@ export default function OrderDetailPage() {
                 </div>
                 {order.delivered_at && (
                   <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2 sm:p-3 inline-block">
-                    <p className="text-green-400 text-xs sm:text-sm">✓ Delivered {new Date(order.delivered_at).toLocaleString()}</p>
+                    <p className="text-green-400 text-xs sm:text-sm">✓ Delivered {formatDate(order.delivered_at)}</p>
                   </div>
                 )}
               </div>
@@ -1280,7 +1303,7 @@ export default function OrderDetailPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-red-400 font-bold text-base sm:text-lg">Dispute Active</p>
-                      <p className="text-xs sm:text-sm text-gray-400">Opened: {new Date(dispute.created_at).toLocaleString()}</p>
+                      <p className="text-xs sm:text-sm text-gray-400">Opened: {formatDate(dispute.created_at)}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold self-start ${
                       dispute.status === 'open' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 
@@ -1343,7 +1366,11 @@ export default function OrderDetailPage() {
                 { show: !!order.dispute_opened_at, icon: '⚠️', color: 'red', title: 'Disputed', time: order.dispute_opened_at, sub: order.dispute_reason },
                 ...adminActions.map(a => ({ show: true, icon: '👑', color: 'orange', title: a.action_type.replace(/_/g, ' '), time: a.created_at, sub: `Admin: ${a.admin?.username || 'Unknown'}` })),
                 { show: !!order.completed_at && (order.status === 'completed' || order.status === 'refunded'), icon: order.status === 'refunded' ? '💰' : '✅', color: order.status === 'refunded' ? 'orange' : 'green', title: order.status === 'refunded' ? 'Refunded' : 'Completed', time: order.completed_at, sub: order.resolution_notes || '' }
-              ].filter(e => e.show).map((e, i, arr) => (
+              ].filter(e => e.show).sort((a, b) => {
+                // Sort timeline events by time (oldest first)
+                if (!a.time || !b.time) return 0
+                return parseAsUTC(a.time).getTime() - parseAsUTC(b.time).getTime()
+              }).map((e, i, arr) => (
                 <div key={i} className="flex gap-3 sm:gap-4">
                   <div className="flex flex-col items-center">
                     <div className={`w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-${e.color}-500/20 to-${e.color}-500/20 rounded-xl flex items-center justify-center border border-${e.color}-500/30 flex-shrink-0`}>
@@ -1353,7 +1380,7 @@ export default function OrderDetailPage() {
                   </div>
                   <div className="flex-1 pb-4 sm:pb-6 min-w-0">
                     <p className="text-white font-semibold text-sm sm:text-base">{e.title}</p>
-                    {e.time && <p className="text-xs sm:text-sm text-gray-400">{new Date(e.time).toLocaleString()}</p>}
+                    {e.time && <p className="text-xs sm:text-sm text-gray-400">{formatDate(e.time)}</p>}
                     {e.sub && <p className="text-xs text-gray-500 mt-1 truncate">{e.sub}</p>}
                   </div>
                 </div>
