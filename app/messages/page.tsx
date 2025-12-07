@@ -50,6 +50,7 @@ interface Message {
   read: boolean
   image_url?: string | null
   replied_to?: string | null
+  order_id?: string | null
   sender: {
     username: string
     is_admin: boolean
@@ -69,6 +70,77 @@ interface TypingUser {
   user_id: string
   username: string
   timestamp: number
+}
+
+// Helper function to parse timestamp as UTC
+const parseAsUTC = (timestamp: string): Date => {
+  if (!timestamp) return new Date()
+  // If timestamp doesn't have timezone info, treat it as UTC
+  if (!timestamp.includes('Z') && !timestamp.includes('+') && !timestamp.includes('-', 10)) {
+    return new Date(timestamp + 'Z')
+  }
+  return new Date(timestamp)
+}
+
+// Helper function to format time consistently
+const formatTime = (timestamp: string): string => {
+  if (!timestamp) return ''
+  const date = parseAsUTC(timestamp)
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+// Helper function to format date and time
+const formatDateTime = (timestamp: string): string => {
+  if (!timestamp) return ''
+  const date = parseAsUTC(timestamp)
+  return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// Helper function to format date for separators
+const formatDateSeparator = (timestamp: string): string => {
+  const messageDate = parseAsUTC(timestamp)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  
+  if (messageDate.toDateString() === today.toDateString()) {
+    return 'Today'
+  } else if (messageDate.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday'
+  } else {
+    return messageDate.toLocaleDateString('en-US', { 
+      month: 'long', 
+      day: 'numeric', 
+      year: messageDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined 
+    })
+  }
+}
+
+// Helper function to format last seen time
+const formatLastSeen = (lastSeenDate: string | null): string => {
+  if (!lastSeenDate) return 'Last seen recently'
+  
+  const lastSeen = parseAsUTC(lastSeenDate)
+  const now = new Date()
+  const diffMinutes = Math.floor((now.getTime() - lastSeen.getTime()) / (1000 * 60))
+  
+  if (diffMinutes < 1) return 'Active now'
+  if (diffMinutes < 60) return `Last active ${diffMinutes}m ago`
+  
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `Last active ${diffHours}h ago`
+  
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays === 1) return 'Last active yesterday'
+  if (diffDays < 7) return `Last active ${diffDays}d ago`
+  
+  return 'Last active long ago'
+}
+
+// Helper function to format conversation date
+const formatConversationDate = (timestamp: string): string => {
+  const date = parseAsUTC(timestamp)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 // Helper function to get listing info from conversation (uses snapshot as fallback)
@@ -140,6 +212,9 @@ function MessagesContent() {
   const [revealedDeliveryMessages, setRevealedDeliveryMessages] = useState<Set<string>>(new Set())
   const [showDeliverySecurityModal, setShowDeliverySecurityModal] = useState(false)
   const [pendingRevealMessageId, setPendingRevealMessageId] = useState<string | null>(null)
+  
+  // Copy order ID state for delivery messages
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null)
   
   // Rate limiting states
   const [messageTimestamps, setMessageTimestamps] = useState<number[]>([])
@@ -221,12 +296,26 @@ function MessagesContent() {
     cleanedContent = cleanedContent.replace(/✅.*?delivered.*?automatically.*$/gim, '')
     cleanedContent = cleanedContent.replace(/⏰.*?48.*?hour.*?protection.*$/gim, '')
     cleanedContent = cleanedContent.replace(/⚠️.*?verify.*?credentials.*$/gim, '')
+    cleanedContent = cleanedContent.replace(/✅.*?Marked as delivered.*$/gim, '')
+    cleanedContent = cleanedContent.replace(/⏰.*?hours to confirm.*$/gim, '')
+    cleanedContent = cleanedContent.replace(/⚠️.*?Raise dispute.*$/gim, '')
     
     // Clean up extra whitespace and newlines
     cleanedContent = cleanedContent.replace(/\n{3,}/g, '\n\n')
     cleanedContent = cleanedContent.trim()
     
     return { credentials: cleanedContent }
+  }
+
+  // Copy order ID function for delivery messages
+  const copyDeliveryOrderId = async (orderId: string) => {
+    try {
+      await navigator.clipboard.writeText(orderId)
+      setCopiedOrderId(orderId)
+      setTimeout(() => setCopiedOrderId(null), 2000)
+    } catch (err) {
+      console.error('Failed to copy order ID:', err)
+    }
   }
 
   // Log delivery access
@@ -430,28 +519,9 @@ function MessagesContent() {
 
   const shouldShowDateSeparator = (currentMsg: Message, previousMsg: Message | null) => {
     if (!previousMsg) return true
-    const currentDate = new Date(currentMsg.created_at)
-    const previousDate = new Date(previousMsg.created_at)
+    const currentDate = parseAsUTC(currentMsg.created_at)
+    const previousDate = parseAsUTC(previousMsg.created_at)
     return currentDate.toDateString() !== previousDate.toDateString()
-  }
-
-  const formatDateSeparator = (date: string) => {
-    const messageDate = new Date(date)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-    
-    if (messageDate.toDateString() === today.toDateString()) {
-      return 'Today'
-    } else if (messageDate.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday'
-    } else {
-      return messageDate.toLocaleDateString('en-US', { 
-        month: 'long', 
-        day: 'numeric', 
-        year: messageDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined 
-      })
-    }
   }
 
   const commonEmojis = ['😊', '😂', '❤️', '👍', '🎮', '🔥', '✨', '🎉', '👋', '🙌', '💯', '✅', '❌', '🤔', '😎', '🥳']
@@ -629,7 +699,7 @@ function MessagesContent() {
           .single()
 
         if (profileData?.last_seen) {
-          const lastSeen = new Date(profileData.last_seen)
+          const lastSeen = parseAsUTC(profileData.last_seen)
           const now = new Date()
           const diffMinutes = Math.floor((now.getTime() - lastSeen.getTime()) / (1000 * 60))
           
@@ -669,26 +739,6 @@ function MessagesContent() {
 
     return () => clearInterval(interval)
   }, [user])
-
-  const formatLastSeen = (lastSeenDate: string | null): string => {
-    if (!lastSeenDate) return 'Last seen recently'
-    
-    const lastSeen = new Date(lastSeenDate)
-    const now = new Date()
-    const diffMinutes = Math.floor((now.getTime() - lastSeen.getTime()) / (1000 * 60))
-    
-    if (diffMinutes < 1) return 'Active now'
-    if (diffMinutes < 60) return `Last active ${diffMinutes}m ago`
-    
-    const diffHours = Math.floor(diffMinutes / 60)
-    if (diffHours < 24) return `Last active ${diffHours}h ago`
-    
-    const diffDays = Math.floor(diffHours / 24)
-    if (diffDays === 1) return 'Last active yesterday'
-    if (diffDays < 7) return `Last active ${diffDays}d ago`
-    
-    return 'Last active long ago'
-  }
 
   const detectScamPattern = (text: string): string | null => {
     for (const pattern of scamPatterns) {
@@ -1210,10 +1260,12 @@ function MessagesContent() {
     )
   }
 
-  // Render delivery message with blur/reveal (FIXED: no duplicate headers)
+  // Render delivery message with blur/reveal, Order ID, and View Order button
   const renderDeliveryMessage = (message: Message) => {
     const isRevealed = revealedDeliveryMessages.has(message.id)
     const { credentials } = extractDeliveryContent(message.content)
+    const orderId = message.order_id || selectedConversation?.order_id
+    const isCopied = copiedOrderId === orderId
     
     return (
       <div className="flex justify-center my-3 sm:my-4">
@@ -1254,6 +1306,48 @@ function MessagesContent() {
                   )}
                 </div>
               </div>
+              
+              {/* Order ID Display */}
+              {orderId && (
+                <div className="mb-3 bg-slate-900/60 border border-green-500/20 rounded-lg p-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs text-gray-400">Order:</span>
+                      <span className="text-xs font-mono text-green-300 truncate">#{orderId.slice(0, 8)}...</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => copyDeliveryOrderId(orderId)}
+                        className={`p-1.5 rounded-md border transition-all duration-200 min-h-[28px] min-w-[28px] flex items-center justify-center ${
+                          isCopied 
+                            ? 'bg-green-500/20 border-green-500/30 text-green-400' 
+                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+                        }`}
+                        title="Copy full Order ID"
+                      >
+                        {isCopied ? (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                      <Link
+  href={`/order/${orderId}`}
+  className="px-2.5 py-1.5 bg-green-500/20 border border-green-500/30 rounded-md text-xs font-medium text-green-300 hover:bg-green-500/30 transition-all flex items-center gap-1.5 min-h-[28px]"
+>
+  <span>View Order</span>
+  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+  </svg>
+</Link>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* Content area */}
               {isRevealed ? (
@@ -1307,7 +1401,7 @@ function MessagesContent() {
               )}
               
               <p className="text-xs text-green-300/60 mt-2 sm:mt-3 text-center">
-                {new Date(message.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {formatDateTime(message.created_at)}
               </p>
             </div>
           </div>
@@ -1634,7 +1728,7 @@ function MessagesContent() {
                                   {conv.last_message}
                                 </p>
                                 <div className="flex items-center justify-between mt-1">
-                                  <p className="text-xs text-gray-500">{new Date(conv.last_message_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                                  <p className="text-xs text-gray-500">{formatConversationDate(conv.last_message_at)}</p>
                                   {conv.order?.status && (
                                     <span className={`text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-medium ${
                                       conv.order.status === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
@@ -1939,7 +2033,7 @@ function MessagesContent() {
                                       </div>
                                       <div className="text-white text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words">{message.content}</div>
                                       <p className="text-xs text-blue-300/60 mt-2 sm:mt-3 text-center">
-                                        {new Date(message.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        {formatDateTime(message.created_at)}
                                       </p>
                                     </div>
                                   </div>
@@ -1959,7 +2053,7 @@ function MessagesContent() {
                                       </div>
                                       <div className="text-white text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words">{message.content}</div>
                                       <p className="text-xs text-orange-300/60 mt-2 sm:mt-3 text-center">
-                                        {new Date(message.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        {formatDateTime(message.created_at)}
                                       </p>
                                     </div>
                                   </div>
@@ -2033,7 +2127,7 @@ function MessagesContent() {
                                   
                                   <div className="flex items-center gap-2 mt-1 px-2">
                                     <p className="text-xs text-gray-500">
-                                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      {formatTime(message.created_at)}
                                     </p>
                                     {renderMessageStatus(message)}
                                   </div>

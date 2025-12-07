@@ -760,7 +760,7 @@ export default function OrderDetailPage() {
               <div className="flex flex-col gap-4">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-xs sm:text-sm font-mono truncate max-w-[200px] sm:max-w-none">📋 Order #{order.id.slice(0, 8)}...</span>
+                    <span className="px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-xs sm:text-sm font-mono break-all">📋 Order ID: #{order.id}</span>
                     <button
                       onClick={copyOrderId}
                       className={`p-2 rounded-lg border transition-all duration-200 min-w-[40px] min-h-[40px] flex items-center justify-center ${
