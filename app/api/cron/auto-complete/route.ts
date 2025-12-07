@@ -38,7 +38,6 @@ export async function GET(request: Request) {
         buyer_id,
         seller_id,
         listing_id,
-        total_amount,
         delivered_at,
         listing:listings(title)
       `)
