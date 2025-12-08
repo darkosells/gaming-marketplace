@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
@@ -11,6 +12,104 @@ import { getSEOContentBySlug } from '@/lib/seo-content-config'
 
 interface Props {
   slug: string
+}
+
+// ============================================
+// IMAGE OPTIMIZATION HELPERS
+// ============================================
+
+// Get optimized image URL from Supabase storage
+function getOptimizedImageUrl(url: string | null | undefined, options?: { width?: number; quality?: number }): string {
+  if (!url) return ''
+  
+  // Check if it's a Supabase storage URL
+  if (url.includes('supabase.co/storage')) {
+    const width = options?.width || 400
+    const quality = options?.quality || 75
+    
+    // Add render/image transform parameters
+    if (url.includes('/object/public/')) {
+      return url.replace('/object/public/', `/render/image/public/`) + `?width=${width}&quality=${quality}`
+    }
+  }
+  
+  return url
+}
+
+// ============================================
+// SKELETON COMPONENTS FOR INSTANT LCP
+// ============================================
+
+function ListingCardSkeleton() {
+  return (
+    <div className="bg-slate-900/50 border border-white/10 rounded-2xl overflow-hidden animate-pulse">
+      <div className="h-40 sm:h-48 bg-slate-800/50" />
+      <div className="p-4 sm:p-5 space-y-3">
+        <div className="h-3 w-20 bg-slate-700/50 rounded" />
+        <div className="h-5 w-3/4 bg-slate-700/50 rounded" />
+        <div className="h-3 w-full bg-slate-700/50 rounded" />
+        <div className="h-3 w-2/3 bg-slate-700/50 rounded" />
+        <div className="flex justify-between items-center pt-2">
+          <div className="h-6 w-16 bg-slate-700/50 rounded" />
+          <div className="h-4 w-20 bg-slate-700/50 rounded" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ListingGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+      {[...Array(6)].map((_, i) => (
+        <ListingCardSkeleton key={i} />
+      ))}
+    </div>
+  )
+}
+
+// ============================================
+// OPTIMIZED LISTING CARD IMAGE
+// ============================================
+
+function ListingImage({ 
+  src, 
+  alt, 
+  category,
+  priority = false 
+}: { 
+  src: string | null
+  alt: string
+  category: string
+  priority?: boolean
+}) {
+  const [imageError, setImageError] = useState(false)
+  
+  const categoryEmoji = category === 'account' ? '🎮' : category === 'items' ? '🎒' : category === 'currency' ? '💰' : '🔑'
+  
+  if (!src || imageError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+        <span className="text-5xl sm:text-6xl group-hover:scale-125 transition-transform duration-300">
+          {categoryEmoji}
+        </span>
+      </div>
+    )
+  }
+  
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+      className="object-cover group-hover:scale-110 transition-transform duration-500"
+      onError={() => setImageError(true)}
+      priority={priority}
+      loading={priority ? 'eager' : 'lazy'}
+      quality={80}
+    />
+  )
 }
 
 // Game-specific platform options (null or empty array means no platform filter)
@@ -23,7 +122,6 @@ const gamePlatformsMap: { [key: string]: string[] | null } = {
   'Clash Royale': null,
   'Clash of Clans': null,
   'Steam': null,
-  // Items category games
   'Steal a Brainrot': null,
   'Grow a Garden': null,
   'Adopt me': null,
@@ -61,7 +159,8 @@ const itemsGameTags: { [key: string]: string[] } = {
 
 const ITEMS_PER_PAGE = 12
 
-export default function GamePageClient({ slug }: Props) {
+// Main content component
+function GamePageContent({ slug }: Props) {
   const [listings, setListings] = useState<any[]>([])
   const [filteredListings, setFilteredListings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -87,7 +186,6 @@ export default function GamePageClient({ slug }: Props) {
   const seoContent = getSEOContentBySlug(slug)
 
   useEffect(() => {
-    // Initialize category from URL params
     const categoryParam = searchParams.get('category')
     if (categoryParam) {
       setSelectedCategory(categoryParam)
@@ -100,10 +198,9 @@ export default function GamePageClient({ slug }: Props) {
 
   useEffect(() => {
     applyFilters()
-    setCurrentPage(1) // Reset to first page when filters change
+    setCurrentPage(1)
   }, [listings, searchQuery, selectedCategory, selectedPlatform, selectedDeliveryType, priceRange, sortBy, selectedTags, selectedValorantRegion, selectedValorantRank, selectedLolServer])
 
-  // Reset tags and game-specific filters when category changes
   useEffect(() => {
     setSelectedTags([])
     setTagSearchQuery('')
@@ -173,7 +270,6 @@ export default function GamePageClient({ slug }: Props) {
       }
     }
 
-    // Filter by selected tags (listing must have ALL selected tags)
     if (selectedTags.length > 0) {
       filtered = filtered.filter(listing => {
         if (!listing.tags || !Array.isArray(listing.tags)) return false
@@ -181,7 +277,6 @@ export default function GamePageClient({ slug }: Props) {
       })
     }
 
-    // Valorant-specific filters
     if (game?.name === 'Valorant') {
       if (selectedValorantRegion !== 'all') {
         filtered = filtered.filter(listing => listing.region === selectedValorantRegion)
@@ -191,40 +286,31 @@ export default function GamePageClient({ slug }: Props) {
       }
     }
 
-    // League of Legends-specific filters
     if (game?.name === 'League of Legends') {
       if (selectedLolServer !== 'all') {
         filtered = filtered.filter(listing => listing.server === selectedLolServer)
       }
     }
 
-    // Apply sorting
     switch (sortBy) {
       case 'recommended':
-        // Smart ranking algorithm
         filtered.sort((a, b) => {
-          // 1. Prioritize in-stock items
           if (a.stock === 0 && b.stock > 0) return 1
           if (b.stock === 0 && a.stock > 0) return -1
           
-          // 2. Seller rating (higher ratings first)
           const ratingA = a.profiles?.average_rating || 0
           const ratingB = b.profiles?.average_rating || 0
           const ratingDiff = ratingB - ratingA
           
-          // If rating difference is significant (> 0.5 stars), prioritize by rating
           if (Math.abs(ratingDiff) > 0.5) return ratingDiff
           
-          // 3. Instant delivery priority (if ratings are similar)
           if (a.delivery_type === 'automatic' && b.delivery_type !== 'automatic') return -1
           if (b.delivery_type === 'automatic' && a.delivery_type !== 'automatic') return 1
           
-          // 4. Number of reviews (more reviews = more established seller)
           const reviewsA = a.profiles?.total_reviews || 0
           const reviewsB = b.profiles?.total_reviews || 0
           if (reviewsB !== reviewsA) return reviewsB - reviewsA
           
-          // 5. Recency as tiebreaker (newer listings get slight boost)
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         })
         break
@@ -270,7 +356,6 @@ export default function GamePageClient({ slug }: Props) {
     }
   }
 
-  // Get available platforms for the current game
   const getAvailablePlatforms = () => {
     if (!game) return null
     return gamePlatformsMap[game.name] || null
@@ -281,9 +366,7 @@ export default function GamePageClient({ slug }: Props) {
     return platforms !== null && platforms.length > 0
   }
 
-  // Get available tags based on selected category and game
   const getAvailableTags = () => {
-    // Only show tags for Account and Items categories
     if (selectedCategory !== 'account' && selectedCategory !== 'items') {
       return []
     }
@@ -319,7 +402,6 @@ export default function GamePageClient({ slug }: Props) {
     setSelectedTags(prev => prev.filter(t => t !== tag))
   }
 
-  // Count active filters for display
   const getActiveFilterCount = () => {
     let count = 0
     if (selectedTags.length > 0) count += selectedTags.length
@@ -333,7 +415,6 @@ export default function GamePageClient({ slug }: Props) {
     return count
   }
 
-  // Pagination calculations
   const totalPages = Math.ceil(filteredListings.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const endIndex = startIndex + ITEMS_PER_PAGE
@@ -348,7 +429,7 @@ export default function GamePageClient({ slug }: Props) {
     if (totalPages <= 1) return null
 
     const pages: React.ReactNode[] = []
-    const maxVisiblePages = window.innerWidth < 640 ? 3 : 5
+    const maxVisiblePages = typeof window !== 'undefined' && window.innerWidth < 640 ? 3 : 5
 
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2))
     let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1)
@@ -357,7 +438,6 @@ export default function GamePageClient({ slug }: Props) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1)
     }
 
-    // Previous button
     pages.push(
       <button
         key="prev"
@@ -374,7 +454,6 @@ export default function GamePageClient({ slug }: Props) {
       </button>
     )
 
-    // First page
     if (startPage > 1) {
       pages.push(
         <button
@@ -394,7 +473,6 @@ export default function GamePageClient({ slug }: Props) {
       }
     }
 
-    // Page numbers
     for (let i = startPage; i <= endPage; i++) {
       pages.push(
         <button
@@ -411,7 +489,6 @@ export default function GamePageClient({ slug }: Props) {
       )
     }
 
-    // Last page
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) {
         pages.push(
@@ -431,7 +508,6 @@ export default function GamePageClient({ slug }: Props) {
       )
     }
 
-    // Next button
     pages.push(
       <button
         key="next"
@@ -455,7 +531,7 @@ export default function GamePageClient({ slug }: Props) {
     )
   }
 
-  // Filter sidebar content (used in both desktop and mobile)
+  // Filter sidebar content
   const FilterContent = () => (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -492,7 +568,7 @@ export default function GamePageClient({ slug }: Props) {
         </select>
       </div>
 
-      {/* Platform Filter - Only show for games that have platforms */}
+      {/* Platform Filter */}
       {shouldShowPlatformFilter() && (
         <div className="mb-6">
           <label className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
@@ -524,7 +600,6 @@ export default function GamePageClient({ slug }: Props) {
       {/* Valorant-specific filters */}
       {game?.name === 'Valorant' && (
         <>
-          {/* Region Filter */}
           <div className="mb-6">
             <label className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
               <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -551,7 +626,6 @@ export default function GamePageClient({ slug }: Props) {
             </select>
           </div>
 
-          {/* Rank Filter */}
           <div className="mb-6">
             <label className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
               <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -737,7 +811,6 @@ export default function GamePageClient({ slug }: Props) {
         <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl p-4">
           <p className="text-sm text-gray-400">
             Showing{' '}
-            {/* iOS Safari Fix: Solid color instead of gradient */}
             <span className="text-purple-400 font-bold">
               {currentListings.length}
             </span>{' '}
@@ -766,18 +839,12 @@ export default function GamePageClient({ slug }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-1/4 left-1/3 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '3s' }}></div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-        <div className="absolute top-20 left-[10%] w-2 h-2 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDuration: '3s' }}></div>
-        <div className="absolute top-40 left-[25%] w-1 h-1 bg-pink-400/60 rounded-full animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}></div>
-        <div className="absolute top-60 right-[15%] w-3 h-3 bg-blue-400/40 rounded-full animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}></div>
-        <div className="absolute top-32 right-[30%] w-2 h-2 bg-purple-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1.5s' }}></div>
+      {/* PERFORMANCE OPTIMIZED: Simplified static background - no animations */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px]" />
+        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
       </div>
 
       <div className="relative z-10">
@@ -871,15 +938,12 @@ export default function GamePageClient({ slug }: Props) {
             {/* Mobile Filters Modal */}
             {mobileFiltersOpen && (
               <div className="lg:hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-                {/* Backdrop */}
                 <div 
                   className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                   onClick={() => setMobileFiltersOpen(false)}
-                ></div>
+                />
                 
-                {/* Filter Panel */}
                 <div className="relative w-full sm:max-w-lg sm:mx-4 bg-slate-900/95 backdrop-blur-xl border-t sm:border border-white/10 rounded-t-3xl sm:rounded-2xl max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
-                  {/* Header */}
                   <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10 bg-gradient-to-r from-purple-500/10 to-pink-500/10">
                     <h2 className="text-xl font-bold text-white">Filters</h2>
                     <button 
@@ -892,12 +956,10 @@ export default function GamePageClient({ slug }: Props) {
                     </button>
                   </div>
 
-                  {/* Scrollable Content */}
                   <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                     <FilterContent />
                   </div>
 
-                  {/* Footer */}
                   <div className="p-4 sm:p-6 border-t border-white/10 bg-slate-800/50">
                     <button
                       onClick={() => setMobileFiltersOpen(false)}
@@ -916,7 +978,7 @@ export default function GamePageClient({ slug }: Props) {
               <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-6 hover:border-purple-500/30 transition-all duration-300">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <div className="flex-1 relative group">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300" />
                     <div className="relative">
                       <input 
                         type="text" 
@@ -930,7 +992,6 @@ export default function GamePageClient({ slug }: Props) {
                       </svg>
                     </div>
                   </div>
-                  {/* Sort Dropdown */}
                   <select 
                     value={sortBy} 
                     onChange={(e) => setSortBy(e.target.value)} 
@@ -1028,13 +1089,8 @@ export default function GamePageClient({ slug }: Props) {
 
               {/* Listings Grid */}
               {loading ? (
-                <div className="text-center py-16 sm:py-20" role="status" aria-label="Loading listings">
-                  <div className="relative inline-block">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-lg opacity-50 animate-pulse"></div>
-                    <div className="relative inline-block animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-purple-500 border-t-transparent"></div>
-                  </div>
-                  <p className="text-white mt-4 sm:mt-6 text-base sm:text-lg">Loading {game.name} listings...</p>
-                </div>
+                // PERFORMANCE: Skeleton loading instead of spinner
+                <ListingGridSkeleton />
               ) : filteredListings.length === 0 ? (
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 sm:p-12 text-center">
                   <div className="text-5xl sm:text-6xl mb-4" aria-hidden="true">
@@ -1056,28 +1112,22 @@ export default function GamePageClient({ slug }: Props) {
               ) : (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6" role="list">
-                    {currentListings.map((listing) => (
+                    {currentListings.map((listing, index) => (
                       <Link key={listing.id} href={`/listing/${listing.id}`} className="group h-full" role="listitem">
                         <article className="relative h-full flex flex-col bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 sm:hover:-translate-y-2">
-                          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/0 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-500"></div>
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/0 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-500" />
 
                           <div className="relative h-40 sm:h-48 flex-shrink-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
-                            {listing.image_url ? (
-                              <img
-                                src={listing.image_url}
-                                alt={`${listing.title} - ${game.name} ${listing.category}`}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="text-5xl sm:text-6xl group-hover:scale-125 transition-transform duration-300" aria-hidden="true">
-                                  {listing.category === 'account' ? '🎮' : listing.category === 'items' ? '🎒' : listing.category === 'currency' ? '💰' : '🔑'}
-                                </span>
-                              </div>
-                            )}
-                            {/* Category Badge - Top Left */}
-                            <div className="absolute top-2 sm:top-3 left-2 sm:left-3">
+                            {/* PERFORMANCE: Next.js Image with priority for first 3 items */}
+                            <ListingImage
+                              src={listing.image_url}
+                              alt={`${listing.title} - ${game.name} ${listing.category}`}
+                              category={listing.category}
+                              priority={index < 3}
+                            />
+                            
+                            {/* Category Badge */}
+                            <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
                               <span className="bg-black/60 backdrop-blur-lg px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold border border-white/10">
                                 {listing.category === 'account'
                                   ? '🎮 Account'
@@ -1088,9 +1138,9 @@ export default function GamePageClient({ slug }: Props) {
                                   : '🔑 Key'}
                               </span>
                             </div>
-                            {/* Delivery Badge - Top Right (Only show for instant delivery) */}
+                            {/* Delivery Badge */}
                             {listing.delivery_type === 'automatic' && (
-                              <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
+                              <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10">
                                 <span className="bg-green-500/80 backdrop-blur-lg px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -1107,7 +1157,7 @@ export default function GamePageClient({ slug }: Props) {
                             </h3>
                             <p className="text-gray-400 text-xs sm:text-sm mb-3 line-clamp-2">{listing.description}</p>
                             
-                            {/* Tags Display - Fixed height container */}
+                            {/* Tags Display */}
                             <div className="h-8 mb-3">
                               {listing.tags && listing.tags.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
@@ -1126,7 +1176,6 @@ export default function GamePageClient({ slug }: Props) {
                             </div>
 
                             <div className="flex items-center justify-between mt-auto">
-                              {/* iOS Safari Fix: Solid color instead of gradient */}
                               <span className="text-xl sm:text-2xl font-bold text-green-400">
                                 ${parseFloat(listing.price).toFixed(2)}
                               </span>
@@ -1161,7 +1210,6 @@ export default function GamePageClient({ slug }: Props) {
             <section className="mt-12 sm:mt-16" aria-label={`About ${game.name} on Nashflare`}>
               <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all duration-300">
                 <div className="px-4 sm:px-6 md:px-8 py-6 sm:py-8">
-                  {/* Main Title & Description */}
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 sm:mb-4">
                     {seoContent.mainTitle}
                   </h2>
@@ -1169,12 +1217,11 @@ export default function GamePageClient({ slug }: Props) {
                     {seoContent.mainDescription}
                   </p>
 
-                  {/* Content Sections */}
                   <div className="space-y-6 sm:space-y-8">
                     {seoContent.sections.map((section, index) => (
                       <div key={index}>
                         <h3 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-3 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500"></span>
+                          <span className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500" />
                           {section.title}
                         </h3>
                         <p className="text-gray-400 text-sm sm:text-base leading-relaxed">
@@ -1184,7 +1231,6 @@ export default function GamePageClient({ slug }: Props) {
                     ))}
                   </div>
 
-                  {/* FAQs */}
                   {seoContent.faqs.length > 0 && (
                     <div className="mt-8 sm:mt-10">
                       <h3 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
@@ -1204,7 +1250,6 @@ export default function GamePageClient({ slug }: Props) {
                     </div>
                   )}
 
-                  {/* Disclaimer */}
                   <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/10">
                     <p className="text-gray-500 text-xs italic">
                       {seoContent.disclaimer}
@@ -1250,5 +1295,21 @@ export default function GamePageClient({ slug }: Props) {
         }
       `}</style>
     </div>
+  )
+}
+
+// Main export with Suspense wrapper
+export default function GamePageClient({ slug }: Props) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent" />
+          <p className="text-white mt-4">Loading...</p>
+        </div>
+      </div>
+    }>
+      <GamePageContent slug={slug} />
+    </Suspense>
   )
 }
