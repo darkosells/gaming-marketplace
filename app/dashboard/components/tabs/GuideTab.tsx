@@ -103,7 +103,7 @@ export default function GuideTab() {
       title: 'Item Delivered',
       description: 'Auto-delivery sends codes instantly, or you deliver manually',
       icon: '📦',
-      time: 'Auto: Instant | Manual: Up to you'
+      time: 'Auto: Instant | Manual: Within 24 hours'
     },
     {
       step: 4,

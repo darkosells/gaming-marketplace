@@ -2,8 +2,82 @@
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+
+// Game icon paths - add more as you create them
+const gameIconPaths: { [key: string]: string } = {
+  'GTA 5': '/game-icons/gta5.svg',
+  'Fortnite': '/game-icons/fortnite.svg',
+  'Roblox': '/game-icons/roblox.svg',
+  'Valorant': '/game-icons/valorant.svg',
+  'Clash Royale': '/game-icons/clash-royale.svg',
+  'Clash of Clans': '/game-icons/clash-of-clans.svg',
+  'Steam': '/game-icons/steam.svg',
+  'Playstation': '/game-icons/playstation.svg',
+  'Xbox': '/game-icons/xbox.svg',
+  'Adopt me': '/game-icons/adopt-me.svg',
+  'Blox Fruits': '/game-icons/blox-fruits.svg',
+  'Grow a Garden': '/game-icons/grow-a-garden.svg',
+  'Steal a Brainrot': '/game-icons/steal-a-brainrot.svg',
+  'Plants vs Brainrots': '/game-icons/plants-vs-brainrots.svg',
+  // Add more icons here as you create them:
+  // 'Fortnite': '/game-icons/fortnite.svg',
+  // 'Roblox': '/game-icons/roblox.svg',
+  // etc.
+}
+
+// Game Icon Component
+const GameIcon = ({ game, size = 'md' }: { game: string; size?: 'sm' | 'md' | 'lg' }) => {
+  const sizeClasses = {
+    sm: 'w-6 h-6',
+    md: 'w-8 h-8',
+    lg: 'w-10 h-10'
+  }
+  
+  const iconPath = gameIconPaths[game]
+  
+  // If we have a custom icon, use it
+  if (iconPath) {
+    return (
+      <div className={`${sizeClasses[size]} rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden`}>
+        <img 
+          src={iconPath} 
+          alt={game}
+          className="w-full h-full object-contain"
+        />
+      </div>
+    )
+  }
+  
+  // Fallback: colored box with first letter
+  const fallbackColors: { [key: string]: string } = {
+    'Fortnite': 'bg-blue-500',
+    'Roblox': 'bg-red-500',
+    'Valorant': 'bg-red-600',
+    'League of Legends': 'bg-yellow-600',
+    'Clash Royale': 'bg-blue-500',
+    'Clash of Clans': 'bg-orange-500',
+    'Steam': 'bg-slate-700',
+    'Steal a Brainrot': 'bg-purple-500',
+    'Grow a Garden': 'bg-green-500',
+    'Adopt me': 'bg-pink-500',
+    'Blox Fruits': 'bg-orange-500',
+    'Plants vs Brainrots': 'bg-lime-500',
+    'Playstation': 'bg-blue-700',
+    'Xbox': 'bg-green-600',
+  }
+  
+  const bgColor = fallbackColors[game] || 'bg-purple-500'
+  const letter = game.charAt(0).toUpperCase()
+  
+  return (
+    <div className={`${sizeClasses[size]} ${bgColor} rounded-lg flex items-center justify-center flex-shrink-0 shadow-md`}>
+      <span className="text-white font-bold text-xs">{letter}</span>
+    </div>
+  )
+}
 
 // Category to Games mapping for mega menu
 const categoryGamesMap: { [key: string]: { icon: string; label: string; description: string; gradient: string; games: string[] } } = {
@@ -386,7 +460,7 @@ export default function Navigation() {
                     {/* Bridge element to prevent menu closing */}
                     <div className="absolute left-0 top-full h-3 w-full" />
                     
-                    <div className="absolute left-1/2 -translate-x-1/2 mt-3 w-[400px] bg-slate-800/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
+                    <div className="absolute left-1/2 -translate-x-1/2 mt-3 w-[420px] bg-slate-800/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
                       {/* Header */}
                       <div className={`p-4 bg-gradient-to-r ${category.gradient} bg-opacity-10`}>
                         <div className="flex items-center space-x-3">
@@ -405,17 +479,15 @@ export default function Navigation() {
                         <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
                           Available Games
                         </h4>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-1.5">
                           {category.games.map((game) => (
                             <button
                               key={game}
                               onClick={() => handleGameClick(key, game)}
-                              className="flex items-center space-x-2 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 group text-left"
+                              className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 group text-left"
                             >
-                              <div className={`w-8 h-8 bg-gradient-to-br ${category.gradient} bg-opacity-20 rounded-lg flex items-center justify-center group-hover:bg-opacity-30 transition-colors`}>
-                                <span className="text-sm">🎯</span>
-                              </div>
-                              <span className="font-medium text-sm">{game}</span>
+                              <GameIcon game={game} size="md" />
+                              <span className="font-medium text-sm truncate">{game}</span>
                             </button>
                           ))}
                         </div>
@@ -714,9 +786,10 @@ export default function Navigation() {
                         <button
                           key={game}
                           onClick={() => handleGameClick(key, game)}
-                          className="w-full px-3 py-2.5 rounded-lg text-sm text-left text-gray-400 hover:text-white hover:bg-white/5 transition-all min-h-[44px] flex items-center"
+                          className="w-full px-3 py-2.5 rounded-lg text-sm text-left text-gray-400 hover:text-white hover:bg-white/5 transition-all min-h-[44px] flex items-center space-x-3"
                         >
-                          <span>🎯 {game}</span>
+                          <GameIcon game={game} size="sm" />
+                          <span>{game}</span>
                         </button>
                       ))}
                       <button

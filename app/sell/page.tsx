@@ -7,6 +7,10 @@ import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import ImageUploader from '@/components/ImageUploader'
 
+// Price limits
+const MIN_PRICE = 3
+const MAX_PRICE = 500
+
 // Category to Games mapping
 const categoryGamesMap: { [key: string]: string[] } = {
   account: ['GTA 5', 'Fortnite', 'Roblox', 'Valorant', 'League of Legends', 'Clash Royale', 'Clash of Clans', 'Steam'],
@@ -25,7 +29,6 @@ const gamePlatformsMap: { [key: string]: string[] | null } = {
   'Clash Royale': null,
   'Clash of Clans': null,
   'Steam': null,
-  // Items category games
   'Steal a Brainrot': null,
   'Grow a Garden': null,
   'Adopt me': null,
@@ -61,6 +64,28 @@ const itemsGameTags: { [key: string]: string[] } = {
   'Plants vs Brainrots': ['Premium Plants', 'Power-ups', 'Coins', 'Gems']
 }
 
+// Draft storage key
+const DRAFT_STORAGE_KEY = 'nashflare_listing_draft'
+
+// Draft interface
+interface ListingDraft {
+  category: string
+  game: string
+  title: string
+  description: string
+  price: string
+  platform: string
+  stock: string
+  imageUrls: string[]
+  selectedTags: string[]
+  valorantRegion: string
+  valorantRank: string
+  lolServer: string
+  deliveryType: 'manual' | 'automatic'
+  deliveryCodes: string[]
+  savedAt: number
+}
+
 export default function CreateListingPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -70,6 +95,11 @@ export default function CreateListingPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [createdListingId, setCreatedListingId] = useState<string | null>(null)
+
+  // Draft states
+  const [hasDraft, setHasDraft] = useState(false)
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false)
+  const [draftSaved, setDraftSaved] = useState(false)
 
   // Form fields
   const [category, setCategory] = useState('account')
@@ -95,6 +125,27 @@ export default function CreateListingPage() {
   useEffect(() => {
     checkAuth()
   }, [])
+
+  // Check for existing draft on load
+  useEffect(() => {
+    if (!loading && user) {
+      checkForDraft()
+    }
+  }, [loading, user])
+
+  // Auto-save draft every 30 seconds
+  useEffect(() => {
+    if (!user || loading) return
+    
+    const hasContent = title || description || game || price
+    if (!hasContent) return
+
+    const autoSaveInterval = setInterval(() => {
+      saveDraft(true)
+    }, 30000)
+
+    return () => clearInterval(autoSaveInterval)
+  }, [user, loading, category, game, title, description, price, platform, stock, imageUrls, selectedTags, valorantRegion, valorantRank, lolServer, deliveryType, deliveryCodes])
 
   // Reset game, tags, and game-specific fields when category changes
   useEffect(() => {
@@ -146,6 +197,96 @@ export default function CreateListingPage() {
     setLoading(false)
   }
 
+  // Draft functions
+  const checkForDraft = () => {
+    try {
+      const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY)
+      if (savedDraft) {
+        const draft: ListingDraft = JSON.parse(savedDraft)
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
+        if (draft.savedAt > sevenDaysAgo) {
+          setHasDraft(true)
+          setShowDraftPrompt(true)
+        } else {
+          localStorage.removeItem(DRAFT_STORAGE_KEY)
+        }
+      }
+    } catch (e) {
+      console.error('Error checking draft:', e)
+    }
+  }
+
+  const loadDraft = () => {
+    try {
+      const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY)
+      if (savedDraft) {
+        const draft: ListingDraft = JSON.parse(savedDraft)
+        setCategory(draft.category || 'account')
+        setGame(draft.game || '')
+        setTitle(draft.title || '')
+        setDescription(draft.description || '')
+        setPrice(draft.price || '')
+        setPlatform(draft.platform || '')
+        setStock(draft.stock || '1')
+        setImageUrls(draft.imageUrls || [])
+        setSelectedTags(draft.selectedTags || [])
+        setValorantRegion(draft.valorantRegion || '')
+        setValorantRank(draft.valorantRank || '')
+        setLolServer(draft.lolServer || '')
+        setDeliveryType(draft.deliveryType || 'manual')
+        setDeliveryCodes(draft.deliveryCodes || [''])
+      }
+    } catch (e) {
+      console.error('Error loading draft:', e)
+    }
+    setShowDraftPrompt(false)
+  }
+
+  const discardDraft = () => {
+    localStorage.removeItem(DRAFT_STORAGE_KEY)
+    setHasDraft(false)
+    setShowDraftPrompt(false)
+  }
+
+  const saveDraft = (silent: boolean = false) => {
+    try {
+      const draft: ListingDraft = {
+        category,
+        game,
+        title,
+        description,
+        price,
+        platform,
+        stock,
+        imageUrls,
+        selectedTags,
+        valorantRegion,
+        valorantRank,
+        lolServer,
+        deliveryType,
+        deliveryCodes,
+        savedAt: Date.now()
+      }
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft))
+      setHasDraft(true)
+      
+      if (!silent) {
+        setDraftSaved(true)
+        setTimeout(() => setDraftSaved(false), 3000)
+      }
+    } catch (e) {
+      console.error('Error saving draft:', e)
+      if (!silent) {
+        setError('Failed to save draft')
+      }
+    }
+  }
+
+  const clearDraftAfterSubmit = () => {
+    localStorage.removeItem(DRAFT_STORAGE_KEY)
+    setHasDraft(false)
+  }
+
   const handleDeliveryCodeChange = (index: number, value: string) => {
     const newCodes = [...deliveryCodes]
     newCodes[index] = value
@@ -170,9 +311,7 @@ export default function CreateListingPage() {
     return platforms !== null && platforms.length > 0
   }
 
-  // Get available tags based on selected category and game
   const getAvailableTags = () => {
-    // Only show tags for Account and Items categories
     if (category !== 'account' && category !== 'items') {
       return []
     }
@@ -185,7 +324,6 @@ export default function CreateListingPage() {
       ? accountGameTags[game] || []
       : itemsGameTags[game] || []
 
-    // Filter tags based on search query
     if (tagSearchQuery) {
       return tags.filter(tag => 
         tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
@@ -231,33 +369,38 @@ export default function CreateListingPage() {
     }
   }
 
+  const getPriceError = () => {
+    if (!price) return null
+    const priceNum = parseFloat(price)
+    if (isNaN(priceNum)) return 'Please enter a valid price'
+    if (priceNum < MIN_PRICE) return `Minimum price is $${MIN_PRICE}`
+    if (priceNum > MAX_PRICE) return `Maximum price is $${MAX_PRICE}`
+    return null
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setSubmitting(true)
 
-    // Validate required fields
     if (!game || !title || !description || !price) {
       setError('Please fill in all required fields')
       setSubmitting(false)
       return
     }
 
-    // Validate platform only if required for the selected game
     if (shouldShowPlatformField() && !platform) {
       setError('Please select a platform')
       setSubmitting(false)
       return
     }
 
-    // Validate Valorant-specific fields
     if (game === 'Valorant' && (!valorantRegion || !valorantRank)) {
       setError('Please select Region and Rank for Valorant listings')
       setSubmitting(false)
       return
     }
 
-    // Validate LoL-specific fields
     if (game === 'League of Legends' && !lolServer) {
       setError('Please select a Server for League of Legends listings')
       setSubmitting(false)
@@ -276,8 +419,21 @@ export default function CreateListingPage() {
       return
     }
 
-    if (parseFloat(price) <= 0) {
+    const priceNum = parseFloat(price)
+    if (isNaN(priceNum) || priceNum <= 0) {
       setError('Price must be greater than 0')
+      setSubmitting(false)
+      return
+    }
+
+    if (priceNum < MIN_PRICE) {
+      setError(`Minimum listing price is $${MIN_PRICE}`)
+      setSubmitting(false)
+      return
+    }
+
+    if (priceNum > MAX_PRICE) {
+      setError(`Maximum listing price is $${MAX_PRICE}`)
       setSubmitting(false)
       return
     }
@@ -323,13 +479,11 @@ export default function CreateListingPage() {
         tags: selectedTags.length > 0 ? selectedTags : null
       }
 
-      // Add Valorant-specific fields
       if (game === 'Valorant') {
         insertData.region = valorantRegion
         insertData.rank = valorantRank
       }
 
-      // Add LoL-specific fields
       if (game === 'League of Legends') {
         insertData.server = lolServer
       }
@@ -383,6 +537,8 @@ export default function CreateListingPage() {
       console.log('=== LISTING CREATED SUCCESSFULLY ===')
       console.log('Listing ID:', listingData?.id)
       
+      clearDraftAfterSubmit()
+      
       setCreatedListingId(listingData?.id || null)
       setSuccess(true)
       
@@ -412,7 +568,6 @@ export default function CreateListingPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
-        {/* Cosmic Background */}
         <div className="fixed inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/30 to-slate-950"></div>
           <div className="absolute top-20 left-10 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px] animate-pulse"></div>
@@ -430,7 +585,6 @@ export default function CreateListingPage() {
   if (success) {
     return (
       <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
-        {/* Cosmic Background */}
         <div className="fixed inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/30 to-slate-950"></div>
           <div className="absolute top-20 left-10 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px] animate-pulse"></div>
@@ -455,23 +609,62 @@ export default function CreateListingPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-      {/* Navigation */}
       <Navigation />
 
-      {/* Performance-Optimized Cosmic Background */}
+      {/* Draft Restore Prompt Modal */}
+      {showDraftPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center space-x-4 mb-4">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Draft Found</h3>
+                <p className="text-gray-400 text-sm">You have an unsaved listing draft</p>
+              </div>
+            </div>
+            <p className="text-gray-300 mb-6">
+              Would you like to continue where you left off or start fresh?
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={loadDraft}
+                className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition"
+              >
+                Continue Draft
+              </button>
+              <button
+                onClick={discardDraft}
+                className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl font-semibold border border-white/10 transition"
+              >
+                Start Fresh
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Draft Saved Toast */}
+      {draftSaved && (
+        <div className="fixed top-24 right-4 z-50 animate-slide-in">
+          <div className="bg-green-500/20 border border-green-500/30 rounded-xl px-4 py-3 flex items-center space-x-3 shadow-lg">
+            <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-green-200 font-medium">Draft saved</span>
+          </div>
+        </div>
+      )}
+
       <div className="fixed inset-0 z-0 pointer-events-none">
-        {/* Base gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-purple-950/30 to-slate-950"></div>
-        
-        {/* Animated gradient orbs - only 3 for performance */}
         <div className="absolute top-20 left-10 w-96 h-96 bg-purple-500/20 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-20 right-10 w-96 h-96 bg-pink-500/20 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '4s' }}></div>
         <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-blue-500/15 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '5s' }}></div>
-        
-        {/* Subtle grid pattern */}
         <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '50px 50px' }}></div>
-        
-        {/* Floating particles - reduced to 5 */}
         {[...Array(5)].map((_, i) => (
           <div
             key={i}
@@ -486,10 +679,8 @@ export default function CreateListingPage() {
         ))}
       </div>
 
-      {/* Main Content */}
       <div className="container mx-auto px-4 pt-24 pb-16 relative z-10">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
           <div className="mb-8">
             <Link 
               href="/dashboard" 
@@ -513,7 +704,6 @@ export default function CreateListingPage() {
             </div>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="bg-slate-800/50 backdrop-blur-xl border border-white/10 rounded-3xl p-6 lg:p-10 shadow-2xl">
             {error && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-8 flex items-start space-x-3">
@@ -581,7 +771,7 @@ export default function CreateListingPage() {
               </select>
             </div>
 
-            {/* Platform Selection - Only show for games that have platforms */}
+            {/* Platform Selection */}
             {shouldShowPlatformField() && (
               <div className="mb-8">
                 <label className="block text-white font-bold text-lg mb-2">
@@ -611,7 +801,6 @@ export default function CreateListingPage() {
             {/* Valorant-specific fields */}
             {game === 'Valorant' && (
               <div className="mb-8 grid lg:grid-cols-2 gap-6">
-                {/* Region */}
                 <div>
                   <label className="block text-white font-bold text-lg mb-2 flex items-center gap-2">
                     <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -639,7 +828,6 @@ export default function CreateListingPage() {
                   </select>
                 </div>
 
-                {/* Rank */}
                 <div>
                   <label className="block text-white font-bold text-lg mb-2 flex items-center gap-2">
                     <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -699,7 +887,7 @@ export default function CreateListingPage() {
               </div>
             )}
 
-            {/* Tags Selection - Only for Accounts and Items */}
+            {/* Tags Selection */}
             {shouldShowTags() && (
               <div className="mb-8">
                 <label className="block text-white font-bold text-lg mb-2">
@@ -722,7 +910,6 @@ export default function CreateListingPage() {
                   </div>
                 </div>
 
-                {/* Tag Search */}
                 <div className="relative mb-4">
                   <input
                     type="text"
@@ -736,7 +923,6 @@ export default function CreateListingPage() {
                   </svg>
                 </div>
 
-                {/* Selected Tags Display */}
                 {selectedTags.length > 0 && (
                   <div className="mb-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
                     <div className="flex items-center justify-between mb-3">
@@ -767,7 +953,6 @@ export default function CreateListingPage() {
                   </div>
                 )}
 
-                {/* Available Tags */}
                 <div className="bg-slate-900/50 border border-white/10 rounded-xl p-4 max-h-80 overflow-y-auto">
                   <p className="text-sm text-gray-400 mb-3">Click to select tags:</p>
                   {getAvailableTags().length > 0 ? (
@@ -861,10 +1046,21 @@ export default function CreateListingPage() {
                     onChange={(e) => setPrice(e.target.value)}
                     placeholder="0.00"
                     required
-                    min="0.01"
+                    min={MIN_PRICE}
+                    max={MAX_PRICE}
                     step="0.01"
-                    className="w-full pl-10 pr-5 py-4 rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    className={`w-full pl-10 pr-5 py-4 rounded-xl bg-slate-900/50 border text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all ${
+                      getPriceError() ? 'border-red-500/50' : 'border-white/10'
+                    }`}
                   />
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-sm text-gray-400">
+                    Min: ${MIN_PRICE} • Max: ${MAX_PRICE}
+                  </p>
+                  {getPriceError() && (
+                    <p className="text-sm text-red-400">{getPriceError()}</p>
+                  )}
                 </div>
               </div>
 
@@ -993,7 +1189,11 @@ export default function CreateListingPage() {
                   <Link href="/terms" className="text-purple-400 hover:text-purple-300 font-semibold">
                     Terms of Service
                   </Link>{' '}
-                  and I have the legal right to sell this item
+                  and{' '}
+                  <Link href="/seller-rules" className="text-purple-400 hover:text-purple-300 font-semibold">
+                    Seller Rules
+                  </Link>
+                  , and I have the legal right to sell this item
                 </span>
               </label>
             </div>
@@ -1019,6 +1219,18 @@ export default function CreateListingPage() {
                   </>
                 )}
               </button>
+              
+              <button
+                type="button"
+                onClick={() => saveDraft(false)}
+                className="sm:w-auto px-8 py-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl font-bold text-lg border border-emerald-500/30 hover:border-emerald-500/50 transition-all flex items-center justify-center space-x-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+                <span>Save Draft</span>
+              </button>
+              
               <Link
                 href="/dashboard"
                 className="sm:w-auto px-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold text-lg border border-white/10 transition-all text-center"
@@ -1026,11 +1238,19 @@ export default function CreateListingPage() {
                 Cancel
               </Link>
             </div>
+
+            {hasDraft && (
+              <p className="text-center text-gray-400 text-sm mt-4">
+                <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Draft auto-saves every 30 seconds
+              </p>
+            )}
           </form>
         </div>
       </div>
 
-      {/* Custom Float Animation */}
       <style jsx>{`
         @keyframes float {
           0%, 100% { 
@@ -1039,6 +1259,21 @@ export default function CreateListingPage() {
           50% { 
             transform: translateY(-20px); 
           }
+        }
+        
+        @keyframes slide-in {
+          from {
+            opacity: 0;
+            transform: translateX(100px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        .animate-slide-in {
+          animation: slide-in 0.3s ease-out;
         }
       `}</style>
     </div>
