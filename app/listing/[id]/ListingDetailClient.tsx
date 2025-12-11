@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import VendorRankBadge, { VendorRank } from '@/app/dashboard/components/VendorRankBadge'
+import MoneyBackGuarantee from './MoneyBackGuarantee'
+import WhatYouGet from './WhatYouGet'
 
 interface Listing {
   id: string
@@ -683,10 +685,6 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
       ? [listing.image_url]
       : []
 
-  const totalPrice = listing.price * quantity
-  const serviceFee = totalPrice * 0.05
-  const finalTotal = totalPrice + serviceFee
-
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
       {/* Custom Modal */}
@@ -790,7 +788,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
           ></div>
           <div className="relative w-full bg-slate-900/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-slide-up">
             <div className="sticky top-0 bg-slate-900/95 backdrop-blur-xl border-b border-white/10 p-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Purchase Details</h3>
+              <h3 className="text-lg font-bold text-white">Complete Purchase</h3>
               <button 
                 onClick={() => setShowMobilePurchase(false)}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -814,29 +812,22 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                 </div>
               )}
 
-              <div>
-                <p className="text-gray-400 text-sm mb-2">Price</p>
+              <div className="text-center py-2">
+                <p className="text-gray-400 text-sm mb-1">Total Price</p>
                 <p className="text-4xl font-bold text-green-400">
                   ${listing.price.toFixed(2)}
                 </p>
               </div>
 
-              <div className="space-y-3 pb-4 border-b border-white/10">
-                <div className="flex justify-between text-gray-300">
-                  <span>Subtotal</span>
-                  <span className="font-semibold">${totalPrice.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-gray-300">
-                  <span>Service Fee (5%)</span>
-                  <span className="font-semibold">${serviceFee.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-white font-bold text-xl pt-3 border-t border-white/10">
-                  <span>Total</span>
-                  <span className="text-purple-400">
-                    ${finalTotal.toFixed(2)}
-                  </span>
-                </div>
-              </div>
+              {/* Money-Back Guarantee - Prominent in Modal */}
+              {!isOwnListing && (
+                <MoneyBackGuarantee 
+                  onLearnMore={() => {
+                    setShowMobilePurchase(false)
+                    setShowGuaranteeModal(true)
+                  }} 
+                />
+              )}
 
               <div className="space-y-3">
                 <button
@@ -871,57 +862,29 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                 )}
               </div>
 
+              {/* Payment Security - Compact in Modal */}
               {!isOwnListing && (
-                <div className="space-y-3">
-                  {/* Trust Badges with Clickable Money-Back Guarantee */}
-                  <div className="bg-white/5 rounded-xl p-3 border border-white/10 space-y-2">
-                    <button
-                      onClick={() => setShowGuaranteeModal(true)}
-                      className="w-full flex items-center space-x-3 text-sm text-gray-300 hover:text-white transition group"
-                    >
-                      <span className="text-green-400 text-lg">✓</span>
-                      <span className="group-hover:underline">Money-Back Guarantee</span>
-                      <svg className="w-4 h-4 text-gray-500 group-hover:text-white transition ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </button>
-                    <div className="flex items-center space-x-3 text-sm text-gray-300">
-                      <span className="text-green-400 text-lg">✓</span>
-                      <span>Secure Payment</span>
-                    </div>
-                    <div className="flex items-center space-x-3 text-sm text-gray-300">
-                      <span className="text-green-400 text-lg">✓</span>
-                      <span>48h Buyer Protection</span>
-                    </div>
-                    <div className="flex items-center space-x-3 text-sm text-gray-300">
-                      <span className="text-green-400 text-lg">✓</span>
-                      <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
-                    </div>
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-400 text-xs font-medium">SECURE CHECKOUT</span>
                   </div>
-
-                  {/* Payment Security Badges */}
-                  <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-gray-400 text-xs font-medium">SECURE CHECKOUT</span>
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+                      <span className="text-blue-400 font-bold text-xs">Pay</span>
+                      <span className="text-blue-300 font-bold text-xs">Pal</span>
                     </div>
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
-                        <span className="text-blue-400 font-bold text-xs">Pay</span>
-                        <span className="text-blue-300 font-bold text-xs">Pal</span>
-                      </div>
-                      <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
-                        <span className="text-orange-400 text-sm">₿</span>
-                        <span className="text-gray-300 text-xs font-medium">Crypto</span>
-                      </div>
-                      <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
-                        <svg className="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                        <span className="text-gray-300 text-xs font-medium">SSL</span>
-                      </div>
+                    <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+                      <span className="text-orange-400 text-sm">₿</span>
+                      <span className="text-gray-300 text-xs font-medium">Crypto</span>
+                    </div>
+                    <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      <span className="text-gray-300 text-xs font-medium">SSL</span>
                     </div>
                   </div>
                 </div>
@@ -1058,7 +1021,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   )}
                   <div className="absolute top-2 sm:top-4 left-2 sm:left-4 flex flex-wrap gap-1.5 sm:gap-2">
                     <span className="bg-black/50 backdrop-blur-lg px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold">
-                      {listing.category === 'account' ? '🎮 Account' : listing.category === 'currency' ? '💰 Currency' : '🔑 Game Key'}
+                      {listing.category === 'account' ? '🎮 Account' : listing.category === 'currency' ? '💰 Currency' : listing.category === 'items' ? '🎒 Items' : '🔑 Game Key'}
                     </span>
                     {listing.delivery_type === 'automatic' && (
                       <span className="bg-green-500/80 backdrop-blur-lg px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold flex items-center gap-1">
@@ -1131,6 +1094,16 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                       >
                         ℹ️ Details
                       </button>
+                      <button
+                        onClick={() => setActiveTab('included')}
+                        className={`pb-3 sm:pb-4 border-b-2 transition font-semibold whitespace-nowrap text-sm sm:text-base ${
+                          activeTab === 'included'
+                            ? 'border-purple-500 text-white'
+                            : 'border-transparent text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        📦 What's Included
+                      </button>
                     </div>
                   </div>
 
@@ -1147,7 +1120,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                           <span>🏷️</span> Category
                         </span>
                         <span className="text-white font-semibold text-sm sm:text-base">
-                          {listing.category === 'account' ? 'Gaming Account' : listing.category === 'currency' ? 'Currency' : 'Game Key'}
+                          {listing.category === 'account' ? 'Gaming Account' : listing.category === 'currency' ? 'Currency' : listing.category === 'items' ? 'In-Game Items' : 'Game Key'}
                         </span>
                       </div>
                       <div className="flex justify-between py-2 sm:py-3 border-b border-white/10">
@@ -1192,7 +1165,16 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                       </div>
                     </div>
                   )}
+
+                  {activeTab === 'included' && (
+                    <WhatYouGet category={listing.category} deliveryType={listing.delivery_type} />
+                  )}
                 </div>
+              </div>
+
+              {/* Mobile Money-Back Guarantee - Visible on page (not in modal) */}
+              <div className="lg:hidden">
+                <MoneyBackGuarantee onLearnMore={() => setShowGuaranteeModal(true)} />
               </div>
 
               {/* Similar Products Section */}
@@ -1326,29 +1308,23 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   </div>
                 )}
 
-                <div className="mb-6">
+                {/* Price - Clean and Simple */}
+                <div className="mb-6 text-center">
                   <p className="text-gray-400 text-sm mb-2">Price</p>
                   <p className="text-5xl font-bold text-green-400">
                     ${listing.price.toFixed(2)}
                   </p>
                 </div>
 
-                <div className="space-y-3 mb-6 pb-6 border-b border-white/10">
-                  <div className="flex justify-between text-gray-300">
-                    <span>Subtotal</span>
-                    <span className="font-semibold">${totalPrice.toFixed(2)}</span>
+                {/* Money-Back Guarantee - ABOVE Buy Buttons */}
+                {!isOwnListing && (
+                  <div className="mb-4">
+                    <MoneyBackGuarantee 
+                      onLearnMore={() => setShowGuaranteeModal(true)} 
+                      variant="compact"
+                    />
                   </div>
-                  <div className="flex justify-between text-gray-300">
-                    <span>Service Fee (5%)</span>
-                    <span className="font-semibold">${serviceFee.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-white font-bold text-xl pt-3 border-t border-white/10">
-                    <span>Total</span>
-                    <span className="text-purple-400">
-                      ${finalTotal.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
+                )}
 
                 <div className="space-y-3">
                   <button
@@ -1383,62 +1359,45 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   )}
                 </div>
 
-                {/* Trust Badges with Clickable Money-Back Guarantee */}
+                {/* Additional Trust Indicators - Below Buy Buttons */}
                 {!isOwnListing && (
                   <div className="mt-6 space-y-4">
-                    {/* Trust Badges */}
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-3">
-                      <button
-                        onClick={() => setShowGuaranteeModal(true)}
-                        className="w-full flex items-center space-x-3 text-sm text-gray-300 hover:text-white transition group"
-                      >
-                        <span className="text-green-400 text-xl">✓</span>
-                        <span className="group-hover:underline">Money-Back Guarantee</span>
-                        <svg className="w-4 h-4 text-gray-500 group-hover:text-white transition ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </button>
-                      <div className="flex items-center space-x-3 text-sm text-gray-300">
-                        <span className="text-green-400 text-xl">✓</span>
-                        <span>Secure Payment</span>
-                      </div>
-                      <div className="flex items-center space-x-3 text-sm text-gray-300">
-                        <span className="text-green-400 text-xl">✓</span>
-                        <span>48h Buyer Protection</span>
-                      </div>
-                      <div className="flex items-center space-x-3 text-sm text-gray-300">
-                        <span className="text-green-400 text-xl">✓</span>
-                        <span>{listing.delivery_type === 'automatic' ? 'Instant Delivery' : 'Fast Delivery'}</span>
-                      </div>
-                    </div>
-
-                    {/* Payment Security Badges */}
-                    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                      <div className="flex items-center justify-center gap-2 mb-3">
-                        <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    {/* Quick Trust Points */}
+                    <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3.5 h-3.5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-gray-400 text-xs font-medium">SECURE CHECKOUT</span>
-                      </div>
-                      <div className="flex items-center justify-center gap-4">
-                        <div className="bg-white/10 rounded-lg px-3 py-2 flex items-center gap-1.5">
-                          <span className="text-blue-400 font-bold text-sm">Pay</span>
-                          <span className="text-blue-300 font-bold text-sm">Pal</span>
+                        Secure
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-green-400">✓</span>
+                        {listing.delivery_type === 'automatic' ? 'Instant' : 'Fast'} Delivery
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-green-400">✓</span>
+                        24/7 Support
+                      </span>
+                    </div>
+
+                    {/* Payment Methods */}
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+                          <span className="text-blue-400 font-bold text-xs">Pay</span>
+                          <span className="text-blue-300 font-bold text-xs">Pal</span>
                         </div>
-                        <div className="bg-white/10 rounded-lg px-3 py-2 flex items-center gap-1.5">
-                          <span className="text-orange-400">₿</span>
-                          <span className="text-gray-300 text-sm font-medium">Crypto</span>
+                        <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+                          <span className="text-orange-400 text-sm">₿</span>
+                          <span className="text-gray-300 text-xs font-medium">Crypto</span>
                         </div>
-                        <div className="bg-white/10 rounded-lg px-3 py-2 flex items-center gap-1.5">
-                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                           </svg>
-                          <span className="text-gray-300 text-sm font-medium">SSL</span>
+                          <span className="text-gray-300 text-xs font-medium">SSL</span>
                         </div>
                       </div>
-                      <p className="text-center text-gray-500 text-xs mt-3">
-                        Your payment is encrypted and secure
-                      </p>
                     </div>
                   </div>
                 )}
@@ -1607,6 +1566,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
               <p className="text-2xl sm:text-3xl font-bold text-green-400">
                 ${listing.price.toFixed(2)}
               </p>
+              <p className="text-xs text-green-400/70">✓ {listing.delivery_type === 'automatic' ? 'Instant delivery' : 'Fast delivery'}</p>
             </div>
             {isOwnListing ? (
               <Link

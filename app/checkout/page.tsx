@@ -23,8 +23,12 @@ interface CartItem {
     image_url: string
     stock: number
     seller_id: string
+    delivery_type: 'manual' | 'automatic'
     profiles: {
       username: string
+      avatar_url?: string | null
+      average_rating?: number
+      verified?: boolean
     }
   }
 }
@@ -47,16 +51,14 @@ export default function CheckoutPage() {
   const [paypalError, setPaypalError] = useState<string | null>(null)
   const [cryptoLoading, setCryptoLoading] = useState(false)
   const [cryptoError, setCryptoError] = useState<string | null>(null)
+  const [sellerStats, setSellerStats] = useState<{ rating: number; totalSales: number } | null>(null)
+  const [showGuaranteeModal, setShowGuaranteeModal] = useState(false)
   
-  // Billing form state
+  // Simplified billing form state - only name and email
   const [billingInfo, setBillingInfo] = useState({
     firstName: '',
     lastName: '',
-    email: '',
-    address: '',
-    city: '',
-    country: '',
-    zipCode: ''
+    email: ''
   })
   
   // Form validation
@@ -172,6 +174,36 @@ export default function CheckoutPage() {
     }
   }, [])
 
+  // Fetch seller stats when cart item loads
+  useEffect(() => {
+    const fetchSellerStats = async () => {
+      if (!cartItem?.listing.seller_id) return
+      
+      try {
+        // Get seller's completed orders count and average rating
+        const { data: orders, error } = await supabase
+          .from('orders')
+          .select('id, review_rating')
+          .eq('seller_id', cartItem.listing.seller_id)
+          .eq('status', 'completed')
+        
+        if (!error && orders) {
+          const totalSales = orders.length
+          const ratedOrders = orders.filter(o => o.review_rating)
+          const avgRating = ratedOrders.length > 0 
+            ? ratedOrders.reduce((sum, o) => sum + (o.review_rating || 0), 0) / ratedOrders.length 
+            : 5
+          
+          setSellerStats({ rating: avgRating, totalSales })
+        }
+      } catch (err) {
+        console.error('Error fetching seller stats:', err)
+      }
+    }
+    
+    fetchSellerStats()
+  }, [cartItem])
+
   // Render PayPal buttons when SDK is loaded and PayPal is selected
   const renderPayPalButtons = useCallback(() => {
     if (!paypalLoaded || !window.paypal || !paypalButtonsRef.current || !cartItem || paypalButtonsRendered.current) {
@@ -235,12 +267,6 @@ export default function CheckoutPage() {
                 surname: billing.lastName || undefined,
               },
               email_address: billing.email || undefined,
-              address: billing.address ? {
-                address_line_1: billing.address,
-                admin_area_2: billing.city || undefined,
-                postal_code: billing.zipCode || undefined,
-                country_code: billing.country || undefined,
-              } : undefined,
             },
             purchase_units: [{
               description: `Nashflare - ${cartItem.listing.title}`.substring(0, 127),
@@ -494,7 +520,7 @@ export default function CheckoutPage() {
       
       const { data: listing, error } = await supabase
         .from('listings')
-        .select(`*, profiles (username)`)
+        .select(`*, profiles (username, avatar_url, average_rating, verified)`)
         .eq('id', cart.listing_id)
         .single()
 
@@ -674,25 +700,131 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* Trust Badges in Mobile Summary */}
               <div className="space-y-3 pt-4 border-t border-white/10">
                 <div className="flex items-center space-x-3 text-sm text-gray-300">
-                  <span className="text-green-400 text-xl">🔒</span>
-                  <span>SSL Encrypted</span>
-                </div>
-                <div className="flex items-center space-x-3 text-sm text-gray-300">
                   <span className="text-green-400 text-xl">🛡️</span>
-                  <span>Buyer Protection</span>
+                  <span>48-Hour Buyer Protection</span>
                 </div>
                 <div className="flex items-center space-x-3 text-sm text-gray-300">
-                  <span className="text-green-400 text-xl">⚡</span>
-                  <span>Instant Delivery</span>
+                  <span className="text-green-400 text-xl">💸</span>
+                  <span>Money-Back Guarantee</span>
                 </div>
                 <div className="flex items-center space-x-3 text-sm text-gray-300">
-                  <span className="text-green-400 text-xl">💬</span>
-                  <span>24/7 Support</span>
+                  {cartItem.listing.delivery_type === 'automatic' ? (
+                    <>
+                      <span className="text-green-400 text-xl">⚡</span>
+                      <span>Instant Delivery</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-blue-400 text-xl">📦</span>
+                      <span>Fast Delivery</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center space-x-3 text-sm text-gray-300">
+                  <span className="text-green-400 text-xl">🔒</span>
+                  <span>Secure Payment</span>
                 </div>
               </div>
+
+              {/* Trustpilot Badge in Mobile Summary */}
+              <a 
+                href="https://www.trustpilot.com/review/nashflare.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block bg-white/5 border border-white/10 rounded-xl p-3 hover:border-[#00B67A]/30 transition-all"
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-gray-400 text-xs">Rated <span className="text-white font-semibold">Excellent</span> on</p>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#00B67A"/>
+                    </svg>
+                    <span className="text-white font-bold text-sm">Trustpilot</span>
+                    <div className="flex gap-0.5">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="w-4 h-4 bg-[#00B67A] flex items-center justify-center">
+                          <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                          </svg>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Money-Back Guarantee Modal */}
+      {showGuaranteeModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                  <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-bold text-white">Money-Back Guarantee</h3>
+              </div>
+              <button
+                onClick={() => setShowGuaranteeModal(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4 text-gray-300 text-sm">
+              <p>
+                Your purchase is protected by our 48-hour Money-Back Guarantee. If something goes wrong, we've got you covered.
+              </p>
+              
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5">✓</span>
+                  <div>
+                    <p className="text-white font-medium">Item Not As Described</p>
+                    <p className="text-gray-400 text-xs">Full refund if the item doesn't match the listing description</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5">✓</span>
+                  <div>
+                    <p className="text-white font-medium">Non-Delivery</p>
+                    <p className="text-gray-400 text-xs">Full refund if you don't receive your item</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-green-400 mt-0.5">✓</span>
+                  <div>
+                    <p className="text-white font-medium">Account Issues</p>
+                    <p className="text-gray-400 text-xs">Protected if account credentials don't work or get recovered</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                <p className="text-xs text-gray-400">
+                  <span className="text-white font-medium">How to claim:</span> Open a dispute within 48 hours of purchase through your order details page. Our team will review and resolve within 24 hours.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowGuaranteeModal(false)}
+              className="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition min-h-[48px]"
+            >
+              Got It
+            </button>
           </div>
         </div>
       )}
@@ -713,7 +845,7 @@ export default function CheckoutPage() {
       <div className="relative z-10">
         <Navigation />
 
-        <div className="container mx-auto px-3 sm:px-4 pt-20 sm:pt-24 pb-24 sm:pb-12">
+        <div className="container mx-auto px-3 sm:px-4 pt-20 sm:pt-24 pb-32 sm:pb-12">
           {/* Page Header */}
           <div className="mb-6 sm:mb-8">
             <Link href="/cart" className="text-purple-400 hover:text-purple-300 transition flex items-center gap-2 mb-3 sm:mb-4 text-sm sm:text-base">
@@ -721,22 +853,47 @@ export default function CheckoutPage() {
             </Link>
             <div className="inline-block mb-3 sm:mb-4">
               <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-300 text-xs sm:text-sm font-medium">
-                💳 Secure Checkout
+                🔒 Secure Checkout
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white">
-              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Checkout</span>
+              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">Complete Your Purchase</span>
             </h1>
           </div>
 
           <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {/* Left Column - Forms */}
             <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-              {/* Billing Information */}
+              
+              {/* Compact Trust Banner - Clickable */}
+              <button
+                onClick={() => setShowGuaranteeModal(true)}
+                className="w-full bg-gradient-to-r from-green-500/10 to-emerald-500/10 backdrop-blur-xl border border-green-500/30 rounded-xl p-3 sm:p-4 hover:border-green-500/50 hover:bg-green-500/15 transition-all duration-300 group text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <span className="text-xl">🛡️</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-white font-bold text-sm sm:text-base">48-Hour Buyer Protection</h3>
+                      <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-semibold rounded-full">Money-Back Guarantee</span>
+                    </div>
+                    <p className="text-green-300/70 text-xs sm:text-sm mt-0.5">Full refund if anything goes wrong • Click to learn more</p>
+                  </div>
+                  <div className="flex-shrink-0 text-green-400 group-hover:translate-x-1 transition-transform">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </button>
+
+              {/* Billing Information - Simplified */}
               <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
                 <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                   <span className="text-purple-400">📝</span>
-                  Billing Information
+                  Contact Information
                 </h2>
 
                 <div className="grid md:grid-cols-2 gap-3 sm:gap-4">
@@ -785,61 +942,12 @@ export default function CheckoutPage() {
                     />
                     {formErrors.email && <p className="text-red-400 text-xs mt-1">{formErrors.email}</p>}
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">Address</label>
-                    <input
-                      type="text"
-                      value={billingInfo.address}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, address: e.target.value })}
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
-                      placeholder="123 Main Street"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">City</label>
-                    <input
-                      type="text"
-                      value={billingInfo.city}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, city: e.target.value })}
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
-                      placeholder="New York"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">Country</label>
-                    <select
-                      value={billingInfo.country}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, country: e.target.value })}
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition appearance-none cursor-pointer"
-                      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.5em 1.5em', paddingRight: '3rem' }}
-                    >
-                      <option value="">Select Country</option>
-                      <option value="US">United States</option>
-                      <option value="CA">Canada</option>
-                      <option value="UK">United Kingdom</option>
-                      <option value="DE">Germany</option>
-                      <option value="FR">France</option>
-                      <option value="AU">Australia</option>
-                      <option value="NL">Netherlands</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-white font-medium mb-2 text-xs sm:text-sm">ZIP / Postal Code</label>
-                    <input
-                      type="text"
-                      value={billingInfo.zipCode}
-                      onChange={(e) => setBillingInfo({ ...billingInfo, zipCode: e.target.value })}
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition"
-                      placeholder="10001"
-                    />
-                  </div>
                 </div>
                 
                 {/* Email confirmation note */}
                 <div className="mt-4 flex items-start gap-2 text-gray-400 text-xs">
                   <span className="text-green-400">✉️</span>
-                  <span>Order confirmation will be sent to <span className="text-white">{billingInfo.email || 'your email'}</span></span>
+                  <span>Order confirmation and delivery details will be sent to <span className="text-white">{billingInfo.email || 'your email'}</span></span>
                 </div>
               </div>
 
@@ -941,7 +1049,7 @@ export default function CheckoutPage() {
                         <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
                           <span className="text-lg flex-shrink-0">⚠️</span>
                           <span>
-                            <span className="font-semibold">Please complete billing info:</span> Fill in your name and email above before paying.
+                            <span className="font-semibold">Please complete your info:</span> Fill in your name and email above before paying.
                           </span>
                         </p>
                       </div>
@@ -1018,7 +1126,7 @@ export default function CheckoutPage() {
                         <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
                           <span className="text-lg flex-shrink-0">⚠️</span>
                           <span>
-                            <span className="font-semibold">Please complete billing info:</span> Fill in your name and email above before paying.
+                            <span className="font-semibold">Please complete your info:</span> Fill in your name and email above before paying.
                           </span>
                         </p>
                       </div>
@@ -1125,6 +1233,46 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </div>
+
+              {/* What Happens Next - Compact Version */}
+              <div className="bg-slate-800/30 backdrop-blur-xl border border-white/5 rounded-xl p-4">
+                <p className="text-gray-500 text-xs font-medium uppercase tracking-wide text-center mb-3">What Happens Next</p>
+                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm">
+                  <div className="flex items-center gap-2 text-gray-300">
+                    {cartItem.listing.delivery_type === 'automatic' ? (
+                      <>
+                        <span className="text-green-400">⚡</span>
+                        <div>
+                          <span className="text-white font-medium">Instant Delivery</span>
+                          <span className="text-gray-500 text-xs block sm:inline sm:ml-1">— Receive immediately</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-blue-400">📦</span>
+                        <div>
+                          <span className="text-white font-medium">Fast Delivery</span>
+                          <span className="text-gray-500 text-xs block sm:inline sm:ml-1">— Usually within minutes</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <span className="text-blue-400">📧</span>
+                    <div>
+                      <span className="text-white font-medium">Email Confirmation</span>
+                      <span className="text-gray-500 text-xs block sm:inline sm:ml-1">— Order details sent</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <span className="text-purple-400">💬</span>
+                    <div>
+                      <span className="text-white font-medium">Chat Support</span>
+                      <span className="text-gray-500 text-xs block sm:inline sm:ml-1">— We're here to help</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Desktop Right Column - Order Summary */}
@@ -1135,7 +1283,7 @@ export default function CheckoutPage() {
                   Order Summary
                 </h2>
 
-                <div className="flex gap-3 mb-6 pb-6 border-b border-white/10">
+                <div className="flex gap-3 mb-4 pb-4 border-b border-white/10">
                   <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
                     {cartItem.listing.image_url ? (
                       <img
@@ -1158,6 +1306,47 @@ export default function CheckoutPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-white font-semibold">${(cartItem.listing.price * cartItem.quantity).toFixed(2)}</p>
+                  </div>
+                </div>
+
+                {/* Seller Info */}
+                <div className="mb-4 pb-4 border-b border-white/10">
+                  <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-3">Sold by</p>
+                  <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden ring-2 ring-purple-500/30">
+                      {cartItem.listing.profiles?.avatar_url ? (
+                        <img 
+                          src={cartItem.listing.profiles.avatar_url} 
+                          alt={cartItem.listing.profiles?.username || 'Seller'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-lg">
+                          {cartItem.listing.profiles?.username?.charAt(0).toUpperCase() || 'S'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-white font-semibold text-sm truncate">{cartItem.listing.profiles?.username || 'Seller'}</p>
+                        {cartItem.listing.profiles?.verified && (
+                          <span className="text-blue-400 text-sm" title="Verified Seller">✓</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs mt-0.5">
+                        {(cartItem.listing.profiles?.average_rating || (sellerStats && sellerStats.rating > 0)) && (
+                          <>
+                            <span className="text-yellow-400 flex items-center gap-0.5">
+                              ★ {(cartItem.listing.profiles?.average_rating || sellerStats?.rating || 0).toFixed(1)}
+                            </span>
+                            <span className="text-gray-500">•</span>
+                          </>
+                        )}
+                        <span className="text-gray-400">
+                          {sellerStats ? `${sellerStats.totalSales} sales` : 'Verified Seller'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1212,7 +1401,7 @@ export default function CheckoutPage() {
                     ) : (
                       <>
                         <div className="text-yellow-400 text-2xl mb-2">📝</div>
-                        <p className="text-yellow-300 text-sm font-medium">Fill in billing info first</p>
+                        <p className="text-yellow-300 text-sm font-medium">Fill in your info first</p>
                         <p className="text-gray-400 text-xs mt-1">Name and email are required</p>
                       </>
                     )}
@@ -1230,7 +1419,7 @@ export default function CheckoutPage() {
                     ) : (
                       <>
                         <div className="text-yellow-400 text-2xl mb-2">📝</div>
-                        <p className="text-yellow-300 text-sm font-medium">Fill in billing info first</p>
+                        <p className="text-yellow-300 text-sm font-medium">Fill in your info first</p>
                         <p className="text-gray-400 text-xs mt-1">Name and email are required</p>
                       </>
                     )}
@@ -1247,112 +1436,187 @@ export default function CheckoutPage() {
 
                 {/* Trust Badges */}
                 <div className="space-y-3 pt-4 border-t border-white/10">
-                  <div className="flex items-center space-x-3 text-sm text-gray-300 group">
-                    <span className="text-green-400 group-hover:scale-110 transition-transform">🔒</span>
-                    <span>SSL Encrypted</span>
-                  </div>
+                  <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-3">Your Purchase is Protected</p>
                   <div className="flex items-center space-x-3 text-sm text-gray-300 group">
                     <span className="text-green-400 group-hover:scale-110 transition-transform">🛡️</span>
-                    <span>Buyer Protection</span>
+                    <span>48-Hour Buyer Protection</span>
                   </div>
                   <div className="flex items-center space-x-3 text-sm text-gray-300 group">
-                    <span className="text-green-400 group-hover:scale-110 transition-transform">⚡</span>
-                    <span>Instant Delivery</span>
+                    <span className="text-green-400 group-hover:scale-110 transition-transform">💸</span>
+                    <span>Money-Back Guarantee</span>
+                  </div>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300 group">
+                    {cartItem.listing.delivery_type === 'automatic' ? (
+                      <>
+                        <span className="text-green-400 group-hover:scale-110 transition-transform">⚡</span>
+                        <span>Instant Delivery</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-blue-400 group-hover:scale-110 transition-transform">📦</span>
+                        <span>Fast Delivery</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300 group">
+                    <span className="text-green-400 group-hover:scale-110 transition-transform">🔒</span>
+                    <span>Secure Encrypted Payment</span>
                   </div>
                   <div className="flex items-center space-x-3 text-sm text-gray-300 group">
                     <span className="text-green-400 group-hover:scale-110 transition-transform">💬</span>
-                    <span>24/7 Support</span>
+                    <span>24/7 Customer Support</span>
                   </div>
                 </div>
+
+                {/* Trustpilot Badge */}
+                <a 
+                  href="https://www.trustpilot.com/review/nashflare.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="mt-4 block bg-white/5 border border-white/10 rounded-xl p-3 hover:border-[#00B67A]/30 hover:bg-[#00B67A]/5 transition-all duration-300 group"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-gray-400 text-xs">Rated <span className="text-white font-semibold">Excellent</span> on</p>
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#00B67A"/>
+                      </svg>
+                      <span className="text-white font-bold text-sm">Trustpilot</span>
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <div key={i} className="w-4 h-4 bg-[#00B67A] flex items-center justify-center">
+                            <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                            </svg>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </a>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Mobile Fixed Bottom Bar - Only show for crypto */}
-        {selectedPayment === 'crypto' && (
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
-            <div className="flex flex-col gap-3">
+        {/* Enhanced Mobile Fixed Bottom Bar */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/98 backdrop-blur-xl border-t border-white/10 z-40 safe-area-bottom">
+          {/* Trust Badge Strip */}
+          <div className="flex items-center justify-center gap-4 py-2 px-3 bg-green-500/10 border-b border-green-500/20">
+            <div className="flex items-center gap-1.5 text-green-400 text-xs">
+              <span>🛡️</span>
+              <span className="font-medium">Buyer Protected</span>
+            </div>
+            <div className="w-px h-3 bg-green-500/30"></div>
+            <div className="flex items-center gap-1.5 text-xs">
+              {cartItem.listing.delivery_type === 'automatic' ? (
+                <>
+                  <span className="text-green-400">⚡</span>
+                  <span className="font-medium text-green-400">Instant Delivery</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-blue-400">📦</span>
+                  <span className="font-medium text-blue-400">Fast Delivery</span>
+                </>
+              )}
+            </div>
+            <div className="w-px h-3 bg-green-500/30"></div>
+            <div className="flex items-center gap-1.5 text-green-400 text-xs">
+              <span>🔒</span>
+              <span className="font-medium">Secure</span>
+            </div>
+          </div>
+
+          {/* Main Bottom Bar Content */}
+          <div className="p-3 sm:p-4">
+            {/* Crypto Payment */}
+            {selectedPayment === 'crypto' && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400 mb-0.5">Total Price</p>
+                    <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                      ${total.toFixed(2)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowMobileSummary(true)}
+                    className="bg-white/10 text-white px-3 py-2.5 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[44px] text-sm whitespace-nowrap"
+                  >
+                    📋 Details
+                  </button>
+                </div>
+                <button
+                  onClick={handlePlaceOrder}
+                  disabled={cryptoLoading || !isFormValid}
+                  className="w-full py-3.5 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {cryptoLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Preparing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🔒</span>
+                      <span>Complete Secure Purchase</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* PayPal Payment */}
+            {selectedPayment === 'paypal' && (
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <p className="text-xs text-gray-400 mb-0.5">Total</p>
+                  <p className="text-xs text-gray-400 mb-0.5">Total Price</p>
                   <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                     ${total.toFixed(2)}
                   </p>
                 </div>
                 <button
                   onClick={() => setShowMobileSummary(true)}
-                  className="bg-white/10 text-white px-4 py-3 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[48px] text-sm whitespace-nowrap"
+                  className="bg-white/10 text-white px-3 py-2.5 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[44px] text-sm whitespace-nowrap"
                 >
-                  📋 Summary
+                  📋 Details
                 </button>
+                <div className="bg-gradient-to-r from-blue-500/20 to-blue-600/20 text-blue-400 px-4 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap border border-blue-500/30 min-h-[44px] flex items-center gap-2">
+                  <span>👆</span>
+                  <span>Pay Above</span>
+                </div>
               </div>
-              <button
-                onClick={handlePlaceOrder}
-                disabled={cryptoLoading || !isFormValid}
-                className="w-full py-3 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {cryptoLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Preparing...
-                  </span>
-                ) : (
-                  `₿ Pay $${total.toFixed(2)} with Crypto`
-                )}
-              </button>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Mobile PayPal Info Bar */}
-        {selectedPayment === 'paypal' && (
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-xs text-gray-400 mb-0.5">Total</p>
-                <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  ${total.toFixed(2)}
-                </p>
+            {/* No Payment Selected */}
+            {!selectedPayment && (
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-xs text-gray-400 mb-0.5">Total Price</p>
+                  <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                    ${total.toFixed(2)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowMobileSummary(true)}
+                  className="bg-white/10 text-white px-3 py-2.5 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[44px] text-sm whitespace-nowrap"
+                >
+                  📋 Details
+                </button>
+                <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-400 px-4 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap border border-purple-500/30 min-h-[44px] flex items-center gap-2">
+                  <span>💳</span>
+                  <span>Select Payment</span>
+                </div>
               </div>
-              <button
-                onClick={() => setShowMobileSummary(true)}
-                className="bg-white/10 text-white px-4 py-3 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[48px] text-sm whitespace-nowrap"
-              >
-                📋 Summary
-              </button>
-              <div className="bg-blue-500/20 text-blue-400 px-4 py-3 rounded-xl font-semibold text-sm whitespace-nowrap">
-                👆 Pay with PayPal
-              </div>
-            </div>
+            )}
           </div>
-        )}
-
-        {/* Mobile - No payment selected */}
-        {!selectedPayment && (
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-xs text-gray-400 mb-0.5">Total</p>
-                <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                  ${total.toFixed(2)}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowMobileSummary(true)}
-                className="bg-white/10 text-white px-4 py-3 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[48px] text-sm whitespace-nowrap"
-              >
-                📋 Summary
-              </button>
-              <div className="bg-purple-500/20 text-purple-400 px-4 py-3 rounded-xl font-semibold text-sm whitespace-nowrap">
-                💳 Select Payment
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Footer */}
-        <Footer />
+        <div className="hidden lg:block">
+          <Footer />
+        </div>
       </div>
 
       {/* Custom Styles */}
@@ -1371,7 +1635,7 @@ export default function CheckoutPage() {
           animation: slide-up 0.3s ease-out;
         }
         .safe-area-bottom {
-          padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+          padding-bottom: env(safe-area-inset-bottom);
         }
         /* PayPal button container styling */
         .paypal-buttons-container {
