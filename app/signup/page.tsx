@@ -486,26 +486,44 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4 py-12">
-      {/* Fixed Background that covers entire viewport */}
-      <div className="fixed inset-0 z-0 bg-slate-950">
+      {/* Fixed Background - Optimized for performance */}
+      <div className="fixed inset-0 z-0 bg-slate-950 overflow-hidden">
         {/* Gradient Mesh */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
         
-        {/* Animated Orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+        {/* Static Gradient Orbs - No blur, no animation */}
+        <div 
+          className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full opacity-20"
+          style={{ 
+            background: 'radial-gradient(circle, rgba(147,51,234,0.5) 0%, transparent 70%)',
+            transform: 'translateZ(0)',
+          }}
+        />
+        <div 
+          className="absolute top-3/4 right-1/4 w-[500px] h-[500px] rounded-full opacity-20"
+          style={{ 
+            background: 'radial-gradient(circle, rgba(219,39,119,0.5) 0%, transparent 70%)',
+            transform: 'translateZ(0)',
+          }}
+        />
+        <div 
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full opacity-15"
+          style={{ 
+            background: 'radial-gradient(circle, rgba(59,130,246,0.5) 0%, transparent 70%)',
+            transform: 'translateZ(0)',
+          }}
+        />
         
         {/* Grid Pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear_gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
         
-        {/* Floating Particles */}
-        <div className="absolute top-20 left-[10%] w-2 h-2 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDuration: '3s' }}></div>
-        <div className="absolute top-40 left-[25%] w-1 h-1 bg-pink-400/60 rounded-full animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}></div>
-        <div className="absolute top-60 right-[15%] w-3 h-3 bg-blue-400/40 rounded-full animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}></div>
-        <div className="absolute top-32 right-[30%] w-2 h-2 bg-purple-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1.5s' }}></div>
-        <div className="absolute top-80 left-[40%] w-1 h-1 bg-pink-400/70 rounded-full animate-bounce" style={{ animationDuration: '4.5s', animationDelay: '2s' }}></div>
-        <div className="absolute bottom-40 right-[20%] w-2 h-2 bg-indigo-400/50 rounded-full animate-bounce" style={{ animationDuration: '3.8s', animationDelay: '2.5s' }}></div>
+        {/* Static Particles - No animation */}
+        <div className="absolute top-20 left-[10%] w-2 h-2 bg-purple-400/40 rounded-full"></div>
+        <div className="absolute top-40 left-[25%] w-1 h-1 bg-pink-400/40 rounded-full"></div>
+        <div className="absolute top-60 right-[15%] w-3 h-3 bg-blue-400/30 rounded-full"></div>
+        <div className="absolute top-32 right-[30%] w-2 h-2 bg-purple-400/35 rounded-full"></div>
+        <div className="absolute top-80 left-[40%] w-1 h-1 bg-pink-400/50 rounded-full"></div>
+        <div className="absolute bottom-40 right-[20%] w-2 h-2 bg-indigo-400/35 rounded-full"></div>
       </div>
 
       {/* Content */}
@@ -518,10 +536,10 @@ export default function SignupPage() {
               alt="Nashflare"
               width={48}
               height={48}
-              className="transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300"
+              className="transform group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300"
               priority
             />
-            <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
+            <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur-lg transition-opacity duration-300"></div>
           </div>
           <div className="flex flex-col">
             <span className="text-2xl font-black text-white tracking-tight">
@@ -543,7 +561,7 @@ export default function SignupPage() {
           <p className="text-gray-400">Start trading gaming assets today</p>
         </div>
 
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
+        <div className="bg-slate-900/60 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-colors duration-200">
           <form onSubmit={handleSignup} className="space-y-5">
             {error && (
               <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4">
@@ -587,13 +605,13 @@ export default function SignupPage() {
             <div>
               <label className="block text-white font-semibold mb-2 text-sm">Username</label>
               <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-200"></div>
                 <input
                   type="text"
                   value={username}
                   onChange={handleUsernameChange}
                   placeholder="Choose a username"
-                  className={`relative w-full bg-slate-800/80 border rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all duration-300 ${
+                  className={`relative w-full bg-slate-800/80 border rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-colors duration-200 ${
                     usernameError 
                       ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' 
                       : usernameAvailable === true 
@@ -634,13 +652,13 @@ export default function SignupPage() {
             <div>
               <label className="block text-white font-semibold mb-2 text-sm">Email</label>
               <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-200"></div>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-colors duration-200"
                   required
                   maxLength={100}
                   autoComplete="email"
@@ -653,7 +671,7 @@ export default function SignupPage() {
             <div>
               <label className="block text-white font-semibold mb-2 text-sm">Password</label>
               <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-200"></div>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -661,7 +679,7 @@ export default function SignupPage() {
                   onKeyDown={handleKeyEvent}
                   onKeyUp={handleKeyEvent}
                   placeholder="••••••••"
-                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-colors duration-200"
                   required
                   minLength={8}
                   maxLength={72}
@@ -671,7 +689,7 @@ export default function SignupPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors duration-200 p-1"
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -706,7 +724,7 @@ export default function SignupPage() {
                       {[0, 1, 2, 3].map((index) => (
                         <div
                           key={index}
-                          className={`flex-1 h-full rounded-full transition-all duration-300 ${
+                          className={`flex-1 h-full rounded-full transition-colors duration-200 ${
                             index <= passwordStrength.score - 1 
                               ? passwordStrength.bgColor 
                               : 'bg-slate-700'
@@ -777,7 +795,7 @@ export default function SignupPage() {
             <div>
               <label className="block text-white font-semibold mb-2 text-sm">Confirm Password</label>
               <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300"></div>
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-200"></div>
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
@@ -785,7 +803,7 @@ export default function SignupPage() {
                   onKeyDown={handleKeyEvent}
                   onKeyUp={handleKeyEvent}
                   placeholder="••••••••"
-                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+                  className="relative w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-colors duration-200"
                   required
                   minLength={8}
                   maxLength={72}
@@ -795,7 +813,7 @@ export default function SignupPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors duration-200 p-1"
                   tabIndex={-1}
                 >
                   {showConfirmPassword ? (
@@ -846,7 +864,7 @@ export default function SignupPage() {
                     disabled={!!lockedUntil}
                   />
                 </div>
-                <span className="text-sm text-gray-400 group-hover:text-gray-300 transition leading-relaxed">
+                <span className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-200 leading-relaxed">
                   I agree to the{' '}
                   <Link 
                     href="/terms" 
@@ -872,7 +890,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading || !!lockedUntil || !agreedToTerms || usernameAvailable === false}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -895,7 +913,7 @@ export default function SignupPage() {
           <div className="mt-6 text-center">
             <p className="text-gray-400">
               Already have an account?{' '}
-              <Link href="/login" className="text-purple-400 hover:text-purple-300 font-semibold transition">
+              <Link href="/login" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors duration-200">
                 Log in
               </Link>
             </p>
@@ -904,7 +922,7 @@ export default function SignupPage() {
 
         {/* Back to Home */}
         <div className="text-center mt-6">
-          <Link href="/" className="text-gray-400 hover:text-purple-400 transition flex items-center justify-center gap-2">
+          <Link href="/" className="text-gray-400 hover:text-purple-400 transition-colors duration-200 flex items-center justify-center gap-2">
             <span>←</span> Back to Home
           </Link>
         </div>
