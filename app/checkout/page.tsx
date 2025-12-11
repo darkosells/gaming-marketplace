@@ -610,16 +610,9 @@ export default function CheckoutPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center">
-        <div className="fixed inset-0 z-0">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
-        </div>
-        <div className="relative z-10 text-center">
-          <div className="relative inline-block">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-lg opacity-50 animate-pulse"></div>
-            <div className="relative inline-block animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-purple-500 border-t-transparent"></div>
-          </div>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-purple-500 border-t-transparent"></div>
           <p className="text-white mt-4 sm:mt-6 text-base sm:text-lg">Loading checkout...</p>
         </div>
       </div>
@@ -635,16 +628,16 @@ export default function CheckoutPage() {
   const total = subtotal + serviceFee
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 relative">
       {/* Mobile Summary Modal */}
       {showMobileSummary && (
         <div className="lg:hidden fixed inset-0 z-50 flex items-end">
           <div 
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/80"
             onClick={() => setShowMobileSummary(false)}
           ></div>
-          <div className="relative w-full bg-slate-900/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-slide-up">
-            <div className="sticky top-0 bg-slate-900/95 backdrop-blur-xl border-b border-white/10 p-4 flex items-center justify-between">
+          <div className="relative w-full bg-slate-900 border-t border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-slide-up">
+            <div className="sticky top-0 bg-slate-900 border-b border-white/10 p-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white">Order Summary</h3>
               <button 
                 onClick={() => setShowMobileSummary(false)}
@@ -658,7 +651,7 @@ export default function CheckoutPage() {
 
             <div className="p-4 space-y-4">
               <div className="flex gap-3 pb-4 border-b border-white/10">
-                <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-slate-800">
                   {cartItem.listing.image_url ? (
                     <img
                       src={cartItem.listing.image_url}
@@ -695,7 +688,7 @@ export default function CheckoutPage() {
                 <div className="border-t border-white/10 pt-3">
                   <div className="flex justify-between text-white text-xl font-bold">
                     <span>Total</span>
-                    <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${total.toFixed(2)}</span>
+                    <span className="text-green-400">${total.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -734,7 +727,7 @@ export default function CheckoutPage() {
                 href="https://www.trustpilot.com/review/nashflare.com" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="block bg-white/5 border border-white/10 rounded-xl p-3 hover:border-[#00B67A]/30 transition-all"
+                className="block bg-slate-800 border border-white/10 rounded-xl p-3"
               >
                 <div className="flex flex-col items-center gap-2">
                   <p className="text-gray-400 text-xs">Rated <span className="text-white font-semibold">Excellent</span> on</p>
@@ -762,7 +755,7 @@ export default function CheckoutPage() {
 
       {/* Money-Back Guarantee Modal */}
       {showGuaranteeModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50">
           <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -812,7 +805,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+              <div className="bg-slate-800 rounded-lg p-3 border border-white/10">
                 <p className="text-xs text-gray-400">
                   <span className="text-white font-medium">How to claim:</span> Open a dispute within 48 hours of purchase through your order details page. Our team will review and resolve within 24 hours.
                 </p>
@@ -821,7 +814,7 @@ export default function CheckoutPage() {
 
             <button
               onClick={() => setShowGuaranteeModal(false)}
-              className="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition min-h-[48px]"
+              className="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition min-h-[48px]"
             >
               Got It
             </button>
@@ -829,26 +822,21 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      {/* Animated Background */}
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-        <div className="absolute top-20 left-[10%] w-2 h-2 bg-purple-400/60 rounded-full animate-bounce" style={{ animationDuration: '3s' }}></div>
-        <div className="absolute top-40 left-[25%] w-1 h-1 bg-pink-400/60 rounded-full animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }}></div>
-        <div className="absolute top-60 right-[15%] w-3 h-3 bg-blue-400/40 rounded-full animate-bounce" style={{ animationDuration: '5s', animationDelay: '1s' }}></div>
+      {/* Simplified Static Background - PERFORMANCE OPTIMIZED */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-purple-900/20 via-slate-950 to-slate-950"></div>
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[100px]"></div>
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-pink-600/10 rounded-full blur-[100px]"></div>
       </div>
 
-      {/* Content */}
-      <div className="relative z-10">
+      {/* Content - GPU accelerated scrolling */}
+      <div className="relative z-10 transform-gpu">
         <Navigation />
 
         <div className="container mx-auto px-3 sm:px-4 pt-20 sm:pt-24 pb-32 sm:pb-12">
           {/* Page Header */}
           <div className="mb-6 sm:mb-8">
-            <Link href="/cart" className="text-purple-400 hover:text-purple-300 transition flex items-center gap-2 mb-3 sm:mb-4 text-sm sm:text-base">
+            <Link href="/cart" className="text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-2 mb-3 sm:mb-4 text-sm sm:text-base">
               <span>←</span> Back to Cart
             </Link>
             <div className="inline-block mb-3 sm:mb-4">
@@ -868,10 +856,10 @@ export default function CheckoutPage() {
               {/* Compact Trust Banner - Clickable */}
               <button
                 onClick={() => setShowGuaranteeModal(true)}
-                className="w-full bg-gradient-to-r from-green-500/10 to-emerald-500/10 backdrop-blur-xl border border-green-500/30 rounded-xl p-3 sm:p-4 hover:border-green-500/50 hover:bg-green-500/15 transition-all duration-300 group text-left"
+                className="w-full bg-green-500/10 border border-green-500/30 rounded-xl p-3 sm:p-4 hover:border-green-500/50 transition-colors text-left"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <div className="flex-shrink-0 w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
                     <span className="text-xl">🛡️</span>
                   </div>
                   <div className="flex-1 min-w-0">
@@ -881,7 +869,7 @@ export default function CheckoutPage() {
                     </div>
                     <p className="text-green-300/70 text-xs sm:text-sm mt-0.5">Full refund if anything goes wrong • Click to learn more</p>
                   </div>
-                  <div className="flex-shrink-0 text-green-400 group-hover:translate-x-1 transition-transform">
+                  <div className="flex-shrink-0 text-green-400">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -890,7 +878,7 @@ export default function CheckoutPage() {
               </button>
 
               {/* Billing Information - Simplified */}
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
+              <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                   <span className="text-purple-400">📝</span>
                   Contact Information
@@ -906,7 +894,7 @@ export default function CheckoutPage() {
                         setBillingInfo({ ...billingInfo, firstName: e.target.value })
                         if (formErrors.firstName) setFormErrors({ ...formErrors, firstName: '' })
                       }}
-                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border ${formErrors.firstName ? 'border-red-500' : 'border-white/10'} text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition`}
+                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800 border ${formErrors.firstName ? 'border-red-500' : 'border-white/10'} text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-colors`}
                       placeholder="John"
                       required
                     />
@@ -921,7 +909,7 @@ export default function CheckoutPage() {
                         setBillingInfo({ ...billingInfo, lastName: e.target.value })
                         if (formErrors.lastName) setFormErrors({ ...formErrors, lastName: '' })
                       }}
-                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border ${formErrors.lastName ? 'border-red-500' : 'border-white/10'} text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition`}
+                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800 border ${formErrors.lastName ? 'border-red-500' : 'border-white/10'} text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-colors`}
                       placeholder="Doe"
                       required
                     />
@@ -936,7 +924,7 @@ export default function CheckoutPage() {
                         setBillingInfo({ ...billingInfo, email: e.target.value })
                         if (formErrors.email) setFormErrors({ ...formErrors, email: '' })
                       }}
-                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800/80 border ${formErrors.email ? 'border-red-500' : 'border-white/10'} text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition`}
+                      className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-slate-800 border ${formErrors.email ? 'border-red-500' : 'border-white/10'} text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-colors`}
                       placeholder="john@example.com"
                       required
                     />
@@ -952,7 +940,7 @@ export default function CheckoutPage() {
               </div>
 
               {/* Payment Method Selection */}
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
+              <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                   <span className="text-purple-400">💳</span>
                   Payment Method
@@ -960,7 +948,7 @@ export default function CheckoutPage() {
 
                 <div className="space-y-3">
                   {/* PayPal - Primary Payment Method */}
-                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
+                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-colors ${
                     selectedPayment === 'paypal' 
                       ? 'bg-blue-500/20 border-blue-500/50' 
                       : 'bg-slate-800/50 border-white/10 hover:border-blue-500/30'
@@ -992,18 +980,17 @@ export default function CheckoutPage() {
                       <p className="text-gray-400 text-xs sm:text-sm">Pay with PayPal, Credit or Debit Card</p>
                     </div>
                     <div className="flex gap-1 sm:gap-2 ml-2 flex-shrink-0">
-                      {/* PayPal Logo */}
                       <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#003087] rounded-lg flex items-center justify-center">
                         <span className="text-white font-bold text-xs">PP</span>
                       </div>
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-700 rounded-lg flex items-center justify-center">
                         <span className="text-white text-lg">💳</span>
                       </div>
                     </div>
                   </label>
 
                   {/* Cryptocurrency via NOWPayments */}
-                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-all duration-300 ${
+                  <label className={`flex items-start sm:items-center p-3 sm:p-4 rounded-xl border cursor-pointer transition-colors ${
                     selectedPayment === 'crypto' 
                       ? 'bg-orange-500/20 border-orange-500/50' 
                       : 'bg-slate-800/50 border-white/10 hover:border-orange-500/30'
@@ -1030,10 +1017,10 @@ export default function CheckoutPage() {
                       <p className="text-gray-400 text-xs sm:text-sm">Bitcoin, Ethereum, USDC, Litecoin & more</p>
                     </div>
                     <div className="flex gap-1 sm:gap-2 ml-2 flex-shrink-0">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-orange-500 to-yellow-500 rounded-lg flex items-center justify-center">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-500 rounded-lg flex items-center justify-center">
                         <span className="text-white font-bold text-xs">₿</span>
                       </div>
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500 rounded-lg flex items-center justify-center">
                         <span className="text-white font-bold text-xs">Ξ</span>
                       </div>
                     </div>
@@ -1068,7 +1055,7 @@ export default function CheckoutPage() {
                                 paypalButtonsRendered.current = false
                                 renderPayPalButtons()
                               }}
-                              className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg text-red-300 text-sm font-medium transition-all"
+                              className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg text-red-300 text-sm font-medium transition-colors"
                             >
                               🔄 Try Again
                             </button>
@@ -1076,7 +1063,7 @@ export default function CheckoutPage() {
                         </div>
                       </div>
                     ) : !paypalLoaded ? (
-                      <div className="p-4 bg-slate-800/50 rounded-xl flex items-center justify-center">
+                      <div className="p-4 bg-slate-800 rounded-xl flex items-center justify-center">
                         <div className="flex items-center gap-3 text-gray-400">
                           <div className="w-5 h-5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
                           <span>Loading PayPal...</span>
@@ -1103,7 +1090,7 @@ export default function CheckoutPage() {
                             </span>
                           </p>
                         </div>
-                        <div className={`paypal-buttons-wrapper bg-slate-800/50 rounded-xl p-4 sm:p-6 ${!isFormValid ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className={`paypal-buttons-wrapper bg-slate-800 rounded-xl p-4 sm:p-6 ${!isFormValid ? 'opacity-50 pointer-events-none' : ''}`}>
                           <div 
                             ref={paypalButtonsRef} 
                             className="paypal-buttons-container min-h-[150px] w-full"
@@ -1141,7 +1128,7 @@ export default function CheckoutPage() {
                             <p className="text-red-300 text-sm">{cryptoError}</p>
                             <button
                               onClick={() => setCryptoError(null)}
-                              className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg text-red-300 text-sm font-medium transition-all"
+                              className="mt-3 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 rounded-lg text-red-300 text-sm font-medium transition-colors"
                             >
                               🔄 Try Again
                             </button>
@@ -1170,7 +1157,7 @@ export default function CheckoutPage() {
                         </div>
 
                         {/* Supported Cryptocurrencies */}
-                        <div className="bg-slate-800/50 rounded-xl p-4 sm:p-6 mb-4">
+                        <div className="bg-slate-800 rounded-xl p-4 sm:p-6 mb-4">
                           <p className="text-gray-400 text-xs mb-3 text-center">Supported Cryptocurrencies</p>
                           <div className="flex justify-center gap-3 flex-wrap">
                             <div className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 rounded-lg border border-orange-500/30">
@@ -1196,9 +1183,9 @@ export default function CheckoutPage() {
                         <button
                           onClick={handleCryptoPayment}
                           disabled={!isFormValid || cryptoLoading}
-                          className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 ${
+                          className={`w-full py-4 rounded-xl font-bold text-lg transition-colors flex items-center justify-center gap-3 ${
                             isFormValid
-                              ? 'bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:scale-[1.02]'
+                              ? 'bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white'
                               : 'bg-slate-700 text-gray-400 cursor-not-allowed'
                           }`}
                         >
@@ -1211,7 +1198,7 @@ export default function CheckoutPage() {
                         </p>
 
                         {/* How it works */}
-                        <div className="mt-4 p-3 bg-slate-800/30 rounded-xl">
+                        <div className="mt-4 p-3 bg-slate-800/50 rounded-xl">
                           <p className="text-gray-400 text-xs mb-2 font-semibold">How it works:</p>
                           <ol className="text-gray-500 text-xs space-y-1">
                             <li className="flex items-start gap-2">
@@ -1235,7 +1222,7 @@ export default function CheckoutPage() {
               </div>
 
               {/* What Happens Next - Compact Version */}
-              <div className="bg-slate-800/30 backdrop-blur-xl border border-white/5 rounded-xl p-4">
+              <div className="bg-slate-800/50 border border-white/5 rounded-xl p-4">
                 <p className="text-gray-500 text-xs font-medium uppercase tracking-wide text-center mb-3">What Happens Next</p>
                 <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm">
                   <div className="flex items-center gap-2 text-gray-300">
@@ -1252,7 +1239,7 @@ export default function CheckoutPage() {
                         <span className="text-blue-400">📦</span>
                         <div>
                           <span className="text-white font-medium">Fast Delivery</span>
-                          <span className="text-gray-500 text-xs block sm:inline sm:ml-1">— Usually within minutes</span>
+                          <span className="text-gray-500 text-xs block sm:inline sm:ml-1">— Usually within hours</span>
                         </div>
                       </>
                     )}
@@ -1277,14 +1264,14 @@ export default function CheckoutPage() {
 
             {/* Desktop Right Column - Order Summary */}
             <div className="hidden lg:block lg:col-span-1">
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-all duration-300">
+              <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-6 sticky top-24">
                 <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                   <span className="text-purple-400">📦</span>
                   Order Summary
                 </h2>
 
                 <div className="flex gap-3 mb-4 pb-4 border-b border-white/10">
-                  <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                  <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-slate-800">
                     {cartItem.listing.image_url ? (
                       <img
                         src={cartItem.listing.image_url}
@@ -1312,7 +1299,7 @@ export default function CheckoutPage() {
                 {/* Seller Info */}
                 <div className="mb-4 pb-4 border-b border-white/10">
                   <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-3">Sold by</p>
-                  <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl">
+                  <div className="flex items-center gap-3 p-3 bg-slate-800 rounded-xl">
                     <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden ring-2 ring-purple-500/30">
                       {cartItem.listing.profiles?.avatar_url ? (
                         <img 
@@ -1362,7 +1349,7 @@ export default function CheckoutPage() {
                   <div className="border-t border-white/10 pt-3">
                     <div className="flex justify-between text-white text-xl font-bold">
                       <span>Total</span>
-                      <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">${total.toFixed(2)}</span>
+                      <span className="text-green-400">${total.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -1373,7 +1360,7 @@ export default function CheckoutPage() {
                     <button
                       onClick={handlePlaceOrder}
                       disabled={cryptoLoading || !isFormValid}
-                      className="w-full py-4 rounded-xl font-semibold transition-all duration-300 mb-4 bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg hover:shadow-orange-500/50 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                      className="w-full py-4 rounded-xl font-semibold transition-colors mb-4 bg-gradient-to-r from-orange-500 to-yellow-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {cryptoLoading ? (
                         <span className="flex items-center justify-center gap-2">
@@ -1437,33 +1424,33 @@ export default function CheckoutPage() {
                 {/* Trust Badges */}
                 <div className="space-y-3 pt-4 border-t border-white/10">
                   <p className="text-gray-500 text-xs font-medium uppercase tracking-wide mb-3">Your Purchase is Protected</p>
-                  <div className="flex items-center space-x-3 text-sm text-gray-300 group">
-                    <span className="text-green-400 group-hover:scale-110 transition-transform">🛡️</span>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400">🛡️</span>
                     <span>48-Hour Buyer Protection</span>
                   </div>
-                  <div className="flex items-center space-x-3 text-sm text-gray-300 group">
-                    <span className="text-green-400 group-hover:scale-110 transition-transform">💸</span>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400">💸</span>
                     <span>Money-Back Guarantee</span>
                   </div>
-                  <div className="flex items-center space-x-3 text-sm text-gray-300 group">
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
                     {cartItem.listing.delivery_type === 'automatic' ? (
                       <>
-                        <span className="text-green-400 group-hover:scale-110 transition-transform">⚡</span>
+                        <span className="text-green-400">⚡</span>
                         <span>Instant Delivery</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-blue-400 group-hover:scale-110 transition-transform">📦</span>
+                        <span className="text-blue-400">📦</span>
                         <span>Fast Delivery</span>
                       </>
                     )}
                   </div>
-                  <div className="flex items-center space-x-3 text-sm text-gray-300 group">
-                    <span className="text-green-400 group-hover:scale-110 transition-transform">🔒</span>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400">🔒</span>
                     <span>Secure Encrypted Payment</span>
                   </div>
-                  <div className="flex items-center space-x-3 text-sm text-gray-300 group">
-                    <span className="text-green-400 group-hover:scale-110 transition-transform">💬</span>
+                  <div className="flex items-center space-x-3 text-sm text-gray-300">
+                    <span className="text-green-400">💬</span>
                     <span>24/7 Customer Support</span>
                   </div>
                 </div>
@@ -1473,7 +1460,7 @@ export default function CheckoutPage() {
                   href="https://www.trustpilot.com/review/nashflare.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="mt-4 block bg-white/5 border border-white/10 rounded-xl p-3 hover:border-[#00B67A]/30 hover:bg-[#00B67A]/5 transition-all duration-300 group"
+                  className="mt-4 block bg-slate-800 border border-white/10 rounded-xl p-3 hover:border-[#00B67A]/30 transition-colors"
                 >
                   <div className="flex flex-col items-center gap-2">
                     <p className="text-gray-400 text-xs">Rated <span className="text-white font-semibold">Excellent</span> on</p>
@@ -1500,7 +1487,7 @@ export default function CheckoutPage() {
         </div>
 
         {/* Enhanced Mobile Fixed Bottom Bar */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/98 backdrop-blur-xl border-t border-white/10 z-40 safe-area-bottom">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-white/10 z-40 safe-area-bottom">
           {/* Trust Badge Strip */}
           <div className="flex items-center justify-center gap-4 py-2 px-3 bg-green-500/10 border-b border-green-500/20">
             <div className="flex items-center gap-1.5 text-green-400 text-xs">
@@ -1536,13 +1523,13 @@ export default function CheckoutPage() {
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
                     <p className="text-xs text-gray-400 mb-0.5">Total Price</p>
-                    <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                    <p className="text-xl sm:text-2xl font-bold text-green-400">
                       ${total.toFixed(2)}
                     </p>
                   </div>
                   <button
                     onClick={() => setShowMobileSummary(true)}
-                    className="bg-white/10 text-white px-3 py-2.5 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[44px] text-sm whitespace-nowrap"
+                    className="bg-slate-800 text-white px-3 py-2.5 rounded-xl font-semibold border border-white/20 min-h-[44px] text-sm whitespace-nowrap"
                   >
                     📋 Details
                   </button>
@@ -1550,7 +1537,7 @@ export default function CheckoutPage() {
                 <button
                   onClick={handlePlaceOrder}
                   disabled={cryptoLoading || !isFormValid}
-                  className="w-full py-3.5 rounded-xl font-bold transition-all duration-300 text-sm sm:text-base min-h-[48px] bg-gradient-to-r from-orange-500 to-yellow-500 text-white hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-xl font-bold transition-colors text-sm sm:text-base min-h-[48px] bg-gradient-to-r from-orange-500 to-yellow-500 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {cryptoLoading ? (
                     <>
@@ -1572,17 +1559,17 @@ export default function CheckoutPage() {
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <p className="text-xs text-gray-400 mb-0.5">Total Price</p>
-                  <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                  <p className="text-xl sm:text-2xl font-bold text-green-400">
                     ${total.toFixed(2)}
                   </p>
                 </div>
                 <button
                   onClick={() => setShowMobileSummary(true)}
-                  className="bg-white/10 text-white px-3 py-2.5 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[44px] text-sm whitespace-nowrap"
+                  className="bg-slate-800 text-white px-3 py-2.5 rounded-xl font-semibold border border-white/20 min-h-[44px] text-sm whitespace-nowrap"
                 >
                   📋 Details
                 </button>
-                <div className="bg-gradient-to-r from-blue-500/20 to-blue-600/20 text-blue-400 px-4 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap border border-blue-500/30 min-h-[44px] flex items-center gap-2">
+                <div className="bg-blue-500/20 text-blue-400 px-4 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap border border-blue-500/30 min-h-[44px] flex items-center gap-2">
                   <span>👆</span>
                   <span>Pay Above</span>
                 </div>
@@ -1594,17 +1581,17 @@ export default function CheckoutPage() {
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <p className="text-xs text-gray-400 mb-0.5">Total Price</p>
-                  <p className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                  <p className="text-xl sm:text-2xl font-bold text-green-400">
                     ${total.toFixed(2)}
                   </p>
                 </div>
                 <button
                   onClick={() => setShowMobileSummary(true)}
-                  className="bg-white/10 text-white px-3 py-2.5 rounded-xl font-semibold border border-white/20 hover:bg-white/20 transition-all duration-300 min-h-[44px] text-sm whitespace-nowrap"
+                  className="bg-slate-800 text-white px-3 py-2.5 rounded-xl font-semibold border border-white/20 min-h-[44px] text-sm whitespace-nowrap"
                 >
                   📋 Details
                 </button>
-                <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-400 px-4 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap border border-purple-500/30 min-h-[44px] flex items-center gap-2">
+                <div className="bg-purple-500/20 text-purple-400 px-4 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap border border-purple-500/30 min-h-[44px] flex items-center gap-2">
                   <span>💳</span>
                   <span>Select Payment</span>
                 </div>
@@ -1647,6 +1634,11 @@ export default function CheckoutPage() {
         }
         .paypal-buttons-wrapper {
           width: 100%;
+        }
+        /* GPU acceleration for smooth scrolling */
+        .transform-gpu {
+          transform: translateZ(0);
+          will-change: transform;
         }
       `}</style>
     </div>

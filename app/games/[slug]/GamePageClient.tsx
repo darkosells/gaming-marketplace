@@ -42,7 +42,7 @@ function getOptimizedImageUrl(url: string | null | undefined, options?: { width?
 
 function ListingCardSkeleton() {
   return (
-    <div className="bg-slate-900/50 border border-white/10 rounded-2xl overflow-hidden animate-pulse">
+    <div className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden animate-pulse">
       <div className="h-40 sm:h-48 bg-slate-800/50" />
       <div className="p-4 sm:p-5 space-y-3">
         <div className="h-3 w-20 bg-slate-700/50 rounded" />
@@ -90,7 +90,7 @@ function ListingImage({
   if (!src || imageError) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-        <span className="text-5xl sm:text-6xl group-hover:scale-125 transition-transform duration-300">
+        <span className="text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-300">
           {categoryEmoji}
         </span>
       </div>
@@ -103,7 +103,7 @@ function ListingImage({
       alt={alt}
       fill
       sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-      className="object-cover group-hover:scale-110 transition-transform duration-500"
+      className="object-cover group-hover:scale-105 transition-transform duration-300"
       onError={() => setImageError(true)}
       priority={priority}
       loading={priority ? 'eager' : 'lazy'}
@@ -377,17 +377,11 @@ function GamePageContent({ slug }: Props) {
       ? accountGameTags[game.name] || []
       : itemsGameTags[game.name] || []
 
-    if (tagSearchQuery) {
-      return tags.filter(tag => 
-        tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
-      )
-    }
-
     return tags
   }
 
   const shouldShowTags = () => {
-    return (selectedCategory === 'account' || selectedCategory === 'items') && game
+    return (selectedCategory === 'account' || selectedCategory === 'items') && game && getAvailableTags().length > 0
   }
 
   const toggleTag = (tag: string) => {
@@ -443,7 +437,7 @@ function GamePageContent({ slug }: Props) {
         key="prev"
         onClick={() => goToPage(currentPage - 1)}
         disabled={currentPage === 1}
-        className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-300 min-h-[44px] text-sm sm:text-base ${
+        className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-200 min-h-[44px] text-sm sm:text-base ${
           currentPage === 1
             ? 'bg-slate-800/50 text-gray-600 cursor-not-allowed'
             : 'bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white'
@@ -459,7 +453,7 @@ function GamePageContent({ slug }: Props) {
         <button
           key={1}
           onClick={() => goToPage(1)}
-          className="px-3 sm:px-4 py-2 rounded-lg font-medium bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white transition-all duration-300 min-h-[44px] text-sm sm:text-base"
+          className="px-3 sm:px-4 py-2 rounded-lg font-medium bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white transition-all duration-200 min-h-[44px] text-sm sm:text-base"
         >
           1
         </button>
@@ -478,9 +472,9 @@ function GamePageContent({ slug }: Props) {
         <button
           key={i}
           onClick={() => goToPage(i)}
-          className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-300 min-h-[44px] text-sm sm:text-base ${
+          className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-200 min-h-[44px] text-sm sm:text-base ${
             currentPage === i
-              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
               : 'bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white'
           }`}
         >
@@ -501,7 +495,7 @@ function GamePageContent({ slug }: Props) {
         <button
           key={totalPages}
           onClick={() => goToPage(totalPages)}
-          className="px-3 sm:px-4 py-2 rounded-lg font-medium bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white transition-all duration-300 min-h-[44px] text-sm sm:text-base"
+          className="px-3 sm:px-4 py-2 rounded-lg font-medium bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white transition-all duration-200 min-h-[44px] text-sm sm:text-base"
         >
           {totalPages}
         </button>
@@ -513,7 +507,7 @@ function GamePageContent({ slug }: Props) {
         key="next"
         onClick={() => goToPage(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-300 min-h-[44px] text-sm sm:text-base ${
+        className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-200 min-h-[44px] text-sm sm:text-base ${
           currentPage === totalPages
             ? 'bg-slate-800/50 text-gray-600 cursor-not-allowed'
             : 'bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white'
@@ -531,7 +525,7 @@ function GamePageContent({ slug }: Props) {
     )
   }
 
-  // Filter sidebar content
+  // Filter sidebar content - REMOVED TAGS SECTION (moved above products)
   const FilterContent = () => (
     <>
       <div className="flex items-center justify-between mb-6">
@@ -552,7 +546,7 @@ function GamePageContent({ slug }: Props) {
         <select
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+          className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-200 hover:border-purple-500/30"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
             backgroundRepeat: 'no-repeat',
@@ -580,7 +574,7 @@ function GamePageContent({ slug }: Props) {
           <select
             value={selectedPlatform}
             onChange={(e) => setSelectedPlatform(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+            className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-200 hover:border-purple-500/30"
             style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
               backgroundRepeat: 'no-repeat',
@@ -610,7 +604,7 @@ function GamePageContent({ slug }: Props) {
             <select
               value={selectedValorantRegion}
               onChange={(e) => setSelectedValorantRegion(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+              className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-200 hover:border-purple-500/30"
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                 backgroundRepeat: 'no-repeat',
@@ -636,7 +630,7 @@ function GamePageContent({ slug }: Props) {
             <select
               value={selectedValorantRank}
               onChange={(e) => setSelectedValorantRank(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+              className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-200 hover:border-purple-500/30"
               style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                 backgroundRepeat: 'no-repeat',
@@ -666,7 +660,7 @@ function GamePageContent({ slug }: Props) {
           <select
             value={selectedLolServer}
             onChange={(e) => setSelectedLolServer(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+            className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-200 hover:border-purple-500/30"
             style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
               backgroundRepeat: 'no-repeat',
@@ -683,80 +677,6 @@ function GamePageContent({ slug }: Props) {
         </div>
       )}
 
-      {/* Tags Section */}
-      {shouldShowTags() && (
-        <div className="mb-6">
-          <label className="block text-white font-semibold mb-3 text-sm flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-              Tags
-            </span>
-            {selectedTags.length > 0 && (
-              <button
-                onClick={() => setSelectedTags([])}
-                className="text-xs text-purple-400 hover:text-purple-300 transition"
-              >
-                Clear ({selectedTags.length})
-              </button>
-            )}
-          </label>
-
-          <div className="relative mb-3">
-            <input
-              type="text"
-              value={tagSearchQuery}
-              onChange={(e) => setTagSearchQuery(e.target.value)}
-              placeholder="Search tags..."
-              className="w-full px-4 py-2 pl-10 rounded-lg bg-slate-800/80 border border-white/10 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50"
-            />
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-
-          {selectedTags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3 p-3 bg-purple-500/5 rounded-lg border border-purple-500/20">
-              {selectedTags.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => removeTag(tag)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg text-xs text-purple-300 transition group"
-                >
-                  <span>{tag}</span>
-                  <svg className="w-3.5 h-3.5 group-hover:text-red-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="max-h-60 overflow-y-auto space-y-1.5 pr-2 custom-scrollbar">
-            {getAvailableTags().length > 0 ? (
-              getAvailableTags().map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className={`w-full px-3 py-2 rounded-lg text-sm text-left transition-all duration-200 ${
-                    selectedTags.includes(tag)
-                      ? 'bg-purple-500/20 border border-purple-500/40 text-purple-300 font-medium'
-                      : 'bg-slate-800/50 border border-white/10 text-gray-300 hover:bg-slate-800/80 hover:border-purple-500/20'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-4">
-                {tagSearchQuery ? 'No tags found' : 'Select a category to see tags'}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Delivery Type Filter */}
       <div className="mb-6">
         <label className="block text-white font-semibold mb-3 text-sm flex items-center gap-2">
@@ -768,7 +688,7 @@ function GamePageContent({ slug }: Props) {
         <select
           value={selectedDeliveryType}
           onChange={(e) => setSelectedDeliveryType(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+          className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-200 hover:border-purple-500/30"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
             backgroundRepeat: 'no-repeat',
@@ -789,7 +709,7 @@ function GamePageContent({ slug }: Props) {
         <select
           value={priceRange}
           onChange={(e) => setPriceRange(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30"
+          className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-200 hover:border-purple-500/30"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
             backgroundRepeat: 'no-repeat',
@@ -839,11 +759,11 @@ function GamePageContent({ slug }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-      {/* PERFORMANCE OPTIMIZED: Simplified static background - no animations */}
+      {/* PERFORMANCE OPTIMIZED: Reduced blur intensity for better performance */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]" />
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px]" />
-        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px]" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl" />
+        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/15 rounded-full blur-3xl" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
       </div>
 
@@ -892,9 +812,9 @@ function GamePageContent({ slug }: Props) {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium transition-all duration-300 text-sm sm:text-base min-h-[36px] sm:min-h-[40px] ${
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium transition-all duration-200 text-sm sm:text-base min-h-[36px] sm:min-h-[40px] ${
                   selectedCategory === cat
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30'
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
                     : 'bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white'
                 }`}
               >
@@ -904,7 +824,7 @@ function GamePageContent({ slug }: Props) {
             {selectedCategory !== 'all' && (
               <button
                 onClick={() => setSelectedCategory('all')}
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white transition-all duration-300 text-sm sm:text-base min-h-[36px] sm:min-h-[40px]"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full font-medium bg-slate-800/50 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white transition-all duration-200 text-sm sm:text-base min-h-[36px] sm:min-h-[40px]"
               >
                 Show All
               </button>
@@ -912,9 +832,9 @@ function GamePageContent({ slug }: Props) {
           </div>
 
           <div className="flex flex-col lg:flex-row gap-6 sm:gap-8">
-            {/* Desktop Filters Sidebar */}
+            {/* Desktop Filters Sidebar - PERFORMANCE: Removed backdrop-blur */}
             <aside className="hidden lg:block w-72 flex-shrink-0" role="complementary" aria-label="Filters">
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-all duration-300">
+              <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-colors duration-200">
                 <FilterContent />
               </div>
             </aside>
@@ -922,7 +842,7 @@ function GamePageContent({ slug }: Props) {
             {/* Mobile Filter Button */}
             <button
               onClick={() => setMobileFiltersOpen(true)}
-              className="lg:hidden fixed bottom-6 right-6 z-40 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-4 rounded-full shadow-2xl shadow-purple-500/50 font-semibold flex items-center gap-2 hover:scale-105 transition-transform duration-300"
+              className="lg:hidden fixed bottom-6 right-6 z-40 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-4 rounded-full shadow-xl font-semibold flex items-center gap-2 hover:scale-105 transition-transform duration-200"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -935,15 +855,15 @@ function GamePageContent({ slug }: Props) {
               )}
             </button>
 
-            {/* Mobile Filters Modal */}
+            {/* Mobile Filters Modal - PERFORMANCE: Removed backdrop-blur */}
             {mobileFiltersOpen && (
               <div className="lg:hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
                 <div 
-                  className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                  className="absolute inset-0 bg-black/80"
                   onClick={() => setMobileFiltersOpen(false)}
                 />
                 
-                <div className="relative w-full sm:max-w-lg sm:mx-4 bg-slate-900/95 backdrop-blur-xl border-t sm:border border-white/10 rounded-t-3xl sm:rounded-2xl max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
+                <div className="relative w-full sm:max-w-lg sm:mx-4 bg-slate-900/98 border-t sm:border border-white/10 rounded-t-3xl sm:rounded-2xl max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
                   <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10 bg-gradient-to-r from-purple-500/10 to-pink-500/10">
                     <h2 className="text-xl font-bold text-white">Filters</h2>
                     <button 
@@ -963,7 +883,7 @@ function GamePageContent({ slug }: Props) {
                   <div className="p-4 sm:p-6 border-t border-white/10 bg-slate-800/50">
                     <button
                       onClick={() => setMobileFiltersOpen(false)}
-                      className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 min-h-[48px]"
+                      className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3.5 rounded-xl font-semibold hover:shadow-lg transition-shadow duration-200 min-h-[48px]"
                     >
                       Apply Filters
                     </button>
@@ -974,18 +894,18 @@ function GamePageContent({ slug }: Props) {
 
             {/* Main Content */}
             <section className="flex-1 min-w-0" aria-label={`${game.name} listings`}>
-              {/* Search Bar & Sort */}
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-6 hover:border-purple-500/30 transition-all duration-300">
+              {/* Search Bar & Sort - PERFORMANCE: Removed backdrop-blur */}
+              <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-6 hover:border-purple-500/30 transition-colors duration-200">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <div className="flex-1 relative group">
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300" />
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl blur opacity-0 group-hover:opacity-20 transition duration-200" />
                     <div className="relative">
                       <input 
                         type="text" 
                         value={searchQuery} 
                         onChange={(e) => setSearchQuery(e.target.value)} 
                         placeholder="Search listings..." 
-                        className="w-full px-4 py-3 pl-11 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300" 
+                        className="w-full px-4 py-3 pl-11 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-200" 
                       />
                       <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -995,7 +915,7 @@ function GamePageContent({ slug }: Props) {
                   <select 
                     value={sortBy} 
                     onChange={(e) => setSortBy(e.target.value)} 
-                    className="px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-300 hover:border-purple-500/30 sm:min-w-[200px]" 
+                    className="px-4 py-3 rounded-xl bg-slate-800/80 border border-white/10 text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 appearance-none cursor-pointer transition-all duration-200 hover:border-purple-500/30 sm:min-w-[200px]" 
                     style={{ 
                       backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, 
                       backgroundRepeat: 'no-repeat', 
@@ -1087,12 +1007,46 @@ function GamePageContent({ slug }: Props) {
                 )}
               </div>
 
+              {/* Tags Section - NEW: Horizontal clickable tags above products */}
+              {shouldShowTags() && (
+                <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-6">
+                  <div className="flex flex-wrap gap-2">
+                    {getAvailableTags().map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => toggleTag(tag)}
+                        className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
+                          selectedTags.includes(tag)
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-slate-800/80 text-gray-300 border border-white/10 hover:border-purple-500/30 hover:text-white'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedTags.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
+                      <span className="text-xs text-gray-400">
+                        {selectedTags.length} tag{selectedTags.length > 1 ? 's' : ''} selected
+                      </span>
+                      <button
+                        onClick={() => setSelectedTags([])}
+                        className="text-xs text-purple-400 hover:text-purple-300 transition font-medium"
+                      >
+                        Clear tags
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Listings Grid */}
               {loading ? (
                 // PERFORMANCE: Skeleton loading instead of spinner
                 <ListingGridSkeleton />
               ) : filteredListings.length === 0 ? (
-                <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 sm:p-12 text-center">
+                <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-8 sm:p-12 text-center">
                   <div className="text-5xl sm:text-6xl mb-4" aria-hidden="true">
                     🔍
                   </div>
@@ -1104,7 +1058,7 @@ function GamePageContent({ slug }: Props) {
                   </p>
                   <button
                     onClick={resetFilters}
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 sm:px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 min-h-[48px]"
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 sm:px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition-shadow duration-200 hover:scale-105 min-h-[48px]"
                   >
                     Reset Filters
                   </button>
@@ -1114,9 +1068,8 @@ function GamePageContent({ slug }: Props) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6" role="list">
                     {currentListings.map((listing, index) => (
                       <Link key={listing.id} href={`/listing/${listing.id}`} className="group h-full" role="listitem">
-                        <article className="relative h-full flex flex-col bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all duration-500 hover:shadow-2xl hover:shadow-purple-500/20 hover:-translate-y-1 sm:hover:-translate-y-2">
-                          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/0 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-500" />
-
+                        {/* PERFORMANCE: Added contain for paint isolation, removed backdrop-blur, simplified animations */}
+                        <article className="listing-card relative h-full flex flex-col bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-colors duration-200 hover:shadow-xl hover:-translate-y-1">
                           <div className="relative h-40 sm:h-48 flex-shrink-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
                             {/* PERFORMANCE: Next.js Image with priority for first 3 items */}
                             <ListingImage
@@ -1126,9 +1079,9 @@ function GamePageContent({ slug }: Props) {
                               priority={index < 3}
                             />
                             
-                            {/* Category Badge */}
+                            {/* Category Badge - PERFORMANCE: Removed backdrop-blur */}
                             <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
-                              <span className="bg-black/60 backdrop-blur-lg px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold border border-white/10">
+                              <span className="bg-black/70 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold border border-white/10">
                                 {listing.category === 'account'
                                   ? '🎮 Account'
                                   : listing.category === 'items'
@@ -1138,10 +1091,10 @@ function GamePageContent({ slug }: Props) {
                                   : '🔑 Key'}
                               </span>
                             </div>
-                            {/* Delivery Badge */}
+                            {/* Delivery Badge - PERFORMANCE: Removed backdrop-blur */}
                             {listing.delivery_type === 'automatic' && (
                               <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10">
-                                <span className="bg-green-500/80 backdrop-blur-lg px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
+                                <span className="bg-green-500/90 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                   </svg>
@@ -1152,7 +1105,7 @@ function GamePageContent({ slug }: Props) {
                           </div>
                           <div className="relative p-4 sm:p-5 flex flex-col flex-grow">
                             <p className="text-purple-400 text-xs sm:text-sm font-semibold mb-1">{game.name}</p>
-                            <h3 className="text-white font-bold text-base sm:text-lg mb-2 group-hover:text-purple-400 transition line-clamp-1">
+                            <h3 className="text-white font-bold text-base sm:text-lg mb-2 group-hover:text-purple-400 transition-colors duration-200 line-clamp-1">
                               {listing.title}
                             </h3>
                             <p className="text-gray-400 text-xs sm:text-sm mb-3 line-clamp-2">{listing.description}</p>
@@ -1208,7 +1161,7 @@ function GamePageContent({ slug }: Props) {
           {/* SEO Content Section */}
           {seoContent && (
             <section className="mt-12 sm:mt-16" aria-label={`About ${game.name} on Nashflare`}>
-              <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all duration-300">
+              <div className="bg-slate-900/90 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-colors duration-200">
                 <div className="px-4 sm:px-6 md:px-8 py-6 sm:py-8">
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 sm:mb-4">
                     {seoContent.mainTitle}
@@ -1264,7 +1217,7 @@ function GamePageContent({ slug }: Props) {
         <Footer />
       </div>
 
-      {/* Custom Scrollbar Styles */}
+      {/* Custom Scrollbar Styles + Performance Optimizations */}
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
@@ -1292,6 +1245,11 @@ function GamePageContent({ slug }: Props) {
         }
         .animate-slide-up {
           animation: slide-up 0.3s ease-out;
+        }
+        /* PERFORMANCE: CSS containment for listing cards */
+        .listing-card {
+          contain: layout style paint;
+          will-change: transform;
         }
       `}</style>
     </div>

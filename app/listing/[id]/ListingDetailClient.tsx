@@ -1,7 +1,7 @@
 // app/listing/[id]/ListingDetailClient.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
@@ -77,6 +77,42 @@ interface Props {
   unavailableReason?: UnavailableReason
 }
 
+// Optimized star data - reduced from 15 to 6 stars
+const STAR_DATA = [
+  { top: 10, left: 20, duration: 3, delay: 0 },
+  { top: 25, left: 60, duration: 4, delay: 0.5 },
+  { top: 35, left: 80, duration: 2.5, delay: 1 },
+  { top: 15, left: 45, duration: 3.5, delay: 1.5 },
+  { top: 45, left: 15, duration: 4.5, delay: 0.8 },
+  { top: 8, left: 70, duration: 3.2, delay: 1.2 },
+]
+
+// Memoized Background Component - prevents re-renders
+const CosmicBackground = () => (
+  <div className="fixed inset-0 z-0 will-change-transform">
+    <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
+    <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+    {/* Reduced blur from 150px to 60px for better performance */}
+    <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[60px] motion-reduce:animate-none animate-pulse-slow"></div>
+    <div className="absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/10 rounded-full blur-[50px] motion-reduce:animate-none animate-pulse-slow" style={{ animationDelay: '1s' }}></div>
+    <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
+    
+    {/* Reduced star count for performance */}
+    {STAR_DATA.map((star, i) => (
+      <div
+        key={i}
+        className="absolute w-1 h-1 bg-white rounded-full motion-reduce:opacity-50 motion-reduce:animate-none animate-pulse-slow"
+        style={{
+          top: `${star.top}%`,
+          left: `${star.left}%`,
+          animationDuration: `${star.duration}s`,
+          animationDelay: `${star.delay}s`
+        }}
+      />
+    ))}
+  </div>
+)
+
 // Unavailable Page Component
 function ListingUnavailablePage({ 
   listing, 
@@ -134,7 +170,7 @@ function ListingUnavailablePage({
     }
   }
 
-  const getReasonContent = () => {
+  const content = useMemo(() => {
     switch (reason) {
       case 'out_of_stock':
         return {
@@ -174,10 +210,8 @@ function ListingUnavailablePage({
           showNotifyButton: false
         }
     }
-  }
+  }, [reason, listing?.title])
 
-  const content = getReasonContent()
-  
   const colorClasses = {
     yellow: {
       bg: 'from-yellow-500/10 to-orange-500/10',
@@ -213,23 +247,18 @@ function ListingUnavailablePage({
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[150px] animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
-      </div>
+      <CosmicBackground />
 
       <div className="relative z-10">
         <Navigation />
 
         <div className="container mx-auto px-4 pt-24 pb-12">
           <div className="max-w-4xl mx-auto">
-            <div className={`bg-gradient-to-r ${colors.bg} backdrop-blur-xl border-2 ${colors.border} rounded-3xl p-6 sm:p-8 md:p-12 mb-8 text-center`}>
+            {/* Reduced backdrop-blur for performance */}
+            <div className={`bg-gradient-to-r ${colors.bg} backdrop-blur-md border-2 ${colors.border} rounded-3xl p-6 sm:p-8 md:p-12 mb-8 text-center`}>
               <div className="relative inline-block mb-6">
-                <div className={`absolute inset-0 bg-gradient-to-r ${colors.button} rounded-full blur-xl opacity-50 animate-pulse`}></div>
-                <div className="relative text-6xl sm:text-7xl md:text-8xl animate-bounce" style={{ animationDuration: '2s' }}>
+                <div className={`absolute inset-0 bg-gradient-to-r ${colors.button} rounded-full blur-xl opacity-50 motion-reduce:animate-none animate-pulse-slow`}></div>
+                <div className="relative text-6xl sm:text-7xl md:text-8xl motion-reduce:animate-none animate-bounce-slow">
                   {content.emoji}
                 </div>
               </div>
@@ -256,7 +285,8 @@ function ListingUnavailablePage({
                         <img 
                           src={listing.image_urls?.[0] || listing.image_url} 
                           alt={listing.title} 
-                          className="w-full h-full object-cover" 
+                          className="w-full h-full object-cover"
+                          loading="lazy"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -300,7 +330,7 @@ function ListingUnavailablePage({
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/browse"
-                  className={`w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r ${colors.button} text-white rounded-xl font-bold text-base sm:text-lg hover:shadow-lg transition-all hover:scale-105`}
+                  className={`w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r ${colors.button} text-white rounded-xl font-bold text-base sm:text-lg hover:shadow-lg transition-all duration-200 hover:scale-105`}
                 >
                   🔍 Browse Marketplace
                 </Link>
@@ -308,7 +338,7 @@ function ListingUnavailablePage({
                 {listing?.game && (
                   <Link
                     href={`/browse?game=${encodeURIComponent(listing.game)}`}
-                    className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-base sm:text-lg border border-white/20 transition-all hover:scale-105"
+                    className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-base sm:text-lg border border-white/20 transition-all duration-200 hover:scale-105"
                   >
                     🎮 More {listing.game}
                   </Link>
@@ -331,7 +361,7 @@ function ListingUnavailablePage({
             </div>
 
             {similarListings.length > 0 && (
-              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 md:p-8">
+              <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-4 sm:p-6 md:p-8">
                 <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-3">
                   <span className="text-purple-400">✨</span>
                   {listing?.game ? `More ${listing.game} Listings` : 'Similar Listings'}
@@ -346,7 +376,7 @@ function ListingUnavailablePage({
                       <Link
                         key={item.id}
                         href={`/listing/${item.id}`}
-                        className="group bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 hover:-translate-y-1"
+                        className="group bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 transition-all duration-200 hover:-translate-y-1"
                       >
                         <div className="aspect-square bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
                           {itemImage ? (
@@ -354,6 +384,7 @@ function ListingUnavailablePage({
                               src={itemImage}
                               alt={item.title}
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                              loading="lazy"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
@@ -444,7 +475,33 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
     return <ListingUnavailablePage listing={initialListing} reason={unavailableReason} />
   }
 
-  const isOwnListing = user && listing && listing.seller_id === user.id
+  // Memoized values to prevent recalculation
+  const isOwnListing = useMemo(() => user && listing && listing.seller_id === user.id, [user, listing])
+  
+  const profileData = listing?.profiles
+  const sellerUsername = profileData?.username || 'Unknown Seller'
+  const sellerId = profileData?.id || listing?.seller_id
+  const sellerRating = profileData?.average_rating || profileData?.rating || 0
+  const sellerTotalSales = profileData?.total_sales || 0
+  const sellerTotalReviews = profileData?.total_reviews || 0
+  const sellerVerified = profileData?.verified || false
+  const sellerAvatar = profileData?.avatar_url || null
+  const sellerRank: VendorRank = profileData?.vendor_rank || 'nova'
+  
+  const sellerJoinDate = useMemo(() => {
+    return profileData?.created_at 
+      ? new Date(profileData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      : 'Unknown'
+  }, [profileData?.created_at])
+
+  const images = useMemo(() => {
+    if (!listing) return []
+    return listing.image_urls && listing.image_urls.length > 0 
+      ? listing.image_urls 
+      : listing.image_url 
+        ? [listing.image_url]
+        : []
+  }, [listing?.image_urls, listing?.image_url])
 
   useEffect(() => {
     checkUser()
@@ -452,12 +509,12 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
     fetchSimilarListings()
   }, [])
 
-  const checkUser = async () => {
+  const checkUser = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     setUser(user)
-  }
+  }, [supabase])
 
-  const fetchSimilarListings = async () => {
+  const fetchSimilarListings = useCallback(async () => {
     if (!listing) return
 
     try {
@@ -495,9 +552,9 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
     } catch (error) {
       console.error('Error fetching similar listings:', error)
     }
-  }
+  }, [listing, supabase])
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     if (!listing?.seller_id) return
     
     try {
@@ -536,9 +593,9 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
     } catch (error) {
       console.error('Error fetching reviews:', error)
     }
-  }
+  }, [listing?.seller_id, supabase])
 
-  const handleBuyNow = () => {
+  const handleBuyNow = useCallback(() => {
     if (!user) {
       router.push('/login')
       return
@@ -566,9 +623,9 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
     window.dispatchEvent(new Event('cart-updated'))
     
     router.push('/cart')
-  }
+  }, [user, listing, quantity, router])
 
-  const handleAddToCart = () => {
+  const handleAddToCart = useCallback(() => {
     if (!user) {
       router.push('/login')
       return
@@ -617,9 +674,9 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
       type: 'success'
     })
     setShowModal(true)
-  }
+  }, [user, listing, quantity, router])
 
-  const handleContactSeller = async () => {
+  const handleContactSeller = useCallback(async () => {
     if (!user) {
       router.push('/login')
       return
@@ -660,34 +717,34 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
       })
       setShowModal(true)
     }
-  }
+  }, [user, listing, router, supabase])
+
+  // Memoized image navigation handlers
+  const handlePrevImage = useCallback(() => {
+    setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length)
+  }, [images.length])
+
+  const handleNextImage = useCallback(() => {
+    setActiveImageIndex((prev) => (prev + 1) % images.length)
+  }, [images.length])
 
   if (!listing) {
     return <ListingUnavailablePage listing={null} reason="not_found" />
   }
 
-  const profileData = listing.profiles
-  const sellerUsername = profileData?.username || 'Unknown Seller'
-  const sellerId = profileData?.id || listing.seller_id
-  const sellerRating = profileData?.average_rating || profileData?.rating || 0
-  const sellerTotalSales = profileData?.total_sales || 0
-  const sellerTotalReviews = profileData?.total_reviews || 0
-  const sellerVerified = profileData?.verified || false
-  const sellerAvatar = profileData?.avatar_url || null
-  const sellerRank: VendorRank = profileData?.vendor_rank || 'nova'
-  const sellerJoinDate = profileData?.created_at 
-    ? new Date(profileData.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    : 'Unknown'
-
-  const images = listing.image_urls && listing.image_urls.length > 0 
-    ? listing.image_urls 
-    : listing.image_url 
-      ? [listing.image_url]
-      : []
+  // Get category icon - memoized inline
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'account': return '🎮'
+      case 'currency': return '💰'
+      case 'items': return '🎒'
+      default: return '🔑'
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-      {/* Custom Modal */}
+      {/* Conditional Modal Rendering - Only mount when needed */}
       {showModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -710,7 +767,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
         </div>
       )}
 
-      {/* Money-Back Guarantee Info Modal */}
+      {/* Money-Back Guarantee Info Modal - Only mount when needed */}
       {showGuaranteeModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-slate-900 border border-white/20 rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -779,15 +836,15 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
         </div>
       )}
 
-      {/* Mobile Purchase Modal */}
+      {/* Mobile Purchase Modal - Only mount when needed */}
       {showMobilePurchase && (
         <div className="lg:hidden fixed inset-0 z-50 flex items-end">
           <div 
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             onClick={() => setShowMobilePurchase(false)}
           ></div>
-          <div className="relative w-full bg-slate-900/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-slide-up">
-            <div className="sticky top-0 bg-slate-900/95 backdrop-blur-xl border-b border-white/10 p-4 flex items-center justify-between">
+          <div className="relative w-full bg-slate-900/95 backdrop-blur-md border-t border-white/10 rounded-t-3xl max-h-[85vh] overflow-y-auto animate-slide-up will-change-transform">
+            <div className="sticky top-0 bg-slate-900/95 backdrop-blur-md border-b border-white/10 p-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white">Complete Purchase</h3>
               <button 
                 onClick={() => setShowMobilePurchase(false)}
@@ -833,21 +890,21 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                 <button
                   onClick={handleBuyNow}
                   disabled={listing.stock === 0 || isOwnListing}
-                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed min-h-[52px]"
+                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed min-h-[52px]"
                 >
                   {isOwnListing ? '🚫 Your Listing' : listing.stock === 0 ? '❌ Out of Stock' : '🚀 Buy Now'}
                 </button>
                 <button
                   onClick={handleAddToCart}
                   disabled={listing.stock === 0 || isOwnListing}
-                  className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-xl font-bold text-lg border-2 border-white/20 hover:border-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed min-h-[52px]"
+                  className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-xl font-bold text-lg border-2 border-white/20 hover:border-purple-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed min-h-[52px]"
                 >
                   {isOwnListing ? '🚫 Cannot Add' : '🛒 Add to Cart'}
                 </button>
                 {!isOwnListing && (
                   <button
                     onClick={handleContactSeller}
-                    className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 py-4 rounded-xl font-bold text-lg border-2 border-blue-500/50 transition-all duration-300 min-h-[52px]"
+                    className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 py-4 rounded-xl font-bold text-lg border-2 border-blue-500/50 transition-all duration-200 min-h-[52px]"
                   >
                     💬 Contact Seller
                   </button>
@@ -855,7 +912,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                 {isOwnListing && (
                   <Link
                     href="/dashboard?tab=listings"
-                    className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 py-4 rounded-xl font-bold text-lg border-2 border-purple-500/50 transition-all duration-300 min-h-[52px] flex items-center justify-center"
+                    className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 py-4 rounded-xl font-bold text-lg border-2 border-purple-500/50 transition-all duration-200 min-h-[52px] flex items-center justify-center"
                   >
                     ✏️ Edit in Dashboard
                   </Link>
@@ -894,43 +951,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
         </div>
       )}
 
-      {/* Cosmic Background */}
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-indigo-950/50 to-slate-950"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[150px] animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-[500px] h-[500px] bg-pink-600/15 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#6366f120_1px,transparent_1px),linear-gradient(to_bottom,#6366f120_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_40%,transparent_100%)]"></div>
-        
-        {[
-          { top: 10, left: 20, duration: 3, delay: 0 },
-          { top: 25, left: 60, duration: 4, delay: 0.5 },
-          { top: 35, left: 80, duration: 2.5, delay: 1 },
-          { top: 15, left: 45, duration: 3.5, delay: 1.5 },
-          { top: 45, left: 15, duration: 4.5, delay: 0.8 },
-          { top: 5, left: 70, duration: 3.2, delay: 1.2 },
-          { top: 40, left: 35, duration: 2.8, delay: 0.3 },
-          { top: 20, left: 90, duration: 4.2, delay: 1.8 },
-          { top: 48, left: 25, duration: 3.8, delay: 0.6 },
-          { top: 8, left: 55, duration: 2.6, delay: 1.4 },
-          { top: 30, left: 75, duration: 3.3, delay: 0.9 },
-          { top: 42, left: 50, duration: 4.8, delay: 1.6 },
-          { top: 18, left: 85, duration: 2.9, delay: 0.4 },
-          { top: 38, left: 10, duration: 3.6, delay: 1.1 },
-          { top: 12, left: 95, duration: 4.4, delay: 1.9 },
-        ].map((star, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
-            style={{
-              top: `${star.top}%`,
-              left: `${star.left}%`,
-              animationDuration: `${star.duration}s`,
-              animationDelay: `${star.delay}s`
-            }}
-          />
-        ))}
-      </div>
+      {/* Optimized Cosmic Background */}
+      <CosmicBackground />
 
       {/* Content */}
       <div className="relative z-10">
@@ -973,8 +995,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
           <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {/* Left Column - Product Info */}
             <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-              {/* Main Product Card */}
-              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all duration-300">
+              {/* Main Product Card - Reduced backdrop-blur */}
+              <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all duration-200">
                 {/* Image Gallery */}
                 <div className="relative h-64 sm:h-80 lg:h-96 bg-gradient-to-br from-purple-500/20 to-pink-500/20">
                   {images.length > 0 ? (
@@ -983,17 +1005,18 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                         src={images[activeImageIndex]}
                         alt={listing.title}
                         className="w-full h-full object-cover"
+                        loading="eager"
                       />
                       {images.length > 1 && (
                         <>
                           <button
-                            onClick={() => setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length)}
+                            onClick={handlePrevImage}
                             className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition min-w-[40px] min-h-[40px]"
                           >
                             ←
                           </button>
                           <button
-                            onClick={() => setActiveImageIndex((prev) => (prev + 1) % images.length)}
+                            onClick={handleNextImage}
                             className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition min-w-[40px] min-h-[40px]"
                           >
                             →
@@ -1015,23 +1038,23 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <span className="text-6xl sm:text-7xl lg:text-9xl">
-                        {listing.category === 'account' ? '🎮' : listing.category === 'currency' ? '💰' : '🔑'}
+                        {getCategoryIcon(listing.category)}
                       </span>
                     </div>
                   )}
                   <div className="absolute top-2 sm:top-4 left-2 sm:left-4 flex flex-wrap gap-1.5 sm:gap-2">
-                    <span className="bg-black/50 backdrop-blur-lg px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold">
+                    <span className="bg-black/50 backdrop-blur-sm px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold">
                       {listing.category === 'account' ? '🎮 Account' : listing.category === 'currency' ? '💰 Currency' : listing.category === 'items' ? '🎒 Items' : '🔑 Game Key'}
                     </span>
                     {listing.delivery_type === 'automatic' && (
-                      <span className="bg-green-500/80 backdrop-blur-lg px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold flex items-center gap-1">
+                      <span className="bg-green-500/80 backdrop-blur-sm px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold flex items-center gap-1">
                         ⚡ Instant
                       </span>
                     )}
                   </div>
                   {isOwnListing && (
                     <div className="absolute top-2 sm:top-4 right-2 sm:right-4">
-                      <span className="bg-yellow-500/80 backdrop-blur-lg px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold">
+                      <span className="bg-yellow-500/80 backdrop-blur-sm px-2.5 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm text-white font-semibold">
                         👤 Your Listing
                       </span>
                     </div>
@@ -1179,7 +1202,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
 
               {/* Similar Products Section */}
               {similarListings.length > 0 && (
-                <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 lg:p-8 hover:border-purple-500/30 transition-all duration-300">
+                <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-4 sm:p-6 lg:p-8 hover:border-purple-500/30 transition-all duration-200">
                   <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                     <span className="text-purple-400">✨</span>
                     Similar Products
@@ -1194,18 +1217,19 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                         <Link
                           key={item.id}
                           href={`/listing/${item.id}`}
-                          className="bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 hover:bg-slate-800/80 transition-all duration-300 group hover:-translate-y-1"
+                          className="bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden hover:border-purple-500/50 hover:bg-slate-800/80 transition-all duration-200 group hover:-translate-y-1"
                         >
                           <div className="relative aspect-square bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
                             {itemImage ? (
                               <img
                                 src={itemImage}
                                 alt={item.title}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                loading="lazy"
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-3xl sm:text-4xl group-hover:scale-125 transition-transform duration-300">
-                                {item.category === 'account' ? '🎮' : item.category === 'currency' ? '💰' : '🔑'}
+                              <div className="w-full h-full flex items-center justify-center text-3xl sm:text-4xl group-hover:scale-125 transition-transform duration-200">
+                                {getCategoryIcon(item.category)}
                               </div>
                             )}
                             {item.game === listing.game && (
@@ -1239,7 +1263,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
               )}
 
               {/* Seller Reviews Section */}
-              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 lg:p-8 hover:border-purple-500/30 transition-all duration-300">
+              <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-4 sm:p-6 lg:p-8 hover:border-purple-500/30 transition-all duration-200">
                 <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center gap-2">
                   <span className="text-purple-400">⭐</span>
                   Seller Reviews
@@ -1294,8 +1318,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
 
             {/* Right Column - Purchase & Seller (Desktop) */}
             <div className="hidden lg:block space-y-6">
-              {/* Purchase Card */}
-              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-all duration-300">
+              {/* Purchase Card - Reduced backdrop-blur */}
+              <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-6 sticky top-24 hover:border-purple-500/30 transition-all duration-200">
                 {isOwnListing && (
                   <div className="mb-6 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
                     <div className="flex items-center gap-3">
@@ -1330,21 +1354,21 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   <button
                     onClick={handleBuyNow}
                     disabled={listing.stock === 0 || isOwnListing}
-                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] disabled:hover:scale-100"
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] disabled:hover:scale-100"
                   >
                     {isOwnListing ? '🚫 Your Listing' : listing.stock === 0 ? '❌ Out of Stock' : '🚀 Buy Now'}
                   </button>
                   <button
                     onClick={handleAddToCart}
                     disabled={listing.stock === 0 || isOwnListing}
-                    className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-xl font-bold text-lg border-2 border-white/20 hover:border-purple-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] disabled:hover:scale-100"
+                    className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-xl font-bold text-lg border-2 border-white/20 hover:border-purple-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] disabled:hover:scale-100"
                   >
                     {isOwnListing ? '🚫 Cannot Add' : '🛒 Add to Cart'}
                   </button>
                   {!isOwnListing && (
                     <button
                       onClick={handleContactSeller}
-                      className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 py-4 rounded-xl font-bold text-lg border-2 border-blue-500/50 transition-all duration-300 hover:scale-[1.02]"
+                      className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 py-4 rounded-xl font-bold text-lg border-2 border-blue-500/50 transition-all duration-200 hover:scale-[1.02]"
                     >
                       💬 Contact Seller
                     </button>
@@ -1352,7 +1376,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   {isOwnListing && (
                     <Link
                       href="/dashboard?tab=listings"
-                      className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 py-4 rounded-xl font-bold text-lg border-2 border-purple-500/50 transition-all duration-300 hover:scale-[1.02] flex items-center justify-center"
+                      className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 py-4 rounded-xl font-bold text-lg border-2 border-purple-500/50 transition-all duration-200 hover:scale-[1.02] flex items-center justify-center"
                     >
                       ✏️ Edit in Dashboard
                     </Link>
@@ -1403,8 +1427,8 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                 )}
               </div>
 
-              {/* Seller Info Card (Desktop) */}
-              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-300">
+              {/* Seller Info Card (Desktop) - Reduced backdrop-blur */}
+              <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-6 hover:border-purple-500/30 transition-all duration-200">
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   <span className="text-purple-400">👤</span>
                   Seller Information
@@ -1417,6 +1441,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                         src={sellerAvatar} 
                         alt={sellerUsername}
                         className="w-full h-full object-cover"
+                        loading="lazy"
                       />
                     ) : (
                       <span className="text-white font-bold text-2xl">
@@ -1475,7 +1500,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
 
                 <Link
                   href={`/seller/${sellerId}`}
-                  className="block w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-white py-3 rounded-xl font-semibold text-center border-2 border-purple-500/50 transition-all duration-300 hover:scale-[1.02]"
+                  className="block w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-white py-3 rounded-xl font-semibold text-center border-2 border-purple-500/50 transition-all duration-200 hover:scale-[1.02]"
                 >
                   View Full Profile →
                 </Link>
@@ -1483,7 +1508,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
             </div>
 
             {/* Mobile Seller Info Card */}
-            <div className="lg:hidden bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300">
+            <div className="lg:hidden bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-200">
               <h3 className="text-lg sm:text-xl font-bold text-white mb-4 flex items-center gap-2">
                 <span className="text-purple-400">👤</span>
                 Seller Information
@@ -1496,6 +1521,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                       src={sellerAvatar} 
                       alt={sellerUsername}
                       className="w-full h-full object-cover"
+                      loading="lazy"
                     />
                   ) : (
                     <span className="text-white font-bold text-lg sm:text-2xl">
@@ -1550,7 +1576,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
 
               <Link
                 href={`/seller/${sellerId}`}
-                className="block w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-white py-3 rounded-xl font-semibold text-center border-2 border-purple-500/50 transition-all duration-300 text-sm sm:text-base min-h-[48px] flex items-center justify-center"
+                className="block w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-white py-3 rounded-xl font-semibold text-center border-2 border-purple-500/50 transition-all duration-200 text-sm sm:text-base min-h-[48px] flex items-center justify-center"
               >
                 View Full Profile →
               </Link>
@@ -1559,7 +1585,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
         </div>
 
         {/* Mobile Fixed Bottom Bar */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md border-t border-white/10 p-3 sm:p-4 z-40 safe-area-bottom">
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <p className="text-xs text-gray-400 mb-0.5">Price</p>
@@ -1571,7 +1597,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
             {isOwnListing ? (
               <Link
                 href="/dashboard?tab=listings"
-                className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold hover:shadow-lg transition-all duration-300 whitespace-nowrap min-h-[48px] text-sm sm:text-base flex items-center"
+                className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold hover:shadow-lg transition-all duration-200 whitespace-nowrap min-h-[48px] text-sm sm:text-base flex items-center"
               >
                 ✏️ Edit Listing
               </Link>
@@ -1579,7 +1605,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
               <button
                 onClick={() => setShowMobilePurchase(true)}
                 disabled={listing.stock === 0}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap min-h-[48px] text-sm sm:text-base"
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap min-h-[48px] text-sm sm:text-base"
               >
                 {listing.stock === 0 ? '❌ Out of Stock' : '🚀 Purchase'}
               </button>
@@ -1609,10 +1635,36 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
           }
         }
         .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
+          animation: slide-up 0.2s ease-out;
         }
         .safe-area-bottom {
           padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+        }
+        /* Slower, more performant animations */
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 4s ease-in-out infinite;
+        }
+        @keyframes bounce-slow {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-slow {
+          animation: bounce-slow 3s ease-in-out infinite;
+        }
+        /* Respect user's motion preferences */
+        @media (prefers-reduced-motion: reduce) {
+          .animate-pulse-slow,
+          .animate-bounce-slow,
+          .animate-slide-up {
+            animation: none !important;
+          }
+          * {
+            transition-duration: 0.01ms !important;
+          }
         }
       `}</style>
     </div>
