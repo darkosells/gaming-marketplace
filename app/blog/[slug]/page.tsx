@@ -81,7 +81,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-// Dynamic content loader - ALL 12 POSTS
+// Dynamic content loader - ALL 14 POSTS
 async function getPostContent(slug: string): Promise<string | null> {
   try {
     switch (slug) {
@@ -102,7 +102,7 @@ async function getPostContent(slug: string): Promise<string | null> {
         return (await import('@/lib/blog/content/gaming-marketplace-safety-avoiding-scams')).content
       case 'best-gaming-accounts-to-buy-2024':
         return (await import('@/lib/blog/content/best-gaming-accounts-to-buy-2024')).content
-      // NEW 4 posts
+      // 4 posts added previously
       case 'how-to-sell-gaming-account-complete-guide':
         return (await import('@/lib/blog/content/how-to-sell-gaming-account-complete-guide')).content
       case 'is-buying-gaming-accounts-legal':
@@ -111,6 +111,11 @@ async function getPostContent(slug: string): Promise<string | null> {
         return (await import('@/lib/blog/content/how-much-is-my-fortnite-account-worth')).content
       case 'gta-5-modded-cars-outfits-guide':
         return (await import('@/lib/blog/content/gta-5-modded-cars-outfits-guide')).content
+      // NEW 2 VALUATION POSTS
+      case 'how-much-is-my-valorant-account-worth':
+        return (await import('@/lib/blog/content/how-much-is-my-valorant-account-worth')).content
+      case 'how-much-is-my-roblox-account-worth':
+        return (await import('@/lib/blog/content/how-much-is-my-roblox-account-worth')).content
       default:
         return null
     }

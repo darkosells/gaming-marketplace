@@ -160,6 +160,33 @@ export const blogPostsMeta: BlogPostMeta[] = [
     tags: ['GTA 5', 'GTA Online', 'Modded Cars', 'Modded Outfits', 'Tryhard'],
     relevantCategories: ['account', 'items'],
   },
+  // 2 NEW VALUATION POSTS
+  {
+    slug: 'how-much-is-my-valorant-account-worth',
+    title: 'How Much Is My Valorant Account Worth? Complete Price Guide 2024',
+    excerpt: 'Calculate your Valorant account value with our comprehensive pricing guide. From Radiant ranks to rare skins, know exactly what your account is worth.',
+    category: 'Valuation',
+    game: 'Valorant',
+    author: 'Nashflare Team',
+    date: '2024-12-08',
+    readTime: '12 min read',
+    image: 'https://images.unsplash.com/photo-1542751110-97427bbecf20?w=1200&auto=format&fit=crop',
+    tags: ['Valorant', 'Account Value', 'Pricing', 'Ranked', 'Skins'],
+    relevantCategories: ['account', 'items'],
+  },
+  {
+    slug: 'how-much-is-my-roblox-account-worth',
+    title: 'How Much Is My Roblox Account Worth? Complete Price Guide 2024',
+    excerpt: 'Calculate your Roblox account value with our comprehensive pricing guide. From rare limiteds to RAP value, know exactly what your account is worth.',
+    category: 'Valuation',
+    game: 'Roblox',
+    author: 'Nashflare Team',
+    date: '2024-12-09',
+    readTime: '13 min read',
+    image: 'https://images.unsplash.com/photo-1493711662062-fa541f7f3d24?w=1200&auto=format&fit=crop',
+    tags: ['Roblox', 'Account Value', 'Pricing', 'Limiteds', 'RAP'],
+    relevantCategories: ['account', 'items', 'currency'],
+  },
 ]
 
 // Helper functions

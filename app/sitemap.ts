@@ -57,6 +57,15 @@ const blogPosts = [
     slug: 'gta-5-modded-cars-outfits-guide',
     lastModified: '2024-12-06',
   },
+  // New valuation posts added December 2024
+  {
+    slug: 'how-much-is-my-valorant-account-worth',
+    lastModified: '2024-12-08',
+  },
+  {
+    slug: 'how-much-is-my-roblox-account-worth',
+    lastModified: '2024-12-09',
+  },
 ]
 
 // Product categories with their slugs
@@ -191,7 +200,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Fetch all active listings (limit to most recent 10,000 for performance)
     const { data: listings, error: listingsError } = await supabase
       .from('listings')
-      .select('id, updated_at, game')
+      .select('id, created_at, game')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(10000)
@@ -199,7 +208,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!listingsError && listings) {
       listingPages = listings.map((listing) => ({
         url: `${baseUrl}/listing/${listing.id}`,
-        lastModified: new Date(listing.updated_at || Date.now()),
+        lastModified: new Date(listing.created_at || Date.now()),
         changeFrequency: 'weekly' as const,
         priority: 0.6,
       }))
@@ -208,7 +217,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Fetch verified vendor profiles (public profiles)
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, updated_at, username')
+      .select('id, created_at, username')
       .eq('role', 'vendor')
       .eq('verified', true)
       .not('username', 'is', null)
@@ -217,7 +226,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!profilesError && profiles) {
       profilePages = profiles.map((profile) => ({
         url: `${baseUrl}/seller/${profile.id}`,
-        lastModified: new Date(profile.updated_at || Date.now()),
+        lastModified: new Date(profile.created_at || Date.now()),
         changeFrequency: 'weekly' as const,
         priority: 0.5,
       }))
