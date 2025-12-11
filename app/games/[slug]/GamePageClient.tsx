@@ -107,7 +107,7 @@ function ListingImage({
       onError={() => setImageError(true)}
       priority={priority}
       loading={priority ? 'eager' : 'lazy'}
-      quality={80}
+      quality={75}
     />
   )
 }

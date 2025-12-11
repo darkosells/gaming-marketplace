@@ -18,25 +18,39 @@ const TOAST_DURATION = 4000
 const REDIRECT_DELAY = 2000
 
 // ============================================
-// MEMOIZED BACKGROUND COMPONENT
-// Prevents re-renders when parent state changes
+// OPTIMIZED BACKGROUND COMPONENT
+// Uses static gradients instead of heavy blur animations
 // ============================================
-const AnimatedBackground = memo(function AnimatedBackground() {
+const OptimizedBackground = memo(function OptimizedBackground() {
   return (
-    <div className="fixed inset-0 z-0 contain-strict">
+    <div className="fixed inset-0 z-0 overflow-hidden">
+      {/* Base gradient - no animation needed */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]" />
+      
+      {/* Static gradient orbs - reduced blur, no animation */}
       <div 
-        className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse will-change-transform gpu-accelerate"
-        style={{ contain: 'strict' }}
+        className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full opacity-20"
+        style={{ 
+          background: 'radial-gradient(circle, rgba(147,51,234,0.5) 0%, transparent 70%)',
+          transform: 'translateZ(0)',
+        }}
       />
       <div 
-        className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse will-change-transform gpu-accelerate"
-        style={{ animationDelay: '1s', contain: 'strict' }}
+        className="absolute top-3/4 right-1/4 w-[500px] h-[500px] rounded-full opacity-20"
+        style={{ 
+          background: 'radial-gradient(circle, rgba(219,39,119,0.5) 0%, transparent 70%)',
+          transform: 'translateZ(0)',
+        }}
       />
       <div 
-        className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px] animate-pulse will-change-transform gpu-accelerate"
-        style={{ animationDelay: '2s', contain: 'strict' }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full opacity-15"
+        style={{ 
+          background: 'radial-gradient(circle, rgba(59,130,246,0.5) 0%, transparent 70%)',
+          transform: 'translateZ(0)',
+        }}
       />
+      
+      {/* Grid overlay */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
     </div>
   )
@@ -50,12 +64,18 @@ const SuccessView = memo(function SuccessView() {
     <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]" />
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse" />
-        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div 
+          className="absolute top-1/4 left-1/4 w-[400px] h-[400px] rounded-full opacity-20"
+          style={{ background: 'radial-gradient(circle, rgba(147,51,234,0.5) 0%, transparent 70%)' }}
+        />
+        <div 
+          className="absolute top-3/4 right-1/4 w-[400px] h-[400px] rounded-full opacity-20"
+          style={{ background: 'radial-gradient(circle, rgba(219,39,119,0.5) 0%, transparent 70%)' }}
+        />
       </div>
 
       <div className="relative z-10 max-w-md w-full text-center">
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-12">
+        <div className="bg-slate-900/50 backdrop-blur-sm border border-white/10 rounded-2xl p-12">
           <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">✓</span>
           </div>
@@ -94,8 +114,8 @@ const Toast = memo(function Toast({ message, type }: ToastProps) {
   }, [type])
 
   return (
-    <div className="fixed top-6 right-6 z-50 transform transition-all duration-300 translate-x-0 opacity-100">
-      <div className={`rounded-xl p-4 shadow-2xl border backdrop-blur-xl min-w-[320px] ${styles.bg}`}>
+    <div className="fixed top-6 right-6 z-50">
+      <div className={`rounded-xl p-4 shadow-2xl border backdrop-blur-sm min-w-[320px] ${styles.bg}`}>
         <p className={`text-sm font-medium ${styles.text}`}>{message}</p>
       </div>
     </div>
@@ -140,7 +160,7 @@ const CodeInput = memo(function CodeInput({
       onChange={handleChange}
       onKeyDown={handleKeyDown}
       onPaste={index === 0 ? onPaste : undefined}
-      className="w-12 h-14 bg-slate-800/80 border border-white/10 rounded-xl text-center text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+      className="w-12 h-14 bg-slate-800/80 border border-white/10 rounded-xl text-center text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-colors duration-200"
       autoFocus={index === 0}
     />
   )
@@ -550,8 +570,8 @@ function VerifyEmailContent() {
       {/* Toast Notification */}
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      {/* Animated Background - Memoized */}
-      <AnimatedBackground />
+      {/* Optimized Background - No heavy blur animations */}
+      <OptimizedBackground />
 
       {/* Content */}
       <div className="relative z-10 max-w-md w-full">
@@ -563,10 +583,10 @@ function VerifyEmailContent() {
               alt="Nashflare"
               width={48}
               height={48}
-              className="transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300"
+              className="transform group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300"
               priority
             />
-            <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300" />
+            <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur-lg transition-opacity duration-300" />
           </div>
           <div className="flex flex-col">
             <span className="text-2xl font-black text-white tracking-tight">
@@ -591,7 +611,8 @@ function VerifyEmailContent() {
           </p>
         </div>
 
-        <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-all duration-300">
+        {/* Main card - reduced backdrop blur */}
+        <div className="bg-slate-900/60 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-purple-500/30 transition-colors duration-300">
           {error && (
             <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 mb-6">
               <p className="text-red-200 text-sm flex items-center gap-2">
@@ -625,7 +646,7 @@ function VerifyEmailContent() {
           <button
             onClick={() => handleVerify()}
             disabled={isVerifyDisabled}
-            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 mb-4"
+            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/30 transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 mb-4"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -641,7 +662,7 @@ function VerifyEmailContent() {
             <button
               onClick={handleResend}
               disabled={!canResend || resending}
-              className="text-purple-400 hover:text-purple-300 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="text-purple-400 hover:text-purple-300 font-semibold transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               {resending ? (
                 <span className="flex items-center justify-center gap-2">
@@ -659,9 +680,9 @@ function VerifyEmailContent() {
           {/* Not getting any code? Help Section */}
           <div className="mt-6 border-t border-white/10 pt-6">
             <details className="group">
-              <summary className="flex items-center justify-center gap-2 cursor-pointer text-gray-400 hover:text-gray-300 transition text-sm">
+              <summary className="flex items-center justify-center gap-2 cursor-pointer text-gray-400 hover:text-gray-300 transition-colors duration-200 text-sm">
                 <svg 
-                  className="w-4 h-4 transition-transform group-open:rotate-180" 
+                  className="w-4 h-4 transition-transform duration-200 group-open:rotate-180" 
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
@@ -727,7 +748,7 @@ function VerifyEmailContent() {
                   </p>
                   <button
                     onClick={handleOpenLiveChat}
-                    className="inline-flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 hover:border-white/20 rounded-full transition-all duration-300 group"
+                    className="inline-flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 hover:border-white/20 rounded-full transition-colors duration-200 group"
                   >
                     <div className="flex items-center gap-2.5">
                       {/* Chat bubble icon */}
@@ -745,7 +766,7 @@ function VerifyEmailContent() {
                     </div>
                     {/* Chevron */}
                     <svg 
-                      className="w-4 h-4 text-gray-500 group-hover:text-gray-400 transition-colors" 
+                      className="w-4 h-4 text-gray-500 group-hover:text-gray-400 transition-colors duration-200" 
                       fill="none" 
                       stroke="currentColor" 
                       viewBox="0 0 24 24"
@@ -763,7 +784,7 @@ function VerifyEmailContent() {
         <div className="text-center mt-6">
           <button
             onClick={handleSignOut}
-            className="text-gray-400 hover:text-purple-400 transition flex items-center justify-center gap-2 mx-auto"
+            className="text-gray-400 hover:text-purple-400 transition-colors duration-200 flex items-center justify-center gap-2 mx-auto"
           >
             <span>←</span> Verify Later (Sign Out)
           </button>
