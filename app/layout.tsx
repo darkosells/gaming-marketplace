@@ -6,6 +6,7 @@ import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import { siteConfig, generateOrganizationSchema, generateWebsiteSchema } from '@/lib/seo-config'
+import CrispChat from '@/components/CrispChat'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -42,8 +43,8 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: '/favicon.ico',
-    shortcut: '/favicon-16x16.png',
-    apple: '/apple-touch-icon.png',
+    shortcut: '/favicon.ico',
+    apple: '/logo.png',
   },
   manifest: '/site.webmanifest',
   openGraph: {
@@ -97,10 +98,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" data-scroll-behavior="smooth">
       <head>
         {/* iOS Safari specific meta tags */}
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Nashflare" />
         
@@ -159,6 +160,9 @@ export default function RootLayout({
         />
         
         {children}
+        
+        {/* Crisp Live Chat - loads lazily after 2 seconds, hidden launcher */}
+        <CrispChat />
       </body>
     </html>
   )
