@@ -151,6 +151,8 @@ export interface AdminVerification {
   id_type?: string
   id_front_url?: string
   id_back_url?: string
+  selfie_with_id_url?: string
+  verification_type?: string
   rejection_reason?: string
   rejection_type?: 'resubmission_required' | 'permanent'
   can_resubmit?: boolean

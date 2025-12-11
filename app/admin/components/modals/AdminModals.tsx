@@ -93,49 +93,67 @@ export function VerificationDetailsModal({
   if (!isOpen || !verification) return null
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-gradient-to-br from-slate-900 to-purple-900 border border-white/20 rounded-2xl p-8 max-w-4xl w-full my-8">
-        <div className="flex justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white">Verification Review</h2>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-gradient-to-br from-slate-900 to-purple-900 border border-white/20 rounded-2xl p-6 md:p-8 max-w-4xl w-full my-4 md:my-8">
+        <div className="flex justify-between items-start mb-6">
+          <h2 className="text-xl md:text-2xl font-bold text-white">Verification Review</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl transition"
+            className="text-gray-400 hover:text-white text-2xl transition p-1 -mr-1 -mt-1"
           >
             ✕
           </button>
         </div>
-        <div className="grid md:grid-cols-2 gap-6">
+        
+        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+          {/* Personal Info */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-4">
             <h3 className="text-lg font-semibold text-white mb-4">Personal Info</h3>
-            <p className="text-gray-400 text-xs">Name</p>
-            <p className="text-white mb-2">{verification.full_name || 'N/A'}</p>
-            <p className="text-gray-400 text-xs">DOB</p>
-            <p className="text-white mb-2">
-              {verification.date_of_birth 
-                ? new Date(verification.date_of_birth).toLocaleDateString() 
-                : 'N/A'}
-            </p>
-            <p className="text-gray-400 text-xs">Phone</p>
-            <p className="text-white mb-2">{verification.phone_number || 'N/A'}</p>
-            <p className="text-gray-400 text-xs">Username</p>
-            <p className="text-purple-400 font-semibold">{verification.user?.username || 'N/A'}</p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-gray-400 text-xs">Name</p>
+                <p className="text-white">{verification.full_name || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs">DOB</p>
+                <p className="text-white">
+                  {verification.date_of_birth 
+                    ? new Date(verification.date_of_birth).toLocaleDateString() 
+                    : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs">Phone</p>
+                <p className="text-white">{verification.phone_number || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs">Username</p>
+                <p className="text-purple-400 font-semibold">{verification.user?.username || 'N/A'}</p>
+              </div>
+            </div>
           </div>
+          
+          {/* Address */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-4">
             <h3 className="text-lg font-semibold text-white mb-4">Address</h3>
-            <p className="text-white mb-2">{verification.street_address || 'N/A'}</p>
-            <p className="text-white mb-2">
-              {[verification.city, verification.state_province].filter(Boolean).join(', ') || 'N/A'}
-            </p>
-            <p className="text-white">
-              {[verification.postal_code, verification.country].filter(Boolean).join(', ') || 'N/A'}
-            </p>
+            <div className="space-y-2">
+              <p className="text-white">{verification.street_address || 'N/A'}</p>
+              <p className="text-white">
+                {[verification.city, verification.state_province].filter(Boolean).join(', ') || 'N/A'}
+              </p>
+              <p className="text-white">
+                {[verification.postal_code, verification.country].filter(Boolean).join(', ') || 'N/A'}
+              </p>
+            </div>
           </div>
+          
+          {/* ID Documents - Only show if not cleared */}
           {!verification.documents_cleared && verification.id_front_url && (
             <div className="bg-white/5 border border-white/10 rounded-xl p-4 md:col-span-2">
               <h3 className="text-lg font-semibold text-white mb-4">
                 ID Documents <span className="text-xs text-red-400">(One-time view)</span>
               </h3>
-              <p className="text-gray-400 text-xs mb-2">
+              <p className="text-gray-400 text-xs mb-3">
                 Type: {verification.id_type?.replace('_', ' ') || 'N/A'}
               </p>
               <div className="grid md:grid-cols-2 gap-4">
@@ -144,7 +162,7 @@ export function VerificationDetailsModal({
                   <img
                     src={verification.id_front_url}
                     alt="ID Front"
-                    className="w-full rounded-lg"
+                    className="w-full rounded-lg max-h-64 object-contain bg-black/20"
                   />
                 </div>
                 {verification.id_back_url && (
@@ -153,45 +171,71 @@ export function VerificationDetailsModal({
                     <img
                       src={verification.id_back_url}
                       alt="ID Back"
-                      className="w-full rounded-lg"
+                      className="w-full rounded-lg max-h-64 object-contain bg-black/20"
                     />
                   </div>
                 )}
               </div>
+              {verification.selfie_with_id_url && (
+                <div className="mt-4">
+                  <p className="text-xs text-gray-400 mb-2">
+                    {verification.verification_type === 'website' ? 'Website Screenshot with ID' : 'Selfie with ID'}
+                  </p>
+                  <img
+                    src={verification.selfie_with_id_url}
+                    alt={verification.verification_type === 'website' ? 'Website with ID' : 'Selfie with ID'}
+                    className="w-full md:w-1/2 rounded-lg max-h-64 object-contain bg-black/20"
+                  />
+                </div>
+              )}
             </div>
           )}
+          
+          {/* Documents Cleared Notice */}
           {verification.documents_cleared && (
             <div className="bg-gray-500/10 border border-gray-500/30 rounded-xl p-4 md:col-span-2 text-center">
               <span className="text-3xl">🔒</span>
               <p className="text-gray-400 mt-2">Documents permanently deleted</p>
             </div>
           )}
+          
+          {/* Vendor Experience */}
           {verification.has_previous_experience && (
             <div className="bg-white/5 border border-white/10 rounded-xl p-4 md:col-span-2">
               <h3 className="text-lg font-semibold text-white mb-4">Vendor Experience</h3>
-              {verification.platform_names && (
-                <p className="text-white mb-2">Platforms: {verification.platform_names}</p>
-              )}
-              {verification.platform_usernames && (
-                <p className="text-white mb-2">Usernames: {verification.platform_usernames}</p>
-              )}
-              {verification.experience_description && (
-                <p className="text-white">{verification.experience_description}</p>
-              )}
+              <div className="space-y-2">
+                {verification.platform_names && (
+                  <p className="text-white">
+                    <span className="text-gray-400">Platforms:</span> {verification.platform_names}
+                  </p>
+                )}
+                {verification.platform_usernames && (
+                  <p className="text-white">
+                    <span className="text-gray-400">Usernames:</span> {verification.platform_usernames}
+                  </p>
+                )}
+                {verification.experience_description && (
+                  <p className="text-white">
+                    <span className="text-gray-400">Description:</span> {verification.experience_description}
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
+        
+        {/* Action Buttons - Only for pending verifications */}
         {verification.status === 'pending' && (
-          <div className="flex gap-4 mt-8">
+          <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-6 border-t border-white/10">
             <button
               onClick={onApprove}
-              className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 rounded-lg font-semibold text-lg hover:shadow-lg hover:shadow-green-500/30 transition"
+              className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 md:py-4 rounded-lg font-semibold text-base md:text-lg hover:shadow-lg hover:shadow-green-500/30 transition"
             >
               ✅ Approve
             </button>
             <button
               onClick={onReject}
-              className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-4 rounded-lg font-semibold text-lg hover:shadow-lg hover:shadow-red-500/30 transition"
+              className="flex-1 bg-gradient-to-r from-red-500 to-orange-500 text-white py-3 md:py-4 rounded-lg font-semibold text-base md:text-lg hover:shadow-lg hover:shadow-red-500/30 transition"
             >
               ❌ Reject
             </button>
@@ -260,15 +304,15 @@ export function VerificationDecisionModal({
   ]
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-start justify-center z-[60] p-4 overflow-y-auto">
       <div
-        className={`border-2 rounded-2xl p-8 max-w-2xl w-full my-8 ${
+        className={`border-2 rounded-2xl p-6 md:p-8 max-w-2xl w-full my-4 md:my-8 ${
           decisionType === 'approve'
             ? 'bg-gradient-to-br from-slate-900 to-green-900 border-green-500/50'
             : 'bg-gradient-to-br from-slate-900 to-red-900 border-red-500/50'
         }`}
       >
-        <h2 className="text-2xl font-bold text-white mb-2">
+        <h2 className="text-xl md:text-2xl font-bold text-white mb-2">
           {decisionType === 'approve' ? '✅ Approve Vendor' : '❌ Reject Application'}
         </h2>
         <p className="text-gray-300 mb-6">
@@ -393,7 +437,7 @@ export function VerificationDecisionModal({
           />
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={onConfirm}
             disabled={isDisabled}
@@ -449,8 +493,8 @@ export function ApproveWithdrawalModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-900 to-green-900 border-2 border-green-500/50 rounded-2xl p-8 max-w-md w-full">
-        <h2 className="text-2xl font-bold text-white mb-6">✅ Approve Withdrawal</h2>
+      <div className="bg-gradient-to-br from-slate-900 to-green-900 border-2 border-green-500/50 rounded-2xl p-6 md:p-8 max-w-md w-full">
+        <h2 className="text-xl md:text-2xl font-bold text-white mb-6">✅ Approve Withdrawal</h2>
         <div className="mb-4">
           <label className="block text-white text-sm mb-2">Transaction ID *</label>
           <input
@@ -469,7 +513,7 @@ export function ApproveWithdrawalModal({
             rows={3}
           />
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={onConfirm}
             disabled={!transactionId.trim()}
@@ -508,8 +552,8 @@ export function RejectWithdrawalModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-md w-full">
-        <h2 className="text-2xl font-bold text-white mb-6">❌ Reject Withdrawal</h2>
+      <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-6 md:p-8 max-w-md w-full">
+        <h2 className="text-xl md:text-2xl font-bold text-white mb-6">❌ Reject Withdrawal</h2>
         <div className="mb-6">
           <label className="block text-white text-sm mb-2">Rejection Reason *</label>
           <textarea
@@ -520,7 +564,7 @@ export function RejectWithdrawalModal({
             placeholder="Min 5 characters..."
           />
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={onConfirm}
             disabled={reason.trim().length < 5}
@@ -580,9 +624,9 @@ export function FraudReviewModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-8 max-w-2xl w-full">
-        <h2 className="text-2xl font-bold text-white mb-6">Review Fraud Flag</h2>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-gradient-to-br from-slate-900 to-red-900 border-2 border-red-500/50 rounded-2xl p-6 md:p-8 max-w-2xl w-full my-4 md:my-8">
+        <h2 className="text-xl md:text-2xl font-bold text-white mb-6">Review Fraud Flag</h2>
 
         <div className="mb-6 space-y-4">
           <div>
@@ -631,7 +675,7 @@ export function FraudReviewModal({
           />
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={onConfirm}
             className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold"

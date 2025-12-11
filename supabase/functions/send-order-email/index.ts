@@ -1,6 +1,7 @@
 // supabase/functions/send-order-email/index.ts
 // Enhanced Edge Function with Professional Cosmic-Themed Email Templates
 // All emails now feature consistent branding with purple-pink gradients and logo
+// Includes Trustpilot AFS (Automatic Feedback Service) integration for order confirmations
 
 // @ts-ignore - Deno import
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -8,6 +9,10 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 // @ts-ignore - Deno global
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 const FROM_EMAIL = 'Nashflare <noreply@nashflare.com>'
+
+// Trustpilot AFS Configuration
+const TRUSTPILOT_AFS_EMAIL = 'nashflare.com+2e25b37e1e@invite.trustpilot.com'
+const TRUSTPILOT_AFS_ENABLED = true // Toggle to enable/disable Trustpilot AFS
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,12 +36,17 @@ serve(async (req) => {
     let subject = ''
     let htmlContent = ''
     let toEmail = ''
+    let bccEmails: string[] = []
 
     switch (emailRequest.type) {
       case 'order_confirmation':
         toEmail = emailRequest.buyerEmail
         subject = `🎮 Order Confirmed - ${emailRequest.listingTitle}`
         htmlContent = generateOrderConfirmationEmail(emailRequest)
+        // Add Trustpilot AFS as BCC for order confirmations
+        if (TRUSTPILOT_AFS_ENABLED) {
+          bccEmails.push(TRUSTPILOT_AFS_EMAIL)
+        }
         break
 
       case 'delivery_notification':
@@ -97,6 +107,19 @@ serve(async (req) => {
         throw new Error(`Unknown email type: ${emailRequest.type}`)
     }
 
+    // Build email payload
+    const emailPayload: any = {
+      from: FROM_EMAIL,
+      to: [toEmail],
+      subject: subject,
+      html: htmlContent,
+    }
+
+    // Add BCC if any
+    if (bccEmails.length > 0) {
+      emailPayload.bcc = bccEmails
+    }
+
     // Send email via Resend
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -104,12 +127,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [toEmail],
-        subject: subject,
-        html: htmlContent,
-      }),
+      body: JSON.stringify(emailPayload),
     })
 
     if (!res.ok) {
@@ -197,10 +215,36 @@ function getEmailFooter(): string {
 }
 
 // ============================================
+// TRUSTPILOT AFS STRUCTURED DATA SNIPPET
+// ============================================
+
+function getTrustpilotAFSSnippet(recipientName: string, recipientEmail: string, referenceId: string): string {
+  // Trustpilot AFS structured data snippet
+  // This allows Trustpilot to extract customer info for review invitations
+  // Wrapped in HTML comments for compatibility with systems that strip script tags
+  return `
+    <!-- Trustpilot AFS Structured Data -->
+    <script type="application/json+trustpilot">
+    {
+      "recipientName": "${recipientName}",
+      "recipientEmail": "${recipientEmail}",
+      "referenceId": "${referenceId}"
+    }
+    </script>
+    <!-- End Trustpilot AFS -->
+  `
+}
+
+// ============================================
 // EMAIL TEMPLATE GENERATORS
 // ============================================
 
 function generateOrderConfirmationEmail(data: any): string {
+  // Generate Trustpilot AFS snippet for this order
+  const trustpilotSnippet = TRUSTPILOT_AFS_ENABLED 
+    ? getTrustpilotAFSSnippet(data.buyerUsername, data.buyerEmail, data.orderId)
+    : ''
+
   return `
     <!DOCTYPE html>
     <html>
@@ -208,6 +252,7 @@ function generateOrderConfirmationEmail(data: any): string {
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      ${trustpilotSnippet}
     </head>
     <body style="margin: 0; padding: 0; background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 40px 20px;">
