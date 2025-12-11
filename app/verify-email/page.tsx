@@ -1,67 +1,191 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useCallback, useMemo, useRef, memo } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { sendVerificationEmail, generateVerificationCode } from '@/lib/email'
 import Image from 'next/image'
 
+// ============================================
+// CONSTANTS (moved outside component)
+// ============================================
+const MIN_RESEND_INTERVAL = 60
+const MAX_CODES_PER_HOUR = 5
+const MAX_CODES_PER_DAY = 15
+const INITIAL_CODE = ['', '', '', '', '', '']
+const TOAST_DURATION = 4000
+const REDIRECT_DELAY = 2000
+
+// ============================================
+// MEMOIZED BACKGROUND COMPONENT
+// Prevents re-renders when parent state changes
+// ============================================
+const AnimatedBackground = memo(function AnimatedBackground() {
+  return (
+    <div className="fixed inset-0 z-0 contain-strict">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]" />
+      <div 
+        className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse will-change-transform gpu-accelerate"
+        style={{ contain: 'strict' }}
+      />
+      <div 
+        className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse will-change-transform gpu-accelerate"
+        style={{ animationDelay: '1s', contain: 'strict' }}
+      />
+      <div 
+        className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px] animate-pulse will-change-transform gpu-accelerate"
+        style={{ animationDelay: '2s', contain: 'strict' }}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+    </div>
+  )
+})
+
+// ============================================
+// MEMOIZED SUCCESS VIEW COMPONENT
+// ============================================
+const SuccessView = memo(function SuccessView() {
+  return (
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse" />
+        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
+
+      <div className="relative z-10 max-w-md w-full text-center">
+        <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-12">
+          <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-4xl">✓</span>
+          </div>
+          <h2 className="text-3xl font-bold text-white mb-4">Email Verified!</h2>
+          <p className="text-gray-400 mb-6">
+            Your account has been successfully verified. Redirecting you to login...
+          </p>
+          <div className="flex items-center justify-center gap-2 text-purple-400">
+            <div className="w-5 h-5 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+            <span>Redirecting...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+})
+
+// ============================================
+// MEMOIZED TOAST COMPONENT
+// ============================================
+interface ToastProps {
+  message: string
+  type: 'success' | 'error' | 'info'
+}
+
+const Toast = memo(function Toast({ message, type }: ToastProps) {
+  const styles = useMemo(() => {
+    switch (type) {
+      case 'success':
+        return { bg: 'bg-green-500/20 border-green-500/50', text: 'text-green-200' }
+      case 'error':
+        return { bg: 'bg-red-500/20 border-red-500/50', text: 'text-red-200' }
+      default:
+        return { bg: 'bg-blue-500/20 border-blue-500/50', text: 'text-blue-200' }
+    }
+  }, [type])
+
+  return (
+    <div className="fixed top-6 right-6 z-50 transform transition-all duration-300 translate-x-0 opacity-100">
+      <div className={`rounded-xl p-4 shadow-2xl border backdrop-blur-xl min-w-[320px] ${styles.bg}`}>
+        <p className={`text-sm font-medium ${styles.text}`}>{message}</p>
+      </div>
+    </div>
+  )
+})
+
+// ============================================
+// MEMOIZED CODE INPUT COMPONENT
+// ============================================
+interface CodeInputProps {
+  index: number
+  value: string
+  inputRef: (el: HTMLInputElement | null) => void
+  onChange: (index: number, value: string) => void
+  onKeyDown: (index: number, e: React.KeyboardEvent) => void
+  onPaste: (e: React.ClipboardEvent) => void
+}
+
+const CodeInput = memo(function CodeInput({ 
+  index, 
+  value, 
+  inputRef, 
+  onChange, 
+  onKeyDown, 
+  onPaste 
+}: CodeInputProps) {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(index, e.target.value)
+  }, [index, onChange])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    onKeyDown(index, e)
+  }, [index, onKeyDown])
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      inputMode="numeric"
+      maxLength={1}
+      value={value}
+      onChange={handleChange}
+      onKeyDown={handleKeyDown}
+      onPaste={index === 0 ? onPaste : undefined}
+      className="w-12 h-14 bg-slate-800/80 border border-white/10 rounded-xl text-center text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+      autoFocus={index === 0}
+    />
+  )
+})
+
+// ============================================
+// MAIN CONTENT COMPONENT
+// ============================================
 function VerifyEmailContent() {
-  const [code, setCode] = useState(['', '', '', '', '', ''])
+  const [code, setCode] = useState<string[]>(INITIAL_CODE)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const [resending, setResending] = useState(false)
   const [canResend, setCanResend] = useState(true)
   const [resendTimer, setResendTimer] = useState(0)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [toast, setToast] = useState<ToastProps | null>(null)
+  
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get('email')
-  const supabase = createClient()
+  
+  // Memoize supabase client to prevent recreation on every render
+  const supabase = useMemo(() => createClient(), [])
+  
+  // Use refs for input elements instead of document.getElementById
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  
+  // Ref callback for setting input refs
+  const setInputRef = useCallback((index: number) => (el: HTMLInputElement | null) => {
+    inputRefs.current[index] = el
+  }, [])
 
-  // Rate limiting constants
-  const MIN_RESEND_INTERVAL = 60 // 60 seconds between resends
-  const MAX_CODES_PER_HOUR = 5 // Maximum 5 codes per hour
-  const MAX_CODES_PER_DAY = 15 // Maximum 15 codes per 24 hours
+  // Focus helper using refs
+  const focusInput = useCallback((index: number) => {
+    inputRefs.current[index]?.focus()
+  }, [])
 
-  useEffect(() => {
-    if (!email) {
-      router.push('/signup')
-      return
-    }
-    
-    const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        await checkRateLimit(user.id)
-      }
-    }
-    getCurrentUser()
-  }, [email, router, supabase.auth])
-
-  useEffect(() => {
-    if (resendTimer > 0) {
-      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000)
-      return () => clearTimeout(timer)
-    } else {
-      setCanResend(true)
-    }
-  }, [resendTimer])
-
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000)
-      return () => clearTimeout(timer)
-    }
-  }, [toast])
-
-  const showToast = (message: string, type: 'success' | 'error' | 'info') => {
+  // Memoized toast function
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
     setToast({ message, type })
-  }
+  }, [])
 
-  const checkRateLimit = async (userId: string) => {
+  // Check rate limit - memoized
+  const checkRateLimit = useCallback(async (userId: string) => {
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -73,13 +197,11 @@ function VerifyEmailContent() {
 
       const now = new Date()
 
-      // Check if we need to reset daily counter (24 hours passed)
       if (profile.verification_daily_reset) {
         const resetTime = new Date(profile.verification_daily_reset)
         const hoursSinceReset = (now.getTime() - resetTime.getTime()) / (1000 * 60 * 60)
 
         if (hoursSinceReset >= 24) {
-          // Reset daily counter
           await supabase
             .from('profiles')
             .update({
@@ -87,11 +209,10 @@ function VerifyEmailContent() {
               verification_daily_reset: now.toISOString()
             })
             .eq('id', userId)
-          return // Counter reset, user can proceed
+          return
         }
       }
 
-      // Check if last send was too recent (60 second cooldown)
       if (profile.verification_last_sent_at) {
         const lastSent = new Date(profile.verification_last_sent_at)
         const secondsSinceLastSend = (now.getTime() - lastSent.getTime()) / 1000
@@ -105,50 +226,100 @@ function VerifyEmailContent() {
     } catch (error) {
       console.error('Error checking rate limit:', error)
     }
-  }
+  }, [supabase])
 
-  const handleCodeChange = (index: number, value: string) => {
-    if (value.length > 1) {
-      value = value[0]
+  // Initial load effect
+  useEffect(() => {
+    if (!email) {
+      router.push('/signup')
+      return
     }
+    
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await checkRateLimit(user.id)
+      }
+    }
+    getCurrentUser()
+  }, [email, router, supabase, checkRateLimit])
 
-    if (!/^\d*$/.test(value)) {
+  // Resend timer effect
+  useEffect(() => {
+    if (resendTimer <= 0) {
+      setCanResend(true)
+      return
+    }
+    
+    const timer = setTimeout(() => setResendTimer(prev => prev - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendTimer])
+
+  // Toast auto-dismiss effect
+  useEffect(() => {
+    if (!toast) return
+    
+    const timer = setTimeout(() => setToast(null), TOAST_DURATION)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  // Verify profile helper - memoized
+  const verifyProfile = useCallback(async (profile: any, codeToVerify: string) => {
+    if (new Date(profile.verification_code_expires) < new Date()) {
+      setError('Verification code has expired. Please request a new one.')
+      setCode(INITIAL_CODE)
+      focusInput(0)
       return
     }
 
-    const newCode = [...code]
-    newCode[index] = value
-    setCode(newCode)
-
-    if (value && index < 5) {
-      const nextInput = document.getElementById(`code-${index + 1}`)
-      nextInput?.focus()
+    if (profile.verification_code_attempts >= 5) {
+      setError('Too many failed attempts. Please request a new code using "Resend Code" below.')
+      setCode(INITIAL_CODE)
+      focusInput(0)
+      return
     }
 
-    if (index === 5 && value && newCode.every(digit => digit !== '')) {
-      handleVerify(newCode.join(''))
+    if (profile.verification_code !== codeToVerify) {
+      const newAttempts = profile.verification_code_attempts + 1
+      await supabase
+        .from('profiles')
+        .update({ verification_code_attempts: newAttempts })
+        .eq('id', profile.id)
+
+      if (newAttempts >= 5) {
+        setError('Too many failed attempts. Please request a new code using "Resend Code" below.')
+      } else {
+        const attemptsLeft = 5 - newAttempts
+        setError(`Invalid code. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`)
+      }
+      
+      setCode(INITIAL_CODE)
+      focusInput(0)
+      return
     }
-  }
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !code[index] && index > 0) {
-      const prevInput = document.getElementById(`code-${index - 1}`)
-      prevInput?.focus()
-    }
-  }
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        email_verified: true,
+        verification_code: null,
+        verification_code_expires: null,
+        verification_code_attempts: 0
+      })
+      .eq('id', profile.id)
 
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault()
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    const newCode = pastedData.split('').concat(Array(6 - pastedData.length).fill(''))
-    setCode(newCode)
+    if (updateError) throw updateError
 
-    if (pastedData.length === 6) {
-      handleVerify(pastedData)
-    }
-  }
+    setSuccess(true)
+    await supabase.auth.signOut()
 
-  const handleVerify = async (verificationCode?: string) => {
+    setTimeout(() => {
+      router.push('/login?verified=true')
+    }, REDIRECT_DELAY)
+  }, [supabase, router, focusInput])
+
+  // Handle verify - memoized
+  const handleVerify = useCallback(async (verificationCode?: string) => {
     const codeToVerify = verificationCode || code.join('')
     
     if (codeToVerify.length !== 6) {
@@ -184,69 +355,57 @@ function VerifyEmailContent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [code, supabase, verifyProfile])
 
-  const verifyProfile = async (profile: any, codeToVerify: string) => {
-    // Check if code has expired
-    if (new Date(profile.verification_code_expires) < new Date()) {
-      setError('Verification code has expired. Please request a new one.')
-      setCode(['', '', '', '', '', ''])
-      document.getElementById('code-0')?.focus()
+  // Handle code change - memoized
+  const handleCodeChange = useCallback((index: number, value: string) => {
+    if (value.length > 1) {
+      value = value[0]
+    }
+
+    if (!/^\d*$/.test(value)) {
       return
     }
 
-    // Check attempt limit
-    if (profile.verification_code_attempts >= 5) {
-      setError('Too many failed attempts. Please request a new code using "Resend Code" below.')
-      setCode(['', '', '', '', '', ''])
-      document.getElementById('code-0')?.focus()
-      return
-    }
-
-    // Check if code matches
-    if (profile.verification_code !== codeToVerify) {
-      const newAttempts = profile.verification_code_attempts + 1
-      await supabase
-        .from('profiles')
-        .update({ 
-          verification_code_attempts: newAttempts
-        })
-        .eq('id', profile.id)
-
-      if (newAttempts >= 5) {
-        setError('Too many failed attempts. Please request a new code using "Resend Code" below.')
-      } else {
-        const attemptsLeft = 5 - newAttempts
-        setError(`Invalid code. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`)
+    setCode(prevCode => {
+      const newCode = [...prevCode]
+      newCode[index] = value
+      
+      // Auto-submit when complete
+      if (index === 5 && value && newCode.every(digit => digit !== '')) {
+        // Use setTimeout to allow state to update first
+        setTimeout(() => handleVerify(newCode.join('')), 0)
       }
       
-      setCode(['', '', '', '', '', ''])
-      document.getElementById('code-0')?.focus()
-      return
+      return newCode
+    })
+
+    if (value && index < 5) {
+      focusInput(index + 1)
     }
+  }, [focusInput, handleVerify])
 
-    // Success! Mark email as verified
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({
-        email_verified: true,
-        verification_code: null,
-        verification_code_expires: null,
-        verification_code_attempts: 0
-      })
-      .eq('id', profile.id)
+  // Handle keydown - memoized
+  const handleKeyDown = useCallback((index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !code[index] && index > 0) {
+      focusInput(index - 1)
+    }
+  }, [code, focusInput])
 
-    if (updateError) throw updateError
+  // Handle paste - memoized
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    e.preventDefault()
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    const newCode = pastedData.split('').concat(Array(6 - pastedData.length).fill(''))
+    setCode(newCode)
 
-    setSuccess(true)
-    await supabase.auth.signOut()
+    if (pastedData.length === 6) {
+      handleVerify(pastedData)
+    }
+  }, [handleVerify])
 
-    setTimeout(() => {
-      router.push('/login?verified=true')
-    }, 2000)
-  }
-
-  const handleResend = async () => {
+  // Handle resend - memoized
+  const handleResend = useCallback(async () => {
     if (!canResend || !email) return
 
     setResending(true)
@@ -259,7 +418,6 @@ function VerifyEmailContent() {
         throw new Error('Please sign up first')
       }
 
-      // Get current rate limit status
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, username, verification_codes_sent, verification_last_sent_at, verification_daily_reset')
@@ -270,19 +428,16 @@ function VerifyEmailContent() {
 
       const now = new Date()
 
-      // Check daily reset
       let codesSent = profile.verification_codes_sent || 0
       if (profile.verification_daily_reset) {
         const resetTime = new Date(profile.verification_daily_reset)
         const hoursSinceReset = (now.getTime() - resetTime.getTime()) / (1000 * 60 * 60)
 
         if (hoursSinceReset >= 24) {
-          // Reset counter
           codesSent = 0
         }
       }
 
-      // Check daily limit
       if (codesSent >= MAX_CODES_PER_DAY) {
         setError(`Daily limit of ${MAX_CODES_PER_DAY} codes reached. Please try again tomorrow or contact support@nashflare.com`)
         showToast('❌ Daily limit reached. Contact support if you need help.', 'error')
@@ -290,15 +445,11 @@ function VerifyEmailContent() {
         return
       }
 
-      // Check hourly limit
       if (profile.verification_last_sent_at) {
         const lastSent = new Date(profile.verification_last_sent_at)
         const minutesSinceLastSend = (now.getTime() - lastSent.getTime()) / (1000 * 60)
 
-        // Count codes sent in last hour
         if (minutesSinceLastSend < 60) {
-          // For simplicity, we'll track that user is within hourly window
-          // In production, you'd want a more sophisticated tracking system
           const recentCodes = codesSent % MAX_CODES_PER_HOUR
           if (recentCodes >= MAX_CODES_PER_HOUR && minutesSinceLastSend < 60) {
             const minutesRemaining = Math.ceil(60 - minutesSinceLastSend)
@@ -310,7 +461,6 @@ function VerifyEmailContent() {
         }
       }
 
-      // Check 60-second cooldown
       if (profile.verification_last_sent_at) {
         const lastSent = new Date(profile.verification_last_sent_at)
         const secondsSinceLastSend = (now.getTime() - lastSent.getTime()) / 1000
@@ -325,18 +475,16 @@ function VerifyEmailContent() {
         }
       }
 
-      // All checks passed - generate and send new code
       const newCode = generateVerificationCode()
       const expiresAt = new Date()
       expiresAt.setMinutes(expiresAt.getMinutes() + 10)
 
-      // Update database with new code and increment counter
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
           verification_code: newCode,
           verification_code_expires: expiresAt.toISOString(),
-          verification_code_attempts: 0,  // Reset attempts for new code
+          verification_code_attempts: 0,
           verification_codes_sent: codesSent + 1,
           verification_last_sent_at: now.toISOString(),
           verification_daily_reset: profile.verification_daily_reset || now.toISOString()
@@ -345,7 +493,6 @@ function VerifyEmailContent() {
 
       if (updateError) throw updateError
 
-      // Send email
       const result = await sendVerificationEmail({
         userEmail: email,
         username: profile.username,
@@ -354,10 +501,9 @@ function VerifyEmailContent() {
 
       if (!result.success) throw new Error(result.error)
 
-      // Set 60 second cooldown
       setCanResend(false)
       setResendTimer(MIN_RESEND_INTERVAL)
-      setCode(['', '', '', '', '', ''])
+      setCode(INITIAL_CODE)
       
       const codesRemaining = MAX_CODES_PER_DAY - (codesSent + 1)
       showToast(`✅ New verification code sent! (${codesRemaining} codes remaining today)`, 'success')
@@ -369,75 +515,43 @@ function VerifyEmailContent() {
     } finally {
       setResending(false)
     }
-  }
+  }, [canResend, email, supabase, showToast])
 
+  // Handle sign out - memoized
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }, [supabase, router])
+
+  // Handle opening live chat - placeholder for Crisp integration
+  const handleOpenLiveChat = useCallback(() => {
+    // TODO: Integrate with Crisp live chat
+    // window.$crisp.push(['do', 'chat:open'])
+    console.log('Live chat placeholder - Crisp integration pending')
+  }, [])
+
+  // Memoize button disabled state
+  const isVerifyDisabled = useMemo(() => 
+    loading || code.some(digit => !digit), 
+    [loading, code]
+  )
+
+  // Early returns
   if (!email) {
     return null
   }
 
   if (success) {
-    return (
-      <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
-        <div className="fixed inset-0 z-0">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
-          <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-        </div>
-
-        <div className="relative z-10 max-w-md w-full text-center">
-          <div className="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-12">
-            <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-4xl">✓</span>
-            </div>
-            <h2 className="text-3xl font-bold text-white mb-4">Email Verified!</h2>
-            <p className="text-gray-400 mb-6">
-              Your account has been successfully verified. Redirecting you to login...
-            </p>
-            <div className="flex items-center justify-center gap-2 text-purple-400">
-              <div className="w-5 h-5 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div>
-              <span>Redirecting...</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <SuccessView />
   }
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden flex items-center justify-center px-4">
       {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-6 right-6 z-50 transform transition-all duration-300 ${
-          toast ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
-        }`}>
-          <div className={`rounded-xl p-4 shadow-2xl border backdrop-blur-xl min-w-[320px] ${
-            toast.type === 'success' 
-              ? 'bg-green-500/20 border-green-500/50' 
-              : toast.type === 'error'
-              ? 'bg-red-500/20 border-red-500/50'
-              : 'bg-blue-500/20 border-blue-500/50'
-          }`}>
-            <p className={`text-sm font-medium ${
-              toast.type === 'success' 
-                ? 'text-green-200' 
-                : toast.type === 'error'
-                ? 'text-red-200'
-                : 'text-blue-200'
-            }`}>
-              {toast.message}
-            </p>
-          </div>
-        </div>
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} />}
 
-      {/* Animated Background */}
-      <div className="fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-600/15 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-      </div>
+      {/* Animated Background - Memoized */}
+      <AnimatedBackground />
 
       {/* Content */}
       <div className="relative z-10 max-w-md w-full">
@@ -452,7 +566,7 @@ function VerifyEmailContent() {
               className="transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300"
               priority
             />
-            <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300"></div>
+            <div className="absolute -inset-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl opacity-0 group-hover:opacity-30 blur transition-opacity duration-300" />
           </div>
           <div className="flex flex-col">
             <span className="text-2xl font-black text-white tracking-tight">
@@ -490,19 +604,16 @@ function VerifyEmailContent() {
             <label className="block text-white font-semibold mb-4 text-sm text-center">
               Enter Verification Code
             </label>
-            <div className="flex gap-2 justify-center" onPaste={handlePaste}>
+            <div className="flex gap-2 justify-center">
               {code.map((digit, index) => (
-                <input
+                <CodeInput
                   key={index}
-                  id={`code-${index}`}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
+                  index={index}
                   value={digit}
-                  onChange={(e) => handleCodeChange(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="w-12 h-14 bg-slate-800/80 border border-white/10 rounded-xl text-center text-white text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
-                  autoFocus={index === 0}
+                  inputRef={setInputRef(index)}
+                  onChange={handleCodeChange}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
                 />
               ))}
             </div>
@@ -513,12 +624,12 @@ function VerifyEmailContent() {
 
           <button
             onClick={() => handleVerify()}
-            disabled={loading || code.some(digit => !digit)}
+            disabled={isVerifyDisabled}
             className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 mb-4"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Verifying...
               </span>
             ) : (
@@ -527,7 +638,6 @@ function VerifyEmailContent() {
           </button>
 
           <div className="text-center">
-            <p className="text-gray-400 text-sm mb-2">Didn't receive the code?</p>
             <button
               onClick={handleResend}
               disabled={!canResend || resending}
@@ -535,25 +645,124 @@ function VerifyEmailContent() {
             >
               {resending ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
                   Sending...
                 </span>
               ) : !canResend ? (
-                `Resend in ${resendTimer}s`
+                `Resend Code in ${resendTimer}s`
               ) : (
                 'Resend Code'
               )}
             </button>
+          </div>
+
+          {/* Not getting any code? Help Section */}
+          <div className="mt-6 border-t border-white/10 pt-6">
+            <details className="group">
+              <summary className="flex items-center justify-center gap-2 cursor-pointer text-gray-400 hover:text-gray-300 transition text-sm">
+                <svg 
+                  className="w-4 h-4 transition-transform group-open:rotate-180" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                <span>Not getting any code?</span>
+              </summary>
+              
+              <div className="mt-4 space-y-4 text-left">
+                {/* Check Spam Tip */}
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-lg">📁</span>
+                    </div>
+                    <div>
+                      <h4 className="text-yellow-200 font-semibold text-sm mb-1">Check your Spam/Junk folder</h4>
+                      <p className="text-yellow-200/70 text-xs leading-relaxed">
+                        Our verification emails sometimes land in spam, especially for new accounts. Look for an email from <span className="font-mono text-yellow-300">noreply@nashflare.com</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tips List */}
+                <div className="bg-slate-800/50 rounded-xl p-4">
+                  <h4 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
+                    <span>💡</span> Quick tips
+                  </h4>
+                  <ul className="space-y-2.5 text-xs text-gray-400">
+                    <li className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>Add <span className="text-purple-300 font-mono">noreply@nashflare.com</span> to your contacts</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>Check your Promotions or Updates tab (Gmail users)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>Make sure <span className="text-white">{email}</span> is spelled correctly</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>Wait a few minutes — emails can take up to 2 min to arrive</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Still having issues - Live Chat Button */}
+                <div className="text-center pt-2">
+                  <p className="text-xs text-gray-500 mb-3">
+                    Still having trouble?
+                  </p>
+                  <button
+                    onClick={handleOpenLiveChat}
+                    className="inline-flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700/80 border border-white/10 hover:border-white/20 rounded-full transition-all duration-300 group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {/* Chat bubble icon */}
+                      <svg 
+                        className="w-5 h-5 text-emerald-400" 
+                        fill="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/>
+                        <circle cx="8" cy="10" r="1.5"/>
+                        <circle cx="12" cy="10" r="1.5"/>
+                        <circle cx="16" cy="10" r="1.5"/>
+                      </svg>
+                      <span className="text-gray-300 text-sm font-medium">Need help? Support available</span>
+                    </div>
+                    {/* Chevron */}
+                    <svg 
+                      className="w-4 h-4 text-gray-500 group-hover:text-gray-400 transition-colors" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </details>
           </div>
         </div>
 
         {/* Skip verification option */}
         <div className="text-center mt-6">
           <button
-            onClick={async () => {
-              await supabase.auth.signOut()
-              router.push('/')
-            }}
+            onClick={handleSignOut}
             className="text-gray-400 hover:text-purple-400 transition flex items-center justify-center gap-2 mx-auto"
           >
             <span>←</span> Verify Later (Sign Out)
@@ -567,11 +776,14 @@ function VerifyEmailContent() {
   )
 }
 
+// ============================================
+// PAGE EXPORT WITH SUSPENSE
+// ============================================
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
       </div>
     }>
       <VerifyEmailContent />
