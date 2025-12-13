@@ -245,6 +245,16 @@ function ListingUnavailablePage({
 
   const colors = colorClasses[content.color as keyof typeof colorClasses]
 
+  // Helper function for category icons
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'account': return '🎮'
+      case 'currency': return '💰'
+      case 'items': return '🎒'
+      default: return '🔑'
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden">
       <CosmicBackground />
@@ -285,7 +295,7 @@ function ListingUnavailablePage({
                         <img 
                           src={listing.image_urls?.[0] || listing.image_url} 
                           alt={listing.title} 
-                          className="w-full h-full object-cover"
+                          className={`w-full h-full ${listing.category === 'items' ? 'object-contain p-1' : 'object-cover'}`}
                           loading="lazy"
                         />
                       ) : (
@@ -371,6 +381,7 @@ function ListingUnavailablePage({
                   {similarListings.map((item) => {
                     const itemImage = item.image_urls?.[0] || item.image_url
                     const sellerData = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles
+                    const isItemsCategory = item.category === 'items'
                     
                     return (
                       <Link
@@ -383,13 +394,15 @@ function ListingUnavailablePage({
                             <img
                               src={itemImage}
                               alt={item.title}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                              className={`w-full h-full group-hover:scale-110 transition-transform duration-300 ${
+                                isItemsCategory ? 'object-contain p-2' : 'object-cover'
+                              }`}
                               loading="lazy"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
                               <span className="text-3xl sm:text-4xl">
-                                {item.category === 'account' ? '🎮' : item.category === 'items' ? '🎒' : item.category === 'currency' ? '💰' : '🔑'}
+                                {getCategoryIcon(item.category)}
                               </span>
                             </div>
                           )}
@@ -502,6 +515,9 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
         ? [listing.image_url]
         : []
   }, [listing?.image_urls, listing?.image_url])
+
+  // Check if this listing is items category (for image display)
+  const isItemsCategory = listing?.category === 'items'
 
   useEffect(() => {
     checkUser()
@@ -929,9 +945,9 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                     <span className="text-gray-400 text-xs font-medium">SECURE CHECKOUT</span>
                   </div>
                   <div className="flex items-center justify-center gap-3">
-                    <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
-                      <span className="text-blue-400 font-bold text-xs">Pay</span>
-                      <span className="text-blue-300 font-bold text-xs">Pal</span>
+                    <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center">
+                      <span className="text-[#003087] font-bold text-xs italic">Pay</span>
+                      <span className="text-[#009cde] font-bold text-xs italic">Pal</span>
                     </div>
                     <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
                       <span className="text-orange-400 text-sm">₿</span>
@@ -1004,7 +1020,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                       <img
                         src={images[activeImageIndex]}
                         alt={listing.title}
-                        className="w-full h-full object-cover"
+                        className={`w-full h-full ${isItemsCategory ? 'object-contain p-4' : 'object-cover'}`}
                         loading="eager"
                       />
                       {images.length > 1 && (
@@ -1212,6 +1228,7 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                     {similarListings.map((item) => {
                       const itemImage = item.image_urls?.[0] || item.image_url
                       const sellerData = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles
+                      const isItemsCategorySimilar = item.category === 'items'
                       
                       return (
                         <Link
@@ -1224,7 +1241,9 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                               <img
                                 src={itemImage}
                                 alt={item.title}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                className={`w-full h-full group-hover:scale-110 transition-transform duration-300 ${
+                                  isItemsCategorySimilar ? 'object-contain p-2' : 'object-cover'
+                                }`}
                                 loading="lazy"
                               />
                             ) : (
@@ -1407,9 +1426,9 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                     {/* Payment Methods */}
                     <div className="bg-white/5 rounded-xl p-3 border border-white/10">
                       <div className="flex items-center justify-center gap-3">
-                        <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
-                          <span className="text-blue-400 font-bold text-xs">Pay</span>
-                          <span className="text-blue-300 font-bold text-xs">Pal</span>
+                        <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center">
+                          <span className="text-[#003087] font-bold text-xs italic">Pay</span>
+                          <span className="text-[#009cde] font-bold text-xs italic">Pal</span>
                         </div>
                         <div className="bg-white/10 rounded-lg px-2.5 py-1.5 flex items-center gap-1">
                           <span className="text-orange-400 text-sm">₿</span>

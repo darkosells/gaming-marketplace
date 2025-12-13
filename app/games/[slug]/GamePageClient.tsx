@@ -40,11 +40,11 @@ function getOptimizedImageUrl(url: string | null | undefined, options?: { width?
 // SKELETON COMPONENTS FOR INSTANT LCP
 // ============================================
 
-function ListingCardSkeleton() {
+function ListingCardSkeleton({ isItemsCategory = false }: { isItemsCategory?: boolean }) {
   return (
-    <div className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden animate-pulse">
-      <div className="h-40 sm:h-48 bg-slate-800/50" />
-      <div className="p-4 sm:p-5 space-y-3">
+    <div className={`bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden animate-pulse ${isItemsCategory ? 'rounded-xl' : ''}`}>
+      <div className={isItemsCategory ? 'h-28 sm:h-32 bg-slate-800/50' : 'h-40 sm:h-48 bg-slate-800/50'} />
+      <div className={`space-y-3 ${isItemsCategory ? 'p-3 sm:p-4' : 'p-4 sm:p-5'}`}>
         <div className="h-3 w-20 bg-slate-700/50 rounded" />
         <div className="h-5 w-3/4 bg-slate-700/50 rounded" />
         <div className="h-3 w-full bg-slate-700/50 rounded" />
@@ -58,11 +58,14 @@ function ListingCardSkeleton() {
   )
 }
 
-function ListingGridSkeleton() {
+function ListingGridSkeleton({ isItemsCategory = false }: { isItemsCategory?: boolean }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-      {[...Array(6)].map((_, i) => (
-        <ListingCardSkeleton key={i} />
+    <div className={isItemsCategory 
+      ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4' 
+      : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6'
+    }>
+      {[...Array(isItemsCategory ? 8 : 6)].map((_, i) => (
+        <ListingCardSkeleton key={i} isItemsCategory={isItemsCategory} />
       ))}
     </div>
   )
@@ -76,12 +79,14 @@ function ListingImage({
   src, 
   alt, 
   category,
-  priority = false 
+  priority = false,
+  isCompact = false
 }: { 
   src: string | null
   alt: string
   category: string
   priority?: boolean
+  isCompact?: boolean
 }) {
   const [imageError, setImageError] = useState(false)
   
@@ -90,7 +95,7 @@ function ListingImage({
   if (!src || imageError) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-        <span className="text-5xl sm:text-6xl group-hover:scale-110 transition-transform duration-300">
+        <span className={`group-hover:scale-110 transition-transform duration-300 ${isCompact ? 'text-3xl sm:text-4xl' : 'text-5xl sm:text-6xl'}`}>
           {categoryEmoji}
         </span>
       </div>
@@ -102,8 +107,13 @@ function ListingImage({
       src={src}
       alt={alt}
       fill
-      sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-      className="object-cover group-hover:scale-105 transition-transform duration-300"
+      sizes={isCompact 
+        ? "(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw"
+        : "(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+      }
+      className={`group-hover:scale-105 transition-transform duration-300 ${
+        isCompact ? 'object-contain p-1' : 'object-cover'
+      }`}
       onError={() => setImageError(true)}
       priority={priority}
       loading={priority ? 'eager' : 'lazy'}
@@ -157,8 +167,6 @@ const itemsGameTags: { [key: string]: string[] } = {
   'Plants vs Brainrots': ['Premium Plants', 'Power-ups', 'Coins', 'Gems']
 }
 
-const ITEMS_PER_PAGE = 12
-
 // Main content component
 function GamePageContent({ slug }: Props) {
   const [listings, setListings] = useState<any[]>([])
@@ -184,6 +192,12 @@ function GamePageContent({ slug }: Props) {
   const searchParams = useSearchParams()
   const game = getGameBySlug(slug)
   const seoContent = getSEOContentBySlug(slug)
+
+  // Check if we're displaying items category (for compact card layout)
+  const isItemsCategory = selectedCategory === 'items'
+  
+  // Items category shows more per page since cards are smaller
+  const ITEMS_PER_PAGE = isItemsCategory ? 16 : 12
 
   useEffect(() => {
     const categoryParam = searchParams.get('category')
@@ -1041,10 +1055,9 @@ function GamePageContent({ slug }: Props) {
                 </div>
               )}
 
-              {/* Listings Grid */}
+              {/* Listings Grid - CONDITIONAL LAYOUT FOR ITEMS CATEGORY */}
               {loading ? (
-                // PERFORMANCE: Skeleton loading instead of spinner
-                <ListingGridSkeleton />
+                <ListingGridSkeleton isItemsCategory={isItemsCategory} />
               ) : filteredListings.length === 0 ? (
                 <div className="bg-slate-900/90 border border-white/10 rounded-2xl p-8 sm:p-12 text-center">
                   <div className="text-5xl sm:text-6xl mb-4" aria-hidden="true">
@@ -1065,23 +1078,38 @@ function GamePageContent({ slug }: Props) {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6" role="list">
+                  {/* CONDITIONAL GRID: 4 columns for Items, 3 columns for other categories */}
+                  <div 
+                    className={
+                      isItemsCategory
+                        ? "grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4"
+                        : "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6"
+                    } 
+                    role="list"
+                  >
                     {currentListings.map((listing, index) => (
                       <Link key={listing.id} href={`/listing/${listing.id}`} className="group h-full" role="listitem">
-                        {/* PERFORMANCE: Added contain for paint isolation, removed backdrop-blur, simplified animations */}
-                        <article className="listing-card relative h-full flex flex-col bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-colors duration-200 hover:shadow-xl hover:-translate-y-1">
-                          <div className="relative h-40 sm:h-48 flex-shrink-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden">
-                            {/* PERFORMANCE: Next.js Image with priority for first 3 items */}
+                        {/* CONDITIONAL CARD STYLING: Compact for Items, Regular for others */}
+                        <article className={`listing-card relative h-full flex flex-col bg-slate-900/80 border border-white/10 overflow-hidden hover:border-purple-500/50 transition-colors duration-200 hover:shadow-xl hover:-translate-y-1 ${
+                          isItemsCategory ? 'rounded-xl' : 'rounded-2xl'
+                        }`}>
+                          {/* IMAGE SECTION - Smaller for Items */}
+                          <div className={`relative flex-shrink-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 overflow-hidden ${
+                            isItemsCategory ? 'h-28 sm:h-32' : 'h-40 sm:h-48'
+                          }`}>
                             <ListingImage
                               src={listing.image_url}
                               alt={`${listing.title} - ${game.name} ${listing.category}`}
                               category={listing.category}
-                              priority={index < 3}
+                              priority={index < (isItemsCategory ? 4 : 3)}
+                              isCompact={isItemsCategory}
                             />
                             
-                            {/* Category Badge - PERFORMANCE: Removed backdrop-blur */}
-                            <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10">
-                              <span className="bg-black/70 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold border border-white/10">
+                            {/* Category Badge - Smaller for Items */}
+                            <div className={`absolute z-10 ${isItemsCategory ? 'top-1.5 left-1.5 sm:top-2 sm:left-2' : 'top-2 sm:top-3 left-2 sm:left-3'}`}>
+                              <span className={`bg-black/70 rounded-full text-white font-semibold border border-white/10 ${
+                                isItemsCategory ? 'px-2 py-0.5 text-[10px] sm:text-xs' : 'px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs'
+                              }`}>
                                 {listing.category === 'account'
                                   ? '🎮 Account'
                                   : listing.category === 'items'
@@ -1091,11 +1119,13 @@ function GamePageContent({ slug }: Props) {
                                   : '🔑 Key'}
                               </span>
                             </div>
-                            {/* Delivery Badge - PERFORMANCE: Removed backdrop-blur */}
+                            {/* Delivery Badge - Smaller for Items */}
                             {listing.delivery_type === 'automatic' && (
-                              <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10">
-                                <span className="bg-green-500/90 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs text-white font-semibold flex items-center gap-1">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <div className={`absolute z-10 ${isItemsCategory ? 'top-1.5 right-1.5 sm:top-2 sm:right-2' : 'top-2 sm:top-3 right-2 sm:right-3'}`}>
+                                <span className={`bg-green-500/90 rounded-full text-white font-semibold flex items-center gap-1 ${
+                                  isItemsCategory ? 'px-2 py-0.5 text-[10px] sm:text-xs' : 'px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs'
+                                }`}>
+                                  <svg className={isItemsCategory ? 'w-2.5 h-2.5' : 'w-3 h-3'} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                   </svg>
                                   Instant
@@ -1103,43 +1133,62 @@ function GamePageContent({ slug }: Props) {
                               </div>
                             )}
                           </div>
-                          <div className="relative p-4 sm:p-5 flex flex-col flex-grow">
-                            <p className="text-purple-400 text-xs sm:text-sm font-semibold mb-1">{game.name}</p>
-                            <h3 className="text-white font-bold text-base sm:text-lg mb-2 group-hover:text-purple-400 transition-colors duration-200 line-clamp-1">
+
+                          {/* CONTENT SECTION - Compact padding for Items */}
+                          <div className={`relative flex flex-col flex-grow ${
+                            isItemsCategory ? 'p-3 sm:p-3.5' : 'p-4 sm:p-5'
+                          }`}>
+                            <p className={`text-purple-400 font-semibold mb-0.5 ${
+                              isItemsCategory ? 'text-[10px] sm:text-xs' : 'text-xs sm:text-sm'
+                            }`}>{game.name}</p>
+                            <h3 className={`text-white font-bold group-hover:text-purple-400 transition-colors duration-200 line-clamp-1 ${
+                              isItemsCategory ? 'text-sm sm:text-base mb-1' : 'text-base sm:text-lg mb-2'
+                            }`}>
                               {listing.title}
                             </h3>
-                            <p className="text-gray-400 text-xs sm:text-sm mb-3 line-clamp-2">{listing.description}</p>
+                            <p className={`text-gray-400 line-clamp-2 ${
+                              isItemsCategory ? 'text-[10px] sm:text-xs mb-2' : 'text-xs sm:text-sm mb-3'
+                            }`}>{listing.description}</p>
                             
-                            {/* Tags Display */}
-                            <div className="h-8 mb-3">
+                            {/* Tags Display - Smaller for Items */}
+                            <div className={isItemsCategory ? 'h-6 mb-2' : 'h-8 mb-3'}>
                               {listing.tags && listing.tags.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
-                                  {listing.tags.slice(0, 3).map((tag: string) => (
-                                    <span key={tag} className="px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-xs text-purple-300">
+                                  {listing.tags.slice(0, isItemsCategory ? 2 : 3).map((tag: string) => (
+                                    <span key={tag} className={`bg-purple-500/10 border border-purple-500/20 rounded text-purple-300 ${
+                                      isItemsCategory ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs'
+                                    }`}>
                                       {tag}
                                     </span>
                                   ))}
-                                  {listing.tags.length > 3 && (
-                                    <span className="px-2 py-1 bg-slate-800/50 border border-white/10 rounded text-xs text-gray-400">
-                                      +{listing.tags.length - 3} more
+                                  {listing.tags.length > (isItemsCategory ? 2 : 3) && (
+                                    <span className={`bg-slate-800/50 border border-white/10 rounded text-gray-400 ${
+                                      isItemsCategory ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs'
+                                    }`}>
+                                      +{listing.tags.length - (isItemsCategory ? 2 : 3)} more
                                     </span>
                                   )}
                                 </div>
                               ) : null}
                             </div>
 
+                            {/* Price & Seller - Compact for Items */}
                             <div className="flex items-center justify-between mt-auto">
-                              <span className="text-xl sm:text-2xl font-bold text-green-400">
+                              <span className={`font-bold text-green-400 ${
+                                isItemsCategory ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'
+                              }`}>
                                 ${parseFloat(listing.price).toFixed(2)}
                               </span>
                               <div className="text-right">
-                                <p className="text-gray-500 text-xs mb-0.5 sm:mb-1">Seller</p>
-                                <p className="text-white font-semibold text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">{listing.profiles?.username}</p>
+                                <p className={`text-gray-500 ${isItemsCategory ? 'text-[10px] mb-0' : 'text-xs mb-0.5 sm:mb-1'}`}>Seller</p>
+                                <p className={`text-white font-semibold truncate ${
+                                  isItemsCategory ? 'text-[10px] sm:text-xs max-w-[60px] sm:max-w-[80px]' : 'text-xs sm:text-sm max-w-[100px] sm:max-w-none'
+                                }`}>{listing.profiles?.username}</p>
                                 <div className="flex items-center justify-end gap-1">
-                                  <span className="text-yellow-400 text-xs sm:text-sm" aria-hidden="true">
+                                  <span className={`text-yellow-400 ${isItemsCategory ? 'text-[10px]' : 'text-xs sm:text-sm'}`} aria-hidden="true">
                                     ★
                                   </span>
-                                  <span className="text-gray-400 text-xs">
+                                  <span className={`text-gray-400 ${isItemsCategory ? 'text-[10px]' : 'text-xs'}`}>
                                     {listing.profiles?.average_rating?.toFixed(1) || '0.0'} ({listing.profiles?.total_reviews || 0})
                                   </span>
                                 </div>
