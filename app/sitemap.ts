@@ -5,6 +5,9 @@ import { MetadataRoute } from 'next'
 import { siteConfig } from '@/lib/seo-config'
 import { gamesConfig } from '@/lib/games-config'
 
+// Revalidate sitemap every 6 hours to include new listings/profiles
+export const revalidate = 21600
+
 // Hardcoded blog posts for sitemap
 // TODO: Consider moving to database or CMS for easier management
 const blogPosts = [
