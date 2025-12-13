@@ -25,6 +25,45 @@ interface UseAdminActionsProps {
   fetchFraudFlags: () => Promise<void>
 }
 
+// Helper function to send vendor status emails
+async function sendVendorStatusEmail(
+  type: 'vendor_approved' | 'vendor_rejected' | 'vendor_resubmission_required',
+  data: {
+    userEmail: string
+    username: string
+    rejectionReason?: string
+    resubmissionFields?: string[]
+    resubmissionInstructions?: string
+  }
+) {
+  try {
+    console.log('📧 Attempting to send vendor status email:', { type, data })
+    
+    const supabase = createClient()
+    const { data: functionData, error } = await supabase.functions.invoke('send-order-email', {
+      body: {
+        type,
+        userEmail: data.userEmail,
+        username: data.username,
+        rejectionReason: data.rejectionReason,
+        resubmissionFields: data.resubmissionFields,
+        resubmissionInstructions: data.resubmissionInstructions
+      }
+    })
+
+    if (error) {
+      console.error('❌ Failed to send vendor status email:', error)
+      return false
+    }
+
+    console.log('✅ Vendor status email sent successfully:', functionData)
+    return true
+  } catch (error) {
+    console.error('❌ Error sending vendor status email:', error)
+    return false
+  }
+}
+
 export function useAdminActions({
   userId,
   profile,
@@ -180,6 +219,24 @@ export function useAdminActions({
       }).eq('id', verification.id)
 
       await logAdminAction(userId, 'vendor_verification_approved', `Approved verification for ${verification.user?.username}`)
+      
+      // DEBUG: Log what we have in verification.user
+      console.log('🔍 DEBUG - Verification object:', verification)
+      console.log('🔍 DEBUG - verification.user:', verification.user)
+      console.log('🔍 DEBUG - verification.user?.email:', verification.user?.email)
+      console.log('🔍 DEBUG - verification.user?.username:', verification.user?.username)
+      
+      // Send approval email notification
+      if (verification.user?.email && verification.user?.username) {
+        console.log('✅ Conditions met, sending approval email...')
+        await sendVendorStatusEmail('vendor_approved', {
+          userEmail: verification.user.email,
+          username: verification.user.username
+        })
+      } else {
+        console.log('❌ Email conditions NOT met - email or username missing')
+      }
+      
       alert('✅ Verification approved!')
       fetchVerifications()
       fetchUsers()
@@ -227,6 +284,34 @@ export function useAdminActions({
       if (error) throw error
 
       await logAdminAction(userId, 'vendor_verification_rejected', `Rejected verification for ${verification.user?.username} (${rejectionType})`)
+      
+      // DEBUG: Log what we have in verification.user
+      console.log('🔍 DEBUG - Verification object:', verification)
+      console.log('🔍 DEBUG - verification.user:', verification.user)
+      console.log('🔍 DEBUG - verification.user?.email:', verification.user?.email)
+      console.log('🔍 DEBUG - verification.user?.username:', verification.user?.username)
+      
+      // Send rejection or resubmission email notification
+      if (verification.user?.email && verification.user?.username) {
+        console.log('✅ Conditions met, sending rejection/resubmission email...')
+        if (rejectionType === 'resubmission_required') {
+          await sendVendorStatusEmail('vendor_resubmission_required', {
+            userEmail: verification.user.email,
+            username: verification.user.username,
+            resubmissionFields: resubmissionFields,
+            resubmissionInstructions: resubmissionInstructions.trim()
+          })
+        } else {
+          await sendVendorStatusEmail('vendor_rejected', {
+            userEmail: verification.user.email,
+            username: verification.user.username,
+            rejectionReason: rejectionReason.trim()
+          })
+        }
+      } else {
+        console.log('❌ Email conditions NOT met - email or username missing')
+      }
+      
       alert(rejectionType === 'permanent' ? '❌ Permanently rejected.' : '🔄 Resubmission requested.')
       fetchVerifications()
       return true

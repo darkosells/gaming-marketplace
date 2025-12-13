@@ -138,16 +138,18 @@ export function useAdminData(userId: string | undefined, isAdmin: boolean) {
   }, [supabase])
 
   const fetchVerifications = useCallback(async () => {
+    // Added 'email' to the select query to enable sending vendor status emails
     const { data: pendingData } = await supabase
       .from('vendor_verifications')
-      .select('*, user:profiles!user_id(username, id, created_at)')
+      .select('*, user:profiles!user_id(username, id, email, created_at)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
     setPendingVerifications(pendingData || [])
 
+    // Added 'email' to past verifications as well for consistency
     const { data: pastData } = await supabase
       .from('vendor_verifications')
-      .select('*, user:profiles!user_id(username, id), reviewer:profiles!reviewed_by(username)')
+      .select('*, user:profiles!user_id(username, id, email), reviewer:profiles!reviewed_by(username)')
       .neq('status', 'pending')
       .order('reviewed_at', { ascending: false })
     setPastVerifications(pastData || [])
