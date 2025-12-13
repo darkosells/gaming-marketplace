@@ -388,6 +388,9 @@ export default function CheckoutPage() {
     }
   }, [selectedPayment, paypalLoaded, cartItem, renderPayPalButtons])
 
+  // ============================================================================
+  // FIXED: Create order as PENDING first, then UPDATE to PAID to trigger delivery
+  // ============================================================================
   const createDatabaseOrder = async (paymentId: string, paymentMethod: string, paymentStatus: string) => {
     if (!cartItem || !user) {
       throw new Error('Missing cart item or user')
@@ -396,7 +399,9 @@ export default function CheckoutPage() {
     const totalPrice = cartItem.listing.price * cartItem.quantity
     console.log('Creating order with:', { paymentId, paymentMethod, paymentStatus, totalPrice })
 
-    // Create the order with paid status
+    // ========================================================================
+    // STEP 1: INSERT order with PENDING status first
+    // ========================================================================
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -405,11 +410,11 @@ export default function CheckoutPage() {
         seller_id: cartItem.listing.seller_id,
         amount: totalPrice,
         quantity: cartItem.quantity,
-        status: paymentStatus === 'paid' ? 'paid' : 'pending',
-        payment_status: paymentStatus,
+        status: 'pending',           // Always start as pending
+        payment_status: 'pending',   // Always start as pending
         payment_method: paymentMethod,
         payment_id: paymentId,
-        paid_at: paymentStatus === 'paid' ? new Date().toISOString() : null
+        listing_delivery_type: cartItem.listing.delivery_type // Store delivery type on order
       })
       .select()
       .single()
@@ -423,25 +428,59 @@ export default function CheckoutPage() {
       throw new Error('Order was not created - no data returned')
     }
 
-    console.log('Order created successfully:', order.id)
+    console.log('Order created with pending status:', order.id)
 
-    // Reduce stock for the listing
-    const { error: stockError } = await supabase
-      .from('listings')
-      .update({ 
-        stock: cartItem.listing.stock - cartItem.quantity,
-        status: cartItem.listing.stock - cartItem.quantity <= 0 ? 'sold' : 'active'
-      })
-      .eq('id', cartItem.listing.id)
+    // ========================================================================
+    // STEP 2: UPDATE order to PAID status - THIS TRIGGERS AUTOMATIC DELIVERY!
+    // ========================================================================
+    if (paymentStatus === 'paid') {
+      console.log('Updating order to paid status (this will trigger automatic delivery if applicable)...')
+      
+      const { data: updatedOrder, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          status: 'paid',
+          payment_status: 'paid',
+          paid_at: new Date().toISOString()
+        })
+        .eq('id', order.id)
+        .select()
+        .single()
 
-    if (stockError) {
-      console.error('Stock update error:', stockError)
-      // Don't throw - order is created, stock update failure is non-critical
+      if (updateError) {
+        console.error('Order update error:', updateError)
+        // Order was created, but update failed - still proceed
+      } else {
+        console.log('Order updated to paid. New status:', updatedOrder?.status)
+        // If automatic delivery worked, status should now be 'delivered'
+        if (updatedOrder?.status === 'delivered') {
+          console.log('✅ Automatic delivery triggered successfully!')
+        }
+      }
     }
 
-    // ========================================
-    // 📧 SEND ORDER CONFIRMATION EMAILS
-    // ========================================
+    // ========================================================================
+    // STEP 3: Reduce stock (only for manual delivery - automatic handled by trigger)
+    // ========================================================================
+    if (cartItem.listing.delivery_type === 'manual') {
+      const { error: stockError } = await supabase
+        .from('listings')
+        .update({ 
+          stock: cartItem.listing.stock - cartItem.quantity,
+          status: cartItem.listing.stock - cartItem.quantity <= 0 ? 'sold' : 'active'
+        })
+        .eq('id', cartItem.listing.id)
+
+      if (stockError) {
+        console.error('Stock update error:', stockError)
+        // Don't throw - order is created, stock update failure is non-critical
+      }
+    }
+    // Note: For automatic delivery, stock is reduced via delivery_codes trigger
+
+    // ========================================================================
+    // STEP 4: Send order confirmation emails
+    // ========================================================================
     try {
       console.log('📧 Sending order confirmation emails...')
       
@@ -484,9 +523,10 @@ export default function CheckoutPage() {
       console.error('❌ Email sending failed (non-critical):', emailError)
       // Don't throw - emails are non-critical, order is already created
     }
-    // ========================================
 
-    // Clear cart only after successful order creation
+    // ========================================================================
+    // STEP 5: Clear cart and redirect
+    // ========================================================================
     localStorage.removeItem('cart')
     window.dispatchEvent(new Event('cart-updated'))
 
