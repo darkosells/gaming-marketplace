@@ -1,4 +1,4 @@
-// app/listing/[id]/edit/page.tsx - MODERNIZED EDIT LISTING WITH TAGS, VALIDATION & GAME-SPECIFIC FILTERS
+// app/listing/[id]/edit/page.tsx - FIXED EDIT LISTING WITH CORRECT DELIVERY TYPE HANDLING
 
 'use client'
 
@@ -296,7 +296,10 @@ export default function EditListingPage() {
       setPrice(data.price.toString())
       setPlatform(data.platform || '')
       setStock(data.stock.toString())
-      setDeliveryType(data.delivery_type === 'instant' ? 'automatic' : 'manual')
+      
+      // FIX: Correctly check for 'automatic' (database value) instead of 'instant'
+      // Database stores 'automatic' or 'manual' - NOT 'instant'
+      setDeliveryType(data.delivery_type === 'automatic' ? 'automatic' : 'manual')
       
       // Load existing tags
       if (data.tags && Array.isArray(data.tags)) {
@@ -317,8 +320,9 @@ export default function EditListingPage() {
         setImageUrls([])
       }
 
-      // Fetch delivery codes if automatic
-      if (data.delivery_type === 'instant' || data.delivery_type === 'automatic') {
+      // Fetch delivery codes if automatic delivery
+      // FIX: Check for 'automatic' (the actual database value)
+      if (data.delivery_type === 'automatic') {
         await fetchDeliveryCodes()
       }
     } catch (error: any) {
@@ -567,6 +571,8 @@ export default function EditListingPage() {
       }
 
       // Build update data
+      // FIX: Save delivery_type directly as 'automatic' or 'manual' (NOT 'instant')
+      // Database constraint only allows 'automatic' or 'manual'
       const updateData: any = {
         title,
         game,
@@ -578,7 +584,7 @@ export default function EditListingPage() {
         status: newStatus,
         image_url: imageUrls[0] || null, // Keep for backward compatibility
         image_urls: imageUrls, // New array field
-        delivery_type: deliveryType === 'automatic' ? 'instant' : 'manual',
+        delivery_type: deliveryType, // FIX: Use deliveryType directly ('automatic' or 'manual')
         tags: selectedTags.length > 0 ? selectedTags : null
       }
 
@@ -1136,7 +1142,7 @@ export default function EditListingPage() {
                       >
                         <div className="text-4xl mb-3">📦</div>
                         <div className="text-white font-bold mb-2">Manual Delivery</div>
-                        <div className="text-sm text-gray-400">You manually deliver after payment (up to 48h)</div>
+                        <div className="text-sm text-gray-400">You manually deliver after payment (up to 24h)</div>
                       </button>
 
                       <button
@@ -1150,7 +1156,7 @@ export default function EditListingPage() {
                       >
                         <div className="text-4xl mb-3">⚡</div>
                         <div className="text-white font-bold mb-2">Instant Delivery</div>
-                        <div className="text-sm text-gray-400">Instant delivery with codes</div>
+                        <div className="text-sm text-gray-400">Instant delivery with codes (auto-sent after payment)</div>
                       </button>
                     </div>
                   </div>
