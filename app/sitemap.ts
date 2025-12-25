@@ -69,6 +69,15 @@ const blogPosts = [
     slug: 'how-much-is-my-roblox-account-worth',
     lastModified: '2024-12-09',
   },
+  // New blog posts added December 2025
+  {
+    slug: 'fortnite-chapter-7-account-guide-2025',
+    lastModified: '2025-12-25',
+  },
+  {
+    slug: 'valorant-skins-investment-guide-2025',
+    lastModified: '2025-12-25',
+  },
 ]
 
 // Product categories with their slugs
