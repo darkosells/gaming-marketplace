@@ -160,7 +160,7 @@ export const blogPostsMeta: BlogPostMeta[] = [
     tags: ['GTA 5', 'GTA Online', 'Modded Cars', 'Modded Outfits', 'Tryhard'],
     relevantCategories: ['account', 'items'],
   },
-  // 2 NEW VALUATION POSTS
+  // 2 VALUATION POSTS
   {
     slug: 'how-much-is-my-valorant-account-worth',
     title: 'How Much Is My Valorant Account Worth? Complete Price Guide 2024',
@@ -186,6 +186,33 @@ export const blogPostsMeta: BlogPostMeta[] = [
     image: 'https://images.unsplash.com/photo-1493711662062-fa541f7f3d24?w=1200&auto=format&fit=crop',
     tags: ['Roblox', 'Account Value', 'Pricing', 'Limiteds', 'RAP'],
     relevantCategories: ['account', 'items', 'currency'],
+  },
+  // 2 NEW POSTS - DECEMBER 2025
+  {
+    slug: 'fortnite-chapter-7-account-guide-2025',
+    title: 'Fortnite Chapter 7 Account Guide: What\'s New & What\'s Worth Buying in 2025',
+    excerpt: 'Complete guide to Fortnite Chapter 7 Pacific Break. Learn about the Kill Bill collab, new mechanics, Winterfest 2025, and which accounts are most valuable now.',
+    category: 'Guides',
+    game: 'Fortnite',
+    author: 'Nashflare Team',
+    date: '2025-12-25',
+    readTime: '14 min read',
+    image: 'https://images.unsplash.com/photo-1589241062272-c0a000072dfa?w=1200&auto=format&fit=crop',
+    tags: ['Fortnite', 'Chapter 7', 'Pacific Break', 'Kill Bill', 'Winterfest 2025', 'Account Value'],
+    relevantCategories: ['account', 'items', 'currency'],
+  },
+  {
+    slug: 'valorant-skins-investment-guide-2025',
+    title: 'Valorant Skins Investment Guide 2025: Which Skins Hold Value?',
+    excerpt: 'Discover which Valorant skins are worth investing in. From Champions bundles to rare Battle Pass items, learn what drives account value in 2025.',
+    category: 'Investment',
+    game: 'Valorant',
+    author: 'Nashflare Team',
+    date: '2025-12-25',
+    readTime: '15 min read',
+    image: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=1200&auto=format&fit=crop',
+    tags: ['Valorant', 'Skins', 'Investment', 'Champions', 'Account Value', 'Battle Pass'],
+    relevantCategories: ['account', 'items'],
   },
 ]
 

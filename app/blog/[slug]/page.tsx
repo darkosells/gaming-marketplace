@@ -81,7 +81,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-// Dynamic content loader - ALL 14 POSTS
+// Dynamic content loader - ALL 16 POSTS
 async function getPostContent(slug: string): Promise<string | null> {
   try {
     switch (slug) {
@@ -111,11 +111,16 @@ async function getPostContent(slug: string): Promise<string | null> {
         return (await import('@/lib/blog/content/how-much-is-my-fortnite-account-worth')).content
       case 'gta-5-modded-cars-outfits-guide':
         return (await import('@/lib/blog/content/gta-5-modded-cars-outfits-guide')).content
-      // NEW 2 VALUATION POSTS
+      // 2 VALUATION POSTS
       case 'how-much-is-my-valorant-account-worth':
         return (await import('@/lib/blog/content/how-much-is-my-valorant-account-worth')).content
       case 'how-much-is-my-roblox-account-worth':
         return (await import('@/lib/blog/content/how-much-is-my-roblox-account-worth')).content
+      // 2 NEW POSTS - DECEMBER 2025
+      case 'fortnite-chapter-7-account-guide-2025':
+        return (await import('@/lib/blog/content/fortnite-chapter-7-account-guide-2025')).content
+      case 'valorant-skins-investment-guide-2025':
+        return (await import('@/lib/blog/content/valorant-skins-investment-guide-2025')).content
       default:
         return null
     }
