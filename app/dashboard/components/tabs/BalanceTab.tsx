@@ -3,25 +3,62 @@
 import { useState } from 'react'
 import type { Withdrawal, Order } from '../../types'
 
+interface BoostingOrder {
+  id: string
+  order_number: string
+  vendor_id: string
+  customer_id: string
+  game: string
+  vendor_payout: number
+  final_price: number
+  platform_fee: number
+  payment_status: string
+  status: string
+  created_at: string
+  customer_confirmed_at: string | null
+}
+
 interface BalanceTabProps {
+  // Marketplace
+  marketplaceEarnings: number
+  marketplacePendingEarnings: number
+  completedOrders: Order[]
+  pendingOrders: Order[]
+  
+  // Boosting
+  boostingEarnings: number
+  boostingPendingEarnings: number
+  completedBoostingOrders: BoostingOrder[]
+  pendingBoostingOrders: BoostingOrder[]
+  
+  // Combined
   totalEarnings: number
   totalWithdrawn: number
   netRevenue: number
-  completedOrders: Order[]
+  
+  // Withdrawals
   withdrawals: Withdrawal[]
   setShowWithdrawalForm: (show: boolean) => void
 }
 
 export default function BalanceTab({
+  marketplaceEarnings,
+  marketplacePendingEarnings,
+  completedOrders,
+  pendingOrders,
+  boostingEarnings,
+  boostingPendingEarnings,
+  completedBoostingOrders,
+  pendingBoostingOrders,
   totalEarnings,
   totalWithdrawn,
   netRevenue,
-  completedOrders,
   withdrawals,
   setShowWithdrawalForm
 }: BalanceTabProps) {
   const [withdrawalsPage, setWithdrawalsPage] = useState(1)
   const [copyToast, setCopyToast] = useState<string | null>(null)
+  const [showEarningsBreakdown, setShowEarningsBreakdown] = useState(false)
   const withdrawalsPerPage = 5
 
   const totalWithdrawalsPages = Math.ceil(withdrawals.length / withdrawalsPerPage)
@@ -39,6 +76,10 @@ export default function BalanceTab({
     setCopyToast(refNum)
     setTimeout(() => setCopyToast(null), 2000)
   }
+
+  // Calculate totals for display
+  const totalPendingEarnings = marketplacePendingEarnings + boostingPendingEarnings
+  const totalCompletedCount = completedOrders.length + completedBoostingOrders.length
 
   return (
     <div id="balance-section">
@@ -64,17 +105,30 @@ export default function BalanceTab({
         Balance & Withdrawals
       </h2>
 
-      {/* Balance Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+      {/* Balance Overview - Main Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-4">
+        {/* Total Earned Card */}
         <div className="bg-slate-800/50 border border-white/10 rounded-xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <span className="text-gray-400 text-xs sm:text-sm">Total Earned</span>
             <span className="text-xl sm:text-2xl">💵</span>
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-white mb-1">${totalEarnings.toFixed(2)}</div>
-          <div className="text-[10px] sm:text-xs text-gray-500">From {completedOrders.length} completed orders</div>
+          <div className="text-[10px] sm:text-xs text-gray-500">From {totalCompletedCount} completed orders</div>
+          
+          {/* Toggle breakdown button */}
+          <button
+            onClick={() => setShowEarningsBreakdown(!showEarningsBreakdown)}
+            className="mt-2 text-[10px] sm:text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+          >
+            {showEarningsBreakdown ? 'Hide' : 'Show'} breakdown
+            <svg className={`w-3 h-3 transition-transform ${showEarningsBreakdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
         </div>
 
+        {/* Withdrawn Card */}
         <div className="bg-slate-800/50 border border-white/10 rounded-xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <span className="text-gray-400 text-xs sm:text-sm">Withdrawn</span>
@@ -84,6 +138,7 @@ export default function BalanceTab({
           <div className="text-[10px] sm:text-xs text-gray-500">{withdrawals.filter(w => w.status === 'completed').length} completed withdrawals</div>
         </div>
 
+        {/* Available Balance Card */}
         <div className="bg-slate-800/50 border border-green-500/30 rounded-xl p-4 sm:p-6">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <span className="text-green-400 text-xs sm:text-sm font-semibold">Available Balance</span>
@@ -101,6 +156,82 @@ export default function BalanceTab({
           </button>
         </div>
       </div>
+
+      {/* Earnings Breakdown (Collapsible) */}
+      {showEarningsBreakdown && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 animate-in slide-in-from-top-2 fade-in duration-300">
+          {/* Marketplace Earnings */}
+          <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <span className="text-lg">🎮</span>
+              </div>
+              <div>
+                <h4 className="text-white font-semibold text-sm">Marketplace</h4>
+                <p className="text-[10px] text-gray-400">Accounts, Items, Keys</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-xs">Completed</span>
+                <span className="text-white font-semibold text-sm">${marketplaceEarnings.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-xs">Pending</span>
+                <span className="text-yellow-400 text-sm">${marketplacePendingEarnings.toFixed(2)}</span>
+              </div>
+              <div className="pt-2 border-t border-white/10 flex justify-between items-center">
+                <span className="text-gray-500 text-[10px]">{completedOrders.length} completed / {pendingOrders.length} pending</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Boosting Earnings */}
+          <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-xl p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                <span className="text-lg">⚡</span>
+              </div>
+              <div>
+                <h4 className="text-white font-semibold text-sm">Boosting</h4>
+                <p className="text-[10px] text-gray-400">Rank Boosts</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-xs">Completed</span>
+                <span className="text-white font-semibold text-sm">${boostingEarnings.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-xs">Pending</span>
+                <span className="text-yellow-400 text-sm">${boostingPendingEarnings.toFixed(2)}</span>
+              </div>
+              <div className="pt-2 border-t border-white/10 flex justify-between items-center">
+                <span className="text-gray-500 text-[10px]">{completedBoostingOrders.length} completed / {pendingBoostingOrders.length} pending</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Earnings Banner */}
+      {totalPendingEarnings > 0 && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-xl">⏳</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-yellow-400 font-semibold text-sm">
+                ${totalPendingEarnings.toFixed(2)} Pending
+              </p>
+              <p className="text-gray-400 text-xs">
+                From {pendingOrders.length + pendingBoostingOrders.length} orders awaiting completion
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Withdrawal History */}
       <div id="withdrawals-section">

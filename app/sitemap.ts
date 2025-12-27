@@ -88,6 +88,21 @@ const categories = [
   { slug: 'key', name: 'Game Keys' },
 ]
 
+// Boosting pages
+const boostingPages = [
+  {
+    slug: '',  // Main boosting landing page: /boosting
+    lastModified: '2025-12-26',
+  },
+  {
+    slug: 'valorant',  // Valorant boosting: /boosting/valorant
+    lastModified: '2025-12-26',
+  },
+  // Add more games here as they launch:
+  // { slug: 'league-of-legends', lastModified: '2025-XX-XX' },
+  // { slug: 'cs2', lastModified: '2025-XX-XX' },
+]
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = siteConfig.url
   const now = new Date()
@@ -190,6 +205,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Instead, use dedicated game pages at /games/[slug] which are cleaner for SEO
 
   // ============================================
+  // BOOSTING PAGES (High Priority - Service Pages)
+  // ============================================
+  const boostingPagesMap: MetadataRoute.Sitemap = boostingPages.map((page) => ({
+    url: page.slug ? `${baseUrl}/boosting/${page.slug}` : `${baseUrl}/boosting`,
+    lastModified: new Date(page.lastModified),
+    changeFrequency: 'weekly',
+    priority: 0.9,
+  }))
+
+  // ============================================
   // BLOG PAGES (High Priority for SEO)
   // ============================================
   const blogPages: MetadataRoute.Sitemap = blogPosts.map((post) => ({
@@ -256,6 +281,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...staticPages,         // Core static pages
     ...gamePages,           // Dedicated game pages (high priority)
     ...categoryPages,       // Category browse pages
+    ...boostingPagesMap,    // Boosting service pages (high priority)
     ...blogPages,           // Blog posts (high priority for SEO)
     ...listingPages,        // Individual product listings
     ...profilePages,        // Verified vendor profiles

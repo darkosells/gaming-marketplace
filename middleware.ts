@@ -77,6 +77,7 @@ export async function middleware(request: NextRequest) {
   // Protected routes that REQUIRE email verification
   const protectedRoutes = [
     '/dashboard',
+    '/boosting',
     '/customer-dashboard', 
     '/admin',
     '/cart',

@@ -5,6 +5,22 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import type { Profile, Listing, Order, Withdrawal, InventoryStats, VendorRank, RankProgress, RankData } from '../types'
 
+// Boosting order type for vendor earnings
+interface BoostingOrder {
+  id: string
+  order_number: string
+  vendor_id: string
+  customer_id: string
+  game: string
+  vendor_payout: number
+  final_price: number
+  platform_fee: number
+  payment_status: string
+  status: string
+  created_at: string
+  customer_confirmed_at: string | null
+}
+
 export function useVendorData() {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -12,8 +28,12 @@ export function useVendorData() {
   const [error, setError] = useState<string | null>(null)
   const [myListings, setMyListings] = useState<Listing[]>([])
   const [myOrders, setMyOrders] = useState<Order[]>([])
-  const [myPurchases, setMyPurchases] = useState<Order[]>([]) // NEW: Purchases state
+  const [myPurchases, setMyPurchases] = useState<Order[]>([])
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
+  
+  // NEW: Boosting orders state
+  const [myBoostingOrders, setMyBoostingOrders] = useState<BoostingOrder[]>([])
+  
   const [inventoryStats, setInventoryStats] = useState<InventoryStats>({
     lowStock: [],
     outOfStock: [],
@@ -84,7 +104,7 @@ export function useVendorData() {
     }
   }, [supabase])
 
-  // NEW: Fetch purchases (orders where vendor is the buyer)
+  // Fetch purchases (orders where vendor is the buyer)
   const fetchMyPurchases = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -109,7 +129,6 @@ export function useVendorData() {
         return
       }
       
-      // Map to ensure consistent structure
       const mappedPurchases = (data || []).map(order => ({
         ...order,
         listing: order.listing || {
@@ -123,6 +142,45 @@ export function useVendorData() {
       setMyPurchases(mappedPurchases)
     } catch (error) {
       console.error('Error fetching purchases:', error)
+    }
+  }, [supabase])
+
+  // NEW: Fetch boosting orders where vendor is the booster
+  const fetchMyBoostingOrders = useCallback(async (userId: string) => {
+    try {
+      console.log('Fetching boosting orders for vendor:', userId)
+      
+      const { data, error } = await supabase
+        .from('boosting_orders')
+        .select(`
+          id,
+          order_number,
+          vendor_id,
+          customer_id,
+          game,
+          vendor_payout,
+          final_price,
+          platform_fee,
+          payment_status,
+          status,
+          created_at,
+          customer_confirmed_at
+        `)
+        .eq('vendor_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Fetch boosting orders error:', error)
+        console.error('Error code:', error.code)
+        console.error('Error message:', error.message)
+        console.error('Error details:', error.details)
+        return
+      }
+
+      console.log('Boosting orders fetched:', data?.length || 0)
+      setMyBoostingOrders(data || [])
+    } catch (error) {
+      console.error('Error fetching boosting orders:', error)
     }
   }, [supabase])
 
@@ -240,11 +298,12 @@ export function useVendorData() {
         return
       }
 
-      // UPDATED: Include fetchMyPurchases in parallel fetch
+      // UPDATED: Include fetchMyBoostingOrders in parallel fetch
       const results = await Promise.allSettled([
         fetchMyListings(user.id),
         fetchMyOrders(user.id),
-        fetchMyPurchases(user.id), // NEW: Fetch purchases
+        fetchMyPurchases(user.id),
+        fetchMyBoostingOrders(user.id), // NEW: Fetch boosting orders
         fetchWithdrawals(user.id)
       ])
 
@@ -265,7 +324,7 @@ export function useVendorData() {
         router.push('/login')
       }
     }
-  }, [supabase, router, fetchMyListings, fetchMyOrders, fetchMyPurchases, fetchWithdrawals])
+  }, [supabase, router, fetchMyListings, fetchMyOrders, fetchMyPurchases, fetchMyBoostingOrders, fetchWithdrawals])
 
   useEffect(() => {
     checkUser()
@@ -275,7 +334,9 @@ export function useVendorData() {
     calculateInventoryStats()
   }, [myListings, myOrders, calculateInventoryStats])
 
-  // Derived values
+  // ============================================
+  // DERIVED VALUES - MARKETPLACE
+  // ============================================
   const activeListings = myListings.filter(l => l.status === 'active')
   const completedOrders = myOrders.filter(o => o.status === 'completed')
   const grossRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(String(o.amount)), 0)
@@ -283,23 +344,49 @@ export function useVendorData() {
   // Use dynamic commission rate from profile (rank-based) instead of hardcoded 0.05
   const commissionRate = profile?.commission_rate ?? 5.00
   const totalCommission = grossRevenue * (commissionRate / 100)
-  const totalEarnings = grossRevenue * (1 - commissionRate / 100)
+  const marketplaceEarnings = grossRevenue * (1 - commissionRate / 100)
   
-  const totalWithdrawn = withdrawals
-    .filter(w => w.status === 'completed' || w.status === 'pending')
-    .reduce((sum, w) => sum + parseFloat(String(w.amount)), 0)
-  const netRevenue = totalEarnings - totalWithdrawn
   const pendingOrders = myOrders.filter(o =>
     o.status === 'paid' ||
     o.status === 'delivered' ||
     o.status === 'dispute_raised'
   )
-  // Use dynamic commission rate for pending earnings
-  const pendingEarnings = pendingOrders.reduce((sum, o) => sum + (parseFloat(String(o.amount)) * (1 - commissionRate / 100)), 0)
+  const marketplacePendingEarnings = pendingOrders.reduce((sum, o) => sum + (parseFloat(String(o.amount)) * (1 - commissionRate / 100)), 0)
+
+  // ============================================
+  // DERIVED VALUES - BOOSTING
+  // ============================================
+ // Completed boosting orders (status completed + payment was made/released)
+const completedBoostingOrders = myBoostingOrders.filter(o => 
+  o.status === 'completed' && ['paid', 'released'].includes(o.payment_status)
+)
+  const boostingEarnings = completedBoostingOrders.reduce((sum, o) => sum + parseFloat(String(o.vendor_payout)), 0)
+  
+  // Pending boosting orders (in progress or awaiting confirmation, payment received)
+  const pendingBoostingOrders = myBoostingOrders.filter(o => 
+    o.payment_status === 'paid' && 
+    o.status !== 'completed' &&
+    !['cancelled', 'refunded'].includes(o.status)
+  )
+  const boostingPendingEarnings = pendingBoostingOrders.reduce((sum, o) => sum + parseFloat(String(o.vendor_payout)), 0)
+
+  // ============================================
+  // COMBINED TOTALS
+  // ============================================
+  const totalEarnings = marketplaceEarnings + boostingEarnings
+  const totalPendingEarnings = marketplacePendingEarnings + boostingPendingEarnings
+  
+  const totalWithdrawn = withdrawals
+    .filter(w => w.status === 'completed' || w.status === 'pending')
+    .reduce((sum, w) => sum + parseFloat(String(w.amount)), 0)
+  
+  const netRevenue = totalEarnings - totalWithdrawn
+
+  // Other derived values
   const uniqueGames = Array.from(new Set(myListings.map(l => l.game))).sort()
   const uniqueOrderGames = Array.from(new Set(myOrders.map(o => o.listing?.game || o.listing_game).filter((g): g is string => Boolean(g)))).sort()
 
-  // NEW: Purchase derived values
+  // Purchase derived values
   const completedPurchases = myPurchases.filter(p => p.status === 'completed')
   const pendingPurchases = myPurchases.filter(p => 
     p.status === 'pending' || p.status === 'paid' || p.status === 'delivered'
@@ -334,26 +421,43 @@ export function useVendorData() {
     error,
     myListings,
     myOrders,
-    myPurchases, // NEW: Export purchases
+    myPurchases,
     withdrawals,
     inventoryStats,
     activeListings,
     completedOrders,
     grossRevenue,
     totalCommission,
+    
+    // Marketplace earnings (separate)
+    marketplaceEarnings,
+    marketplacePendingEarnings,
+    
+    // Boosting earnings (separate)
+    myBoostingOrders,
+    completedBoostingOrders,
+    boostingEarnings,
+    pendingBoostingOrders,
+    boostingPendingEarnings,
+    
+    // Combined totals
     totalEarnings,
+    totalPendingEarnings,
     totalWithdrawn,
     netRevenue,
+    
+    // Legacy (keeping for backwards compatibility)
     pendingOrders,
-    pendingEarnings,
+    pendingEarnings: totalPendingEarnings,
+    
     uniqueGames,
     uniqueOrderGames,
-    // NEW: Purchase exports
     completedPurchases,
     pendingPurchases,
     fetchMyListings,
     fetchMyOrders,
-    fetchMyPurchases, // NEW: Export fetch function
+    fetchMyPurchases,
+    fetchMyBoostingOrders,
     fetchWithdrawals,
     supabase,
     // Rank exports

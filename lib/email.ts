@@ -444,3 +444,374 @@ export async function sendPasswordResetEmail(data: {
 export function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
+
+
+// ============================================================================
+// BOOSTING EMAIL FUNCTIONS
+// ============================================================================
+
+/**
+ * Send email to customer when a vendor submits an offer (accept or counter)
+ */
+export async function sendBoostNewOfferEmail(data: {
+  customerEmail: string
+  customerUsername: string
+  boosterUsername: string
+  currentRank: string
+  desiredRank: string
+  offerPrice: number
+  offerType: 'accept' | 'counter'
+  requestId: string
+  requestNumber: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'boost_new_offer',
+        ...data
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send boost new offer email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Send email to booster when their offer is accepted and paid
+ */
+export async function sendBoostOfferAcceptedEmail(data: {
+  boosterEmail: string
+  boosterUsername: string
+  customerUsername: string
+  currentRank: string
+  desiredRank: string
+  finalPrice: number
+  boosterPayout: number
+  orderNumber: string
+  orderId: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'boost_offer_accepted',
+        ...data
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send boost offer accepted email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Send email to booster when customer submits credentials
+ */
+export async function sendBoostCredentialsSubmittedEmail(data: {
+  boosterEmail: string
+  boosterUsername: string
+  customerUsername: string
+  currentRank: string
+  desiredRank: string
+  orderNumber: string
+  orderId: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'boost_credentials_submitted',
+        ...data
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send boost credentials submitted email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Send email to customer when booster starts the boost
+ */
+export async function sendBoostStartedEmail(data: {
+  customerEmail: string
+  customerUsername: string
+  boosterUsername: string
+  currentRank: string
+  desiredRank: string
+  orderNumber: string
+  orderId: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'boost_started',
+        ...data
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send boost started email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Send email to customer with progress update
+ */
+export async function sendBoostProgressUpdateEmail(data: {
+  customerEmail: string
+  customerUsername: string
+  boosterUsername: string
+  currentRank: string
+  desiredRank: string
+  newRank: string
+  newRR: number
+  gamesPlayed: number
+  gamesWon: number
+  notes?: string
+  orderNumber: string
+  orderId: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'boost_progress_update',
+        ...data
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send boost progress update email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Send email to customer when boost is complete and needs confirmation
+ */
+export async function sendBoostPendingConfirmationEmail(data: {
+  customerEmail: string
+  customerUsername: string
+  boosterUsername: string
+  currentRank: string
+  desiredRank: string
+  startRank: string
+  finalRank: string
+  finalRR: number
+  totalGames: number
+  totalWins: number
+  orderNumber: string
+  orderId: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'boost_pending_confirmation',
+        ...data
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send boost pending confirmation email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Send completion email to customer or booster
+ */
+export async function sendBoostCompletedEmail(data: {
+  recipientType: 'customer' | 'booster'
+  recipientEmail: string
+  recipientUsername: string
+  otherPartyUsername: string
+  currentRank: string
+  desiredRank: string
+  finalRank: string
+  totalGames: number
+  completionTime: string
+  boosterPayout?: number // Only for booster
+  orderNumber: string
+  orderId: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'boost_completed',
+        ...data
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send boost completed email:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Send completion emails to both customer and booster
+ */
+export async function sendBoostCompletionEmails(params: {
+  customerEmail: string
+  customerUsername: string
+  boosterEmail: string
+  boosterUsername: string
+  currentRank: string
+  desiredRank: string
+  finalRank: string
+  totalGames: number
+  completionTime: string
+  boosterPayout: number
+  orderNumber: string
+  orderId: string
+}): Promise<{ customerEmailSent: boolean; boosterEmailSent: boolean }> {
+  const results = await Promise.allSettled([
+    // Customer email
+    sendBoostCompletedEmail({
+      recipientType: 'customer',
+      recipientEmail: params.customerEmail,
+      recipientUsername: params.customerUsername,
+      otherPartyUsername: params.boosterUsername,
+      currentRank: params.currentRank,
+      desiredRank: params.desiredRank,
+      finalRank: params.finalRank,
+      totalGames: params.totalGames,
+      completionTime: params.completionTime,
+      orderNumber: params.orderNumber,
+      orderId: params.orderId
+    }),
+    // Booster email
+    sendBoostCompletedEmail({
+      recipientType: 'booster',
+      recipientEmail: params.boosterEmail,
+      recipientUsername: params.boosterUsername,
+      otherPartyUsername: params.customerUsername,
+      currentRank: params.currentRank,
+      desiredRank: params.desiredRank,
+      finalRank: params.finalRank,
+      totalGames: params.totalGames,
+      completionTime: params.completionTime,
+      boosterPayout: params.boosterPayout,
+      orderNumber: params.orderNumber,
+      orderId: params.orderId
+    })
+  ])
+
+  return {
+    customerEmailSent: results[0].status === 'fulfilled' && (results[0].value as EmailResponse).success,
+    boosterEmailSent: results[1].status === 'fulfilled' && (results[1].value as EmailResponse).success
+  }
+}
+
+// ============================================================================
+// MESSAGING EMAIL FUNCTIONS
+// ============================================================================
+
+/**
+ * Send email notification when a user receives a new message
+ */
+export async function sendNewMessageEmail(data: {
+  recipientEmail: string
+  recipientUsername: string
+  senderUsername: string
+  messagePreview: string
+  conversationId: string
+  listingTitle?: string
+  boostingOrderNumber?: string
+}): Promise<EmailResponse> {
+  try {
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({
+        type: 'new_message',
+        ...data
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to send new message email:', error)
+    return { success: false, error: error.message }
+  }
+}

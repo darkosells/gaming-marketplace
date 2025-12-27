@@ -61,7 +61,14 @@ export default function VendorDashboardPage() {
     supabase,
     // Rank data
     rankData,
-    rankProgress
+    rankProgress,
+    // NEW: Boosting earnings data
+    marketplaceEarnings,
+    marketplacePendingEarnings,
+    boostingEarnings,
+    boostingPendingEarnings,
+    completedBoostingOrders,
+    pendingBoostingOrders
   } = useVendorData()
 
   // Listing filters hook
@@ -296,7 +303,7 @@ export default function VendorDashboardPage() {
               >
                 🛒 <span className="hidden sm:inline">My </span>Orders ({myOrders.length})
               </button>
-              {/* NEW: My Purchases Tab */}
+              {/* My Purchases Tab */}
               <button
                 onClick={() => setActiveTab('purchases')}
                 className={`px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-sm lg:text-base whitespace-nowrap ${activeTab === 'purchases'
@@ -428,7 +435,7 @@ export default function VendorDashboardPage() {
               />
             )}
 
-            {/* NEW: Purchases Tab Content */}
+            {/* Purchases Tab Content */}
             {activeTab === 'purchases' && (
               <PurchasesTab
                 myPurchases={myPurchases}
@@ -436,12 +443,27 @@ export default function VendorDashboardPage() {
               />
             )}
 
+            {/* UPDATED: Balance Tab with boosting earnings */}
             {activeTab === 'balance' && (
               <BalanceTab
+                // Marketplace earnings
+                marketplaceEarnings={marketplaceEarnings}
+                marketplacePendingEarnings={marketplacePendingEarnings}
+                completedOrders={completedOrders}
+                pendingOrders={pendingOrders}
+                
+                // Boosting earnings
+                boostingEarnings={boostingEarnings}
+                boostingPendingEarnings={boostingPendingEarnings}
+                completedBoostingOrders={completedBoostingOrders}
+                pendingBoostingOrders={pendingBoostingOrders}
+                
+                // Combined totals
                 totalEarnings={totalEarnings}
                 totalWithdrawn={totalWithdrawn}
                 netRevenue={netRevenue}
-                completedOrders={completedOrders}
+                
+                // Withdrawals
                 withdrawals={withdrawals}
                 setShowWithdrawalForm={withdrawalActions.setShowWithdrawalForm}
               />

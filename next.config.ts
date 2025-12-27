@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
         hostname: 'oljvdnbgefdgxadfeslx.supabase.co',
         pathname: '/storage/v1/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'trackercdn.com',
+        pathname: '/cdn/tracker.gg/valorant/**',
+      },
     ],
   },
 };

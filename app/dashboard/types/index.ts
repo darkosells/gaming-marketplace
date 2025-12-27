@@ -1,6 +1,7 @@
 // Vendor Dashboard Types
 
-export type VendorTab = 'listings' | 'orders' | 'purchases' | 'balance' | 'inventory' | 'guide' | 'rank'
+// UPDATED: Added 'boosting' to VendorTab
+export type VendorTab = 'listings' | 'orders' | 'purchases' | 'balance' | 'inventory' | 'guide' | 'rank' | 'boosting'
 export type InventoryFilter = 'all' | 'low' | 'out' | 'over'
 export type InventorySort = 'stock' | 'value' | 'usage'
 

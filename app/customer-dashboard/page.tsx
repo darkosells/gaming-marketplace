@@ -3,9 +3,43 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
+import { RANKS_MAP } from '@/lib/boosting/ranks'
+import { RankKey } from '@/lib/boosting/types'
+
+// Boosting types
+interface BoostRequest {
+  id: string
+  request_number: string
+  game: string
+  current_rank: string
+  desired_rank: string
+  customer_offer_price: number
+  status: string
+  total_offers_received: number
+  expires_at: string
+  created_at: string
+}
+
+interface BoostingOrder {
+  id: string
+  order_number: string
+  game: string
+  current_rank: string
+  desired_rank: string
+  progress_current_rank: string | null
+  final_price: number
+  status: string
+  payment_status: string
+  created_at: string
+  vendor?: {
+    username: string
+    avatar_url: string | null
+  }
+}
 
 export default function CustomerDashboardPage() {
   const [user, setUser] = useState<any>(null)
@@ -15,6 +49,11 @@ export default function CustomerDashboardPage() {
   const [verificationStatus, setVerificationStatus] = useState<any>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [error, setError] = useState<string | null>(null)
+  
+  // Boosting state
+  const [boostRequests, setBoostRequests] = useState<BoostRequest[]>([])
+  const [boostOrders, setBoostOrders] = useState<BoostingOrder[]>([])
+  
   const ordersPerPage = 5
   const router = useRouter()
   const supabase = createClient()
@@ -61,7 +100,9 @@ export default function CustomerDashboardPage() {
       
       const results = await Promise.allSettled([
         fetchMyOrders(user.id),
-        fetchVerificationStatus(user.id)
+        fetchVerificationStatus(user.id),
+        fetchBoostRequests(user.id),
+        fetchBoostOrders(user.id)
       ])
       
       results.forEach((result, index) => {
@@ -85,8 +126,6 @@ export default function CustomerDashboardPage() {
 
   const fetchMyOrders = async (userId: string) => {
     try {
-      // Fetch orders with snapshot data - no need to join listings table
-      // The snapshot fields (listing_title, listing_game, etc.) are stored directly on the order
       const { data, error } = await supabase
         .from('orders')
         .select('*')
@@ -98,10 +137,8 @@ export default function CustomerDashboardPage() {
         return
       }
       
-      // Transform orders to use snapshot data, falling back to any joined listing data if available
       const transformedOrders = (data || []).map(order => ({
         ...order,
-        // Use snapshot data stored on the order itself
         listing: {
           title: order.listing_title || 'Deleted Listing',
           game: order.listing_game || 'N/A',
@@ -136,6 +173,71 @@ export default function CustomerDashboardPage() {
     }
   }
 
+  // Fetch boost requests (customer's open requests) with actual offer counts
+  const fetchBoostRequests = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('boost_requests')
+        .select(`
+          *,
+          boost_offers!boost_offers_request_id_fkey (
+            id,
+            status
+          )
+        `)
+        .eq('customer_id', userId)
+        .in('status', ['open', 'has_offers'])
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('Fetch boost requests error:', error)
+        return
+      }
+      
+      // Transform data to include actual pending offer count
+      const transformedData = (data || []).map(request => {
+        const pendingOffers = request.boost_offers?.filter(
+          (offer: any) => offer.status === 'pending'
+        ) || []
+        return {
+          ...request,
+          total_offers_received: pendingOffers.length,
+          boost_offers: undefined // Remove the nested data
+        }
+      })
+      
+      setBoostRequests(transformedData)
+    } catch (error) {
+      console.error('Error fetching boost requests:', error)
+    }
+  }
+
+  // Fetch boost orders (customer's boost orders)
+  const fetchBoostOrders = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('boosting_orders')
+        .select(`
+          *,
+          vendor:profiles!boosting_orders_vendor_id_fkey (
+            username,
+            avatar_url
+          )
+        `)
+        .eq('customer_id', userId)
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('Fetch boost orders error:', error)
+        return
+      }
+      
+      setBoostOrders(data || [])
+    } catch (error) {
+      console.error('Error fetching boost orders:', error)
+    }
+  }
+
   const totalPages = Math.ceil(myOrders.length / ordersPerPage)
   const startIndex = (currentPage - 1) * ordersPerPage
   const endIndex = startIndex + ordersPerPage
@@ -144,6 +246,23 @@ export default function CustomerDashboardPage() {
   const goToPage = (page: number) => {
     setCurrentPage(page)
     window.scrollTo({ top: document.getElementById('orders-section')?.offsetTop || 0, behavior: 'smooth' })
+  }
+
+  // Boosting stats
+  const activeBoostOrders = boostOrders.filter(o => 
+    ['awaiting_credentials', 'credentials_received', 'in_progress', 'pending_confirmation'].includes(o.status)
+  )
+  const completedBoostOrders = boostOrders.filter(o => o.status === 'completed')
+  const pendingRequests = boostRequests.filter(r => r.status === 'open' || r.status === 'has_offers')
+
+  // Status config for boost orders
+  const BOOST_STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+    awaiting_credentials: { label: 'Awaiting Credentials', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20' },
+    credentials_received: { label: 'Starting Soon', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
+    in_progress: { label: 'In Progress', color: 'text-cyan-400', bgColor: 'bg-cyan-500/20' },
+    pending_confirmation: { label: 'Confirm Completion', color: 'text-purple-400', bgColor: 'bg-purple-500/20' },
+    completed: { label: 'Completed', color: 'text-green-400', bgColor: 'bg-green-500/20' },
+    dispute: { label: 'Dispute', color: 'text-red-400', bgColor: 'bg-red-500/20' }
   }
 
   if (error) {
@@ -352,7 +471,7 @@ export default function CustomerDashboardPage() {
             )}
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6 lg:mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6 lg:mb-8">
               <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/30 transition-all duration-300 group">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -361,18 +480,29 @@ export default function CustomerDashboardPage() {
                   <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded-full">Total</span>
                 </div>
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1">{myOrders.length}</div>
-                <div className="text-xs sm:text-sm text-gray-400">Total Orders</div>
+                <div className="text-xs sm:text-sm text-gray-400">Marketplace Orders</div>
+              </div>
+
+              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-cyan-500/30 transition-all duration-300 group">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <span className="text-xl sm:text-2xl">🎮</span>
+                  </div>
+                  <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded-full">Active</span>
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1">{activeBoostOrders.length}</div>
+                <div className="text-xs sm:text-sm text-gray-400">Active Boosts</div>
               </div>
 
               <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-yellow-500/30 transition-all duration-300 group">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <span className="text-xl sm:text-2xl">⏳</span>
+                    <span className="text-xl sm:text-2xl">📋</span>
                   </div>
-                  <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded-full">Active</span>
+                  <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded-full">Open</span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-bold text-white mb-1">{myOrders.filter(o => o.status === 'pending' || o.status === 'paid' || o.status === 'delivered').length}</div>
-                <div className="text-xs sm:text-sm text-gray-400">Pending Orders</div>
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1">{pendingRequests.length}</div>
+                <div className="text-xs sm:text-sm text-gray-400">Boost Requests</div>
               </div>
 
               <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-green-500/30 transition-all duration-300 group">
@@ -382,44 +512,227 @@ export default function CustomerDashboardPage() {
                   </div>
                   <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded-full">Done</span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-bold text-white mb-1">{myOrders.filter(o => o.status === 'completed').length}</div>
-                <div className="text-xs sm:text-sm text-gray-400">Completed Orders</div>
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1">{completedBoostOrders.length}</div>
+                <div className="text-xs sm:text-sm text-gray-400">Completed Boosts</div>
               </div>
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6 lg:mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6 lg:mb-8">
               <Link href="/browse" className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/50 transition-all duration-300 group hover:-translate-y-1">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
                   <span className="text-2xl sm:text-3xl">🔍</span>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-2 group-hover:text-purple-400 transition-colors">Browse Marketplace</h3>
-                <p className="text-gray-400 text-xs sm:text-sm">Find gaming accounts, items, and keys</p>
+                <h3 className="text-base sm:text-lg font-bold text-white mb-1 group-hover:text-purple-400 transition-colors">Marketplace</h3>
+                <p className="text-gray-400 text-xs sm:text-sm">Browse accounts & items</p>
+              </Link>
+
+              <Link href="/boosting" className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-4 sm:p-6 hover:border-cyan-500/50 transition-all duration-300 group hover:-translate-y-1">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
+                  <span className="text-2xl sm:text-3xl">🎮</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-white mb-1 group-hover:text-cyan-400 transition-colors">Rank Boost</h3>
+                <p className="text-gray-400 text-xs sm:text-sm">Get boosted today</p>
               </Link>
 
               <Link href="/messages" className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/50 transition-all duration-300 group hover:-translate-y-1">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
                   <span className="text-2xl sm:text-3xl">💬</span>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-2 group-hover:text-purple-400 transition-colors">Messages</h3>
-                <p className="text-gray-400 text-xs sm:text-sm">Chat with sellers and track orders</p>
+                <h3 className="text-base sm:text-lg font-bold text-white mb-1 group-hover:text-purple-400 transition-colors">Messages</h3>
+                <p className="text-gray-400 text-xs sm:text-sm">Chat with sellers</p>
               </Link>
 
               <Link href="/settings" className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 hover:border-purple-500/50 transition-all duration-300 group hover:-translate-y-1">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-pink-500/20 to-orange-500/20 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
                   <span className="text-2xl sm:text-3xl">⚙️</span>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-2 group-hover:text-purple-400 transition-colors">Account Settings</h3>
-                <p className="text-gray-400 text-xs sm:text-sm">Manage your profile and preferences</p>
+                <h3 className="text-base sm:text-lg font-bold text-white mb-1 group-hover:text-purple-400 transition-colors">Settings</h3>
+                <p className="text-gray-400 text-xs sm:text-sm">Manage profile</p>
               </Link>
             </div>
+
+            {/* Active Boost Orders Section */}
+            {(activeBoostOrders.length > 0 || pendingRequests.length > 0) && (
+              <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6 lg:mb-8 hover:border-cyan-500/30 transition-all duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                    <span className="text-cyan-400">🎮</span>
+                    My Boosting Activity
+                  </h2>
+                  <Link 
+                    href="/boosting/my-requests"
+                    className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors"
+                  >
+                    View All →
+                  </Link>
+                </div>
+
+                {/* Pending Requests */}
+                {pendingRequests.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <span className="text-yellow-400">📋</span>
+                      Open Requests ({pendingRequests.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {pendingRequests.slice(0, 3).map((request) => {
+                        const currentRank = RANKS_MAP[request.current_rank as RankKey]
+                        const desiredRank = RANKS_MAP[request.desired_rank as RankKey]
+                        
+                        return (
+                          <Link
+                            key={request.id}
+                            href={`/boosting/my-requests/${request.id}`}
+                            className="block bg-slate-800/50 border border-yellow-500/20 rounded-xl p-4 hover:border-yellow-500/40 transition-all"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-10 h-10 relative rounded-lg bg-slate-900/50 p-1">
+                                    {currentRank?.image ? (
+                                      <Image src={currentRank.image} alt={currentRank.name} fill className="object-contain" unoptimized />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">🎮</div>
+                                    )}
+                                  </div>
+                                  <span className="text-gray-500">→</span>
+                                  <div className="w-10 h-10 relative rounded-lg bg-slate-900/50 p-1">
+                                    {desiredRank?.image ? (
+                                      <Image src={desiredRank.image} alt={desiredRank.name} fill className="object-contain" unoptimized />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">🎮</div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-white font-medium text-sm">{currentRank?.name} → {desiredRank?.name}</p>
+                                  <p className="text-gray-500 text-xs">{request.total_offers_received} offers received</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-green-400 font-bold">${request.customer_offer_price.toFixed(2)}</p>
+                                <p className="text-xs text-gray-500">Your offer</p>
+                              </div>
+                            </div>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Active Orders */}
+                {activeBoostOrders.length > 0 && (
+                  <div>
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <span className="text-cyan-400">🎮</span>
+                      Active Boosts ({activeBoostOrders.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {activeBoostOrders.slice(0, 3).map((order) => {
+                        const currentRank = RANKS_MAP[order.current_rank as RankKey]
+                        const desiredRank = RANKS_MAP[order.desired_rank as RankKey]
+                        const statusConfig = BOOST_STATUS_CONFIG[order.status]
+                        
+                        return (
+                          <Link
+                            key={order.id}
+                            href={`/dashboard/boosts/${order.id}`}
+                            className="block bg-slate-800/50 border border-cyan-500/20 rounded-xl p-4 hover:border-cyan-500/40 transition-all"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-10 h-10 relative rounded-lg bg-slate-900/50 p-1">
+                                    {currentRank?.image ? (
+                                      <Image src={currentRank.image} alt={currentRank.name} fill className="object-contain" unoptimized />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">🎮</div>
+                                    )}
+                                  </div>
+                                  <span className="text-gray-500">→</span>
+                                  <div className="w-10 h-10 relative rounded-lg bg-slate-900/50 p-1">
+                                    {desiredRank?.image ? (
+                                      <Image src={desiredRank.image} alt={desiredRank.name} fill className="object-contain" unoptimized />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">🎮</div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="text-white font-medium text-sm">{currentRank?.name} → {desiredRank?.name}</p>
+                                  <p className="text-gray-500 text-xs">by {order.vendor?.username || 'Booster'}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${statusConfig?.bgColor} ${statusConfig?.color}`}>
+                                  {statusConfig?.label}
+                                </span>
+                                {order.status === 'pending_confirmation' && (
+                                  <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-3 mt-6 pt-4 border-t border-white/10">
+                  <Link
+                    href="/boosting"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-sm hover:shadow-lg hover:shadow-cyan-500/30 transition-all"
+                  >
+                    🎮 Request New Boost
+                  </Link>
+                  <Link
+                    href="/boosting/my-requests"
+                    className="px-4 py-2 rounded-xl bg-slate-700 text-white font-medium text-sm hover:bg-slate-600 transition-all"
+                  >
+                    📋 View All Requests
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Boost CTA if no activity */}
+            {activeBoostOrders.length === 0 && pendingRequests.length === 0 && (
+              <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 backdrop-blur-xl border border-cyan-500/30 rounded-2xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6 lg:mb-8 hover:border-cyan-500/50 transition-all duration-300">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-2xl sm:text-3xl">🎮</span>
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Need a Rank Boost?</h3>
+                      <p className="text-gray-300 text-sm sm:text-base">
+                        Get your dream rank with our professional boosting service. Fast, secure, and affordable.
+                      </p>
+                    </div>
+                  </div>
+                  <Link 
+                    href="/boosting" 
+                    className="w-full md:w-auto bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-6 sm:px-8 lg:px-10 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300 hover:scale-105 whitespace-nowrap text-center"
+                  >
+                    🚀 Get Boosted Now
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* My Orders Section with Pagination */}
             <div id="orders-section" className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6 lg:mb-8 hover:border-purple-500/30 transition-all duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
                 <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
                   <span className="text-purple-400">📦</span>
-                  My Orders
+                  Marketplace Orders
                 </h2>
                 {myOrders.length > 0 && (
                   <span className="text-xs sm:text-sm text-gray-400 bg-white/5 px-2 sm:px-3 py-1 rounded-full self-start sm:self-auto">
