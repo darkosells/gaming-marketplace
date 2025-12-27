@@ -531,44 +531,76 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
   }, [supabase])
 
   const fetchSimilarListings = useCallback(async () => {
-    if (!listing) return
+  if (!listing) return
 
-    try {
-      const { data, error } = await supabase
-        .from('listings')
-        .select(`
-          id,
-          title,
-          price,
-          game,
-          category,
-          image_url,
-          image_urls,
-          profiles (
-            username,
-            average_rating
-          )
-        `)
-        .eq('status', 'active')
-        .gt('stock', 0)
-        .neq('id', listing.id)
-        .or(`game.eq.${listing.game},category.eq.${listing.category}`)
-        .limit(4)
-        .order('created_at', { ascending: false })
+  try {
+    // First: Try to get listings from the SAME GAME
+    const { data: sameGameData, error: sameGameError } = await supabase
+      .from('listings')
+      .select(`
+        id,
+        title,
+        price,
+        game,
+        category,
+        image_url,
+        image_urls,
+        profiles (
+          username,
+          average_rating
+        )
+      `)
+      .eq('status', 'active')
+      .gt('stock', 0)
+      .neq('id', listing.id)
+      .eq('game', listing.game)
+      .limit(4)
+      .order('created_at', { ascending: false })
 
-      if (error) throw error
+    if (sameGameError) throw sameGameError
 
-      const sorted = (data || []).sort((a, b) => {
-        const aScore = (a.game === listing.game ? 2 : 0) + (a.category === listing.category ? 1 : 0)
-        const bScore = (b.game === listing.game ? 2 : 0) + (b.category === listing.category ? 1 : 0)
-        return bScore - aScore
-      })
-
-      setSimilarListings(sorted.slice(0, 4))
-    } catch (error) {
-      console.error('Error fetching similar listings:', error)
+    // If we have 4 same-game listings, we're done
+    if (sameGameData && sameGameData.length >= 4) {
+      setSimilarListings(sameGameData.slice(0, 4))
+      return
     }
-  }, [listing, supabase])
+
+    // Second: If not enough same-game listings, fill with same CATEGORY + same GAME combo
+    const existingIds = (sameGameData || []).map(item => item.id)
+    const remaining = 4 - (sameGameData?.length || 0)
+
+    const { data: sameCategoryData, error: sameCategoryError } = await supabase
+      .from('listings')
+      .select(`
+        id,
+        title,
+        price,
+        game,
+        category,
+        image_url,
+        image_urls,
+        profiles (
+          username,
+          average_rating
+        )
+      `)
+      .eq('status', 'active')
+      .gt('stock', 0)
+      .neq('id', listing.id)
+      .not('id', 'in', `(${existingIds.length > 0 ? existingIds.join(',') : 'null'})`)
+      .eq('category', listing.category)
+      .limit(remaining)
+      .order('created_at', { ascending: false })
+
+    if (sameCategoryError) throw sameCategoryError
+
+    // Combine: Same game first, then same category
+    const combined = [...(sameGameData || []), ...(sameCategoryData || [])]
+    setSimilarListings(combined.slice(0, 4))
+  } catch (error) {
+    console.error('Error fetching similar listings:', error)
+  }
+}, [listing, supabase])
 
   const fetchReviews = useCallback(async () => {
     if (!listing?.seller_id) return
@@ -1298,9 +1330,11 @@ export default function ListingDetailClient({ initialListing, listingId, unavail
                   <div className="space-y-3 sm:space-y-4">
                     {reviews.map((review) => {
                       const rawUsername = review.profiles?.username || 'Anonymous'
-                      const censoredUsername = rawUsername.length > 3 
-                        ? rawUsername.substring(0, 3) + '***' 
-                        : rawUsername
+const censoredUsername = rawUsername.length > 3 
+  ? rawUsername.substring(0, 3) + '***' 
+  : rawUsername.length > 1
+    ? rawUsername.charAt(0) + '*'.repeat(rawUsername.length - 1)
+    : rawUsername
                       
                       return (
                         <div key={review.id} className="bg-white/5 rounded-xl p-3 sm:p-4 hover:bg-white/10 transition">

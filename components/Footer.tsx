@@ -138,7 +138,7 @@ export default function Footer() {
 
       {/* ORIGINAL FOOTER CONTENT - Unchanged */}
       <div className="container mx-auto px-4 py-12">
-        <div className="grid md:grid-cols-4 gap-8 mb-8">
+        <div className="grid md:grid-cols-5 gap-8 mb-8">
           {/* About Section */}
           <div>
             <div className="flex items-center space-x-2 mb-4">
@@ -196,6 +196,30 @@ export default function Footer() {
                   All Items
                 </Link>
               </li>
+            </ul>
+          </div>
+
+          {/* Boosting Section - NEW */}
+          <div>
+            <h4 className="text-white font-semibold mb-4">Boosting</h4>
+            <ul className="space-y-2 text-gray-400 text-sm">
+              <li>
+                <Link href="/boosting" className="hover:text-white transition">
+                  All Boosting Services
+                </Link>
+              </li>
+              <li>
+                <Link href="/boosting/valorant" className="hover:text-white transition flex items-center gap-1.5">
+                  <img src="/game-icons/valorant.svg" alt="Valorant" className="w-4 h-4" />
+                  Valorant Boosting
+                </Link>
+              </li>
+              {/* Add more games as they launch */}
+              {/* <li>
+                <Link href="/boosting/league-of-legends" className="hover:text-white transition">
+                  LoL Boosting
+                </Link>
+              </li> */}
             </ul>
           </div>
 

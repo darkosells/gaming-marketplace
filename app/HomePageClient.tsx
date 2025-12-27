@@ -53,6 +53,36 @@ const popularGames = [
   { name: 'Clash of Clans', icon: '🏰' },
 ]
 
+// Boosting games data
+const boostingGames = [
+  {
+    name: 'Valorant',
+    slug: 'valorant',
+    icon: '/game-icons/valorant.svg',
+    description: 'Iron to Radiant',
+    gradient: 'from-red-500 to-purple-600',
+    status: 'live',
+  },
+  {
+    name: 'League of Legends',
+    slug: 'league-of-legends',
+    icon: '⚔️',
+    description: 'Iron to Challenger',
+    gradient: 'from-blue-500 to-cyan-500',
+    status: 'coming',
+    releaseDate: 'Q1 2025',
+  },
+  {
+    name: 'CS2',
+    slug: 'cs2',
+    icon: '🔫',
+    description: 'Silver to Global',
+    gradient: 'from-orange-500 to-yellow-500',
+    status: 'coming',
+    releaseDate: 'Q1 2025',
+  },
+]
+
 // FAQ Data - Important for SEO
 const faqData = [
   {
@@ -532,6 +562,139 @@ export default function HomePageClient() {
                   </Link>
                   , Nashflare connects you with buyers worldwide.
                 </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* NEW: Boosting Services Section */}
+        <section className="py-12 sm:py-16 lg:py-20" aria-labelledby="boosting-heading">
+          <div className="container mx-auto px-4">
+            <div className="max-w-5xl mx-auto">
+              {/* Section Header */}
+              <div className="text-center mb-8 sm:mb-12">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-red-500/20 to-purple-500/20 border border-red-500/30 mb-4">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  <span className="text-sm font-medium text-gray-300">New Service</span>
+                </div>
+                <h2 id="boosting-heading" className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4">
+                  Professional Game Boosting
+                </h2>
+                <p className="text-gray-400 text-sm sm:text-base max-w-2xl mx-auto">
+                  Rank up faster with verified professional boosters. Secure payments, live tracking, and guaranteed results.
+                </p>
+              </div>
+
+              {/* Boosting Games Grid */}
+              <div className="grid sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
+                {boostingGames.map((game) => (
+                  <Link
+                    key={game.slug}
+                    href={game.status === 'live' ? `/boosting/${game.slug}` : '/boosting'}
+                    className={`
+                      group relative p-5 sm:p-6 rounded-2xl border transition-all duration-300 overflow-hidden
+                      ${game.status === 'live' 
+                        ? 'bg-slate-900/80 border-white/10 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-500/10' 
+                        : 'bg-slate-900/50 border-white/5 opacity-60 cursor-default'
+                      }
+                    `}
+                    onClick={(e) => game.status !== 'live' && e.preventDefault()}
+                  >
+                    {/* Hover glow effect */}
+                    {game.status === 'live' && (
+                      <div className={`absolute inset-0 bg-gradient-to-br ${game.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                    )}
+
+                    {/* Status Badge */}
+                    {game.status === 'live' ? (
+                      <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/20 border border-green-500/30">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                        <span className="text-xs font-medium text-green-400">Live</span>
+                      </div>
+                    ) : (
+                      <div className="absolute top-4 right-4 px-2 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30">
+                        <span className="text-xs font-medium text-yellow-400">Coming Soon</span>
+                      </div>
+                    )}
+
+                    <div className="relative">
+                      {/* Game Icon */}
+                      <div className={`
+                        w-14 h-14 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300
+                        ${game.status === 'live' ? 'group-hover:scale-110' : ''}
+                        ${game.status === 'live' ? `bg-gradient-to-br ${game.gradient}` : 'bg-slate-700/50'}
+                      `}>
+                        {game.icon.startsWith('/') ? (
+                          <img 
+                            src={game.icon} 
+                            alt={game.name}
+                            className={`w-8 h-8 object-contain ${game.status !== 'live' ? 'grayscale' : ''}`}
+                          />
+                        ) : (
+                          <span className={`text-3xl ${game.status !== 'live' ? 'grayscale' : ''}`}>{game.icon}</span>
+                        )}
+                      </div>
+
+                      {/* Game Name */}
+                      <h3 className={`text-xl font-bold mb-1 ${game.status === 'live' ? 'text-white' : 'text-gray-400'}`}>
+                        {game.name}
+                      </h3>
+
+                      {/* Description */}
+                      <p className={`text-sm ${game.status === 'live' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {game.description}
+                      </p>
+
+                      {/* Release Date for coming soon */}
+                      {game.status === 'coming' && game.releaseDate && (
+                        <p className="text-xs text-gray-600 mt-2">{game.releaseDate}</p>
+                      )}
+                    </div>
+
+                    {/* Arrow for live games */}
+                    {game.status === 'live' && (
+                      <div className="absolute bottom-5 right-5 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                        <svg className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </Link>
+                ))}
+              </div>
+
+              {/* Features Row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+                {[
+                  { icon: '🛡️', label: 'Account Safe' },
+                  { icon: '💰', label: 'Money-Back Guarantee' },
+                  { icon: '📊', label: 'Live Tracking' },
+                  { icon: '⚡', label: 'Fast Completion' },
+                ].map((feature) => (
+                  <div key={feature.label} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-slate-900/60 border border-white/10">
+                    <span className="text-lg">{feature.icon}</span>
+                    <span className="text-xs sm:text-sm text-gray-400">{feature.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA Button */}
+              <div className="text-center">
+                <Link
+                  href="/boosting"
+                  className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 rounded-xl bg-gradient-to-r from-red-600 to-purple-600 hover:from-red-500 hover:to-purple-500 text-white font-bold text-base sm:text-lg shadow-lg shadow-red-500/25 transition-all duration-300 hover:scale-105"
+                >
+                  <span>Explore Boosting Services</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </Link>
               </div>
             </div>
           </div>

@@ -178,14 +178,16 @@ export default function SellerProfilePage() {
   }
 
   const censorUsername = (username: string) => {
-    if (!username || username.length <= 3) return username
-    
-    const firstTwo = username.substring(0, 2)
-    const lastOne = username.substring(username.length - 1)
-    const middle = '*'.repeat(Math.min(username.length - 3, 4))
-    
-    return `${firstTwo}${middle}${lastOne}`
+  if (!username) return username
+  
+  // For short usernames (3 or fewer chars), show first char + asterisks
+  if (username.length <= 3) {
+    return username.charAt(0) + '*'.repeat(username.length - 1)
   }
+  
+  // For longer usernames, show first 3 chars + ***
+  return username.substring(0, 3) + '***'
+}
 
   const getListingImage = (listing: Listing) => {
     if (listing.image_urls && listing.image_urls.length > 0) {
