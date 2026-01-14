@@ -78,6 +78,19 @@ const blogPosts = [
     slug: 'valorant-skins-investment-guide-2025',
     lastModified: '2025-12-25',
   },
+  // New blog posts added January 2025
+  {
+    slug: 'clash-of-clans-account-buying-guide-2025',
+    lastModified: '2025-01-14',
+  },
+  {
+    slug: 'roblox-adopt-me-pet-value-guide-2025',
+    lastModified: '2025-01-14',
+  },
+  {
+    slug: 'best-gaming-marketplace-2025',
+    lastModified: '2025-01-14',
+  },
 ]
 
 // Product categories with their slugs
