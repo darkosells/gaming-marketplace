@@ -31,7 +31,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
-  const title = `Buy ${game.name} Accounts, Items & Currency`
+  // Use custom seoTitle if available, otherwise use default format
+  const title = game.seoTitle || `Buy ${game.name} Accounts, Items & Currency`
   const description = game.description
 
   return {
