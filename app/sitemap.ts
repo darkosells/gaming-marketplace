@@ -91,6 +91,19 @@ const blogPosts = [
     slug: 'best-gaming-marketplace-2025',
     lastModified: '2025-01-14',
   },
+  // New blog posts added February 2025
+  {
+    slug: 'clash-royale-account-buying-guide-2025',
+    lastModified: '2025-02-01',
+  },
+  {
+    slug: 'steam-account-game-keys-guide-2025',
+    lastModified: '2025-02-01',
+  },
+  {
+    slug: 'how-much-is-my-gta-5-account-worth',
+    lastModified: '2025-02-01',
+  },
 ]
 
 // Product categories with their slugs

@@ -81,7 +81,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-// Dynamic content loader - ALL 19 POSTS
+// Dynamic content loader - ALL 22 POSTS
 async function getPostContent(slug: string): Promise<string | null> {
   try {
     switch (slug) {
@@ -128,6 +128,13 @@ async function getPostContent(slug: string): Promise<string | null> {
         return (await import('@/lib/blog/content/roblox-adopt-me-pet-value-guide-2025')).content
       case 'best-gaming-marketplace-2025':
         return (await import('@/lib/blog/content/best-gaming-marketplace-2025')).content
+      // 3 NEW POSTS - FEBRUARY 2025
+      case 'clash-royale-account-buying-guide-2025':
+        return (await import('@/lib/blog/content/clash-royale-account-buying-guide-2025')).content
+      case 'steam-account-game-keys-guide-2025':
+        return (await import('@/lib/blog/content/steam-account-game-keys-guide-2025')).content
+      case 'how-much-is-my-gta-5-account-worth':
+        return (await import('@/lib/blog/content/how-much-is-my-gta-5-account-worth')).content
       default:
         return null
     }

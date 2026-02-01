@@ -254,6 +254,46 @@ export const blogPostsMeta: BlogPostMeta[] = [
     tags: ['Gaming Marketplace', 'Nashflare', 'G2G', 'Eldorado', 'Comparison', 'Buyer Protection', 'Safe Trading'],
     relevantCategories: ['account', 'items', 'currency', 'key'],
   },
+  // 3 NEW POSTS - FEBRUARY 2025
+  {
+    slug: 'clash-royale-account-buying-guide-2025',
+    title: 'Clash Royale Account Buying Guide 2025: Everything You Need to Know',
+    excerpt: 'Complete guide to buying Clash Royale accounts. Learn about card levels, trophy ranges, champion cards, pricing, and how to avoid scams when purchasing.',
+    category: 'Buyers Guide',
+    game: 'Clash Royale',
+    author: 'Nashflare Team',
+    date: '2025-02-01',
+    readTime: '18 min read',
+    image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=1200&auto=format&fit=crop',
+    tags: ['Clash Royale', 'Buying Guide', 'Account', 'Champion Cards', 'Trophy Pushing', 'CR'],
+    relevantCategories: ['account', 'currency'],
+  },
+  {
+    slug: 'steam-account-game-keys-guide-2025',
+    title: 'Steam Account & Game Keys Guide 2025: Everything You Need to Know',
+    excerpt: 'Complete guide to buying Steam accounts and game keys. Learn about CS2 Prime, Dota 2 cosmetics, game library values, and safe purchasing practices.',
+    category: 'Buyers Guide',
+    game: 'Steam',
+    author: 'Nashflare Team',
+    date: '2025-02-01',
+    readTime: '24 min read',
+    image: 'https://images.unsplash.com/photo-1593305841991-05c297ba4575?w=1200&auto=format&fit=crop',
+    tags: ['Steam', 'Game Keys', 'CS2', 'Dota 2', 'PC Gaming', 'Buying Guide'],
+    relevantCategories: ['account', 'key'],
+  },
+  {
+    slug: 'how-much-is-my-gta-5-account-worth',
+    title: 'How Much Is My GTA 5 Account Worth? Complete Valuation Guide 2025',
+    excerpt: 'Calculate your GTA 5 account value with our comprehensive pricing guide. From money and rank to modded vehicles and properties, know exactly what your account is worth.',
+    category: 'Valuation',
+    game: 'GTA 5',
+    author: 'Nashflare Team',
+    date: '2025-02-01',
+    readTime: '21 min read',
+    image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1200&auto=format&fit=crop',
+    tags: ['GTA 5', 'Account Value', 'Pricing', 'Modded Vehicles', 'F1 Wheels', 'GTA Online'],
+    relevantCategories: ['account', 'items'],
+  },
 ]
 
 // Helper functions
@@ -288,4 +328,4 @@ export function getAllSlugs(): string[] {
 
 // Filter options
 export const categories = ['All', 'Guides', 'Buyers Guide', 'Sellers Guide', 'Education', 'Investment', 'Safety', 'Reviews', 'Valuation']
-export const popularGames = ['All Games', 'Fortnite', 'Valorant', 'GTA 5', 'League of Legends', 'Roblox', 'Clash of Clans', 'General']
+export const popularGames = ['All Games', 'Fortnite', 'Valorant', 'GTA 5', 'League of Legends', 'Roblox', 'Clash of Clans', 'Clash Royale', 'Steam', 'General']
