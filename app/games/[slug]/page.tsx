@@ -11,6 +11,7 @@ import GamePageClient from './GamePageClient'
 
 interface Props {
   params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 // Generate static paths for all games (optional but good for performance)
@@ -19,9 +20,49 @@ export async function generateStaticParams() {
   return slugs.map((slug) => ({ slug }))
 }
 
-// Generate dynamic metadata for each game
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+// Category-specific SEO title templates
+function getCategoryTitle(gameName: string, category: string, customSeoTitle?: string): string {
+  // If there's a custom SEO title and no category filter, use it
+  if (!category && customSeoTitle) {
+    return customSeoTitle
+  }
+
+  // Category-specific titles
+  switch (category) {
+    case 'account':
+      return customSeoTitle || `${gameName} Accounts for Sale - Buy Verified ${gameName} Accounts`
+    case 'items':
+      return `${gameName} Items for Sale - Buy In-Game Items & Collectibles`
+    case 'currency':
+      return `${gameName} Currency - Buy In-Game Money & Credits | Instant Delivery`
+    case 'key':
+      return `${gameName} Game Keys - Steam Keys & Activation Codes for Sale`
+    default:
+      // No category filter - show general marketplace
+      return `${gameName} Marketplace - Accounts, Items, Currency & Keys | Nashflare`
+  }
+}
+
+// Category-specific SEO descriptions
+function getCategoryDescription(gameName: string, category: string, defaultDescription: string): string {
+  switch (category) {
+    case 'account':
+      return `Buy verified ${gameName} accounts with 48-hour buyer protection. Browse accounts from trusted sellers with secure payments and instant delivery.`
+    case 'items':
+      return `Shop ${gameName} in-game items and collectibles. Find rare items, skins, and exclusive content from verified sellers with buyer protection.`
+    case 'currency':
+      return `Buy ${gameName} in-game currency with instant delivery. Safe and secure transactions with 48-hour buyer protection on all orders.`
+    case 'key':
+      return `Purchase ${gameName} game keys and activation codes. Instant delivery of Steam keys and CD keys from verified sellers.`
+    default:
+      return defaultDescription
+  }
+}
+
+// Generate dynamic metadata for each game with category support
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params
+  const resolvedSearchParams = await searchParams
   const game = getGameBySlug(slug)
 
   if (!game) {
@@ -31,9 +72,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
-  // Use custom seoTitle if available, otherwise use default format
-  const title = game.seoTitle || `Buy ${game.name} Accounts, Items & Currency`
-  const description = game.description
+  // Get category from query params
+  const category = typeof resolvedSearchParams.category === 'string' ? resolvedSearchParams.category : ''
+  
+  // Generate category-specific title and description
+  const title = getCategoryTitle(game.name, category, game.seoTitle)
+  const description = getCategoryDescription(game.name, category, game.description)
+
+  // Build canonical URL (include category in canonical if present)
+  const canonicalUrl = category 
+    ? `${siteConfig.url}/games/${slug}?category=${category}`
+    : `${siteConfig.url}/games/${slug}`
 
   return {
     title,
@@ -43,6 +92,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       `buy ${game.name.toLowerCase()}`,
       `${game.name.toLowerCase()} marketplace`,
       `${game.name.toLowerCase()} trading`,
+      ...(category === 'account' ? [`${game.name.toLowerCase()} accounts for sale`, `buy ${game.name.toLowerCase()} account`] : []),
+      ...(category === 'items' ? [`${game.name.toLowerCase()} items for sale`, `buy ${game.name.toLowerCase()} items`] : []),
+      ...(category === 'currency' ? [`${game.name.toLowerCase()} currency`, `buy ${game.name.toLowerCase()} money`] : []),
+      ...(category === 'key' ? [`${game.name.toLowerCase()} keys`, `${game.name.toLowerCase()} steam key`] : []),
       'gaming marketplace',
       'verified sellers',
       'buyer protection',
@@ -50,7 +103,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${title} | ${siteConfig.name}`,
       description,
-      url: `${siteConfig.url}/games/${slug}`,
+      url: canonicalUrl,
       siteName: siteConfig.name,
       images: [
         {
@@ -71,7 +124,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       creator: siteConfig.twitterHandle,
     },
     alternates: {
-      canonical: `${siteConfig.url}/games/${slug}`,
+      canonical: canonicalUrl,
     },
   }
 }
